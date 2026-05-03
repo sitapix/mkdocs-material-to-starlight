@@ -111,3 +111,64 @@ describe('runWizard — Tier 1 conditional (content.tabs.link → tabs prompt)',
     expect(prompter.calls.some((c) => c.message.toLowerCase().includes('tab'))).toBe(false);
   });
 });
+
+describe('runWizard — additional Tier 1 prompts', () => {
+  it('asks sidebar-topics when navigation.tabs is detected', async () => {
+    const plan = makePlan({
+      theme: { name: 'material', options: { features: ['navigation.tabs'] } },
+    });
+    const defaults = deriveDefaults(plan.config, { userAgent: undefined, env: {} });
+    const prompter = createFakePrompter({
+      text: ['/o'],
+      confirm: [true, true, true], // check, sidebar-topics, proceed
+      select: ['npm', 'apply'],
+    });
+    const result = await runWizard({
+      projectDir: '/p',
+      plan,
+      defaults,
+      prompter,
+    });
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.value.sidebarTopics).toBe(true);
+    expect(
+      prompter.calls.some((c) => c.message.toLowerCase().includes('topics')),
+    ).toBe(true);
+  });
+
+  it('asks rss confirmation when rss plugin is present', async () => {
+    const plan = makePlan({ plugins: [{ name: 'rss', options: {} }] });
+    const defaults = deriveDefaults(plan.config, { userAgent: undefined, env: {} });
+    const prompter = createFakePrompter({
+      text: ['/o'],
+      confirm: [true, true, true], // check, rss, proceed
+      select: ['npm', 'apply'],
+    });
+    const result = await runWizard({
+      projectDir: '/p',
+      plan,
+      defaults,
+      prompter,
+    });
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.value.rss).toBe(true);
+  });
+
+  it('asks i18n locale multiselect when i18n plugin is present', async () => {
+    const plan = makePlan({ plugins: [{ name: 'i18n', options: {} }] });
+    const planWithLocales: ConversionPlan = {
+      ...plan,
+      detectedLocales: ['en', 'fr', 'de'],
+    };
+    const defaults = deriveDefaults(plan.config, { userAgent: undefined, env: {} });
+    const prompter = createFakePrompter({
+      text: ['/o'],
+      confirm: [true, true],
+      select: ['npm', 'apply'],
+      multiselect: [['en', 'fr']],
+    });
+    const result = await runWizard({ plan: planWithLocales, projectDir: '/p', defaults, prompter });
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.value.locales).toEqual(['en', 'fr']);
+  });
+});
