@@ -20,6 +20,38 @@ export type Command =
       readonly dryRun: boolean;
       readonly check: boolean;
       readonly checkTimeoutMs: number | null;
+      // wizard surface
+      readonly yes: boolean;
+      readonly noInteractive: boolean;
+      readonly ci: boolean;
+      readonly force: boolean;
+      readonly quiet: boolean;
+      readonly json: boolean;
+      readonly color: boolean | null;
+      readonly packageManager: 'npm' | 'pnpm' | 'yarn' | 'bun' | null;
+      readonly tabs: 'mdx' | 'html' | null;
+      readonly sidebarTopics: boolean | null;
+      readonly rss: boolean | null;
+      readonly mikeVersions: ReadonlyArray<string>;
+      readonly palette: 'translate' | 'skip' | 'custom' | null;
+      readonly extraAssets: ReadonlyArray<string>;
+      readonly locales: ReadonlyArray<string>;
+      readonly snippetMaxDepth: number | null;
+      readonly snippetDedentSubsections: boolean;
+      readonly linksValidator: boolean | null;
+      readonly expressiveCodeTheme: string | null;
+      readonly cards: 'mdx' | 'html' | 'skip' | null;
+      readonly mdxMode: 'auto' | 'always' | 'never' | null;
+      readonly logoReplacesTitle: boolean;
+      readonly admonitionMapPath: string | null;
+      readonly keepExplicitHeadingIds: boolean;
+      readonly noSmartSymbols: boolean;
+      readonly noEmojiShortcodes: boolean;
+      readonly noInlineMarks: boolean;
+      readonly noAutoAppend: boolean;
+      readonly suppressRules: ReadonlyArray<string>;
+      readonly configFormat: 'mjs' | 'ts' | null;
+      readonly packageName: string | null;
     }
   | { readonly kind: 'explain'; readonly projectDir: string }
   | {
@@ -32,14 +64,55 @@ export type Command =
     };
 
 const CONVERT_OPTIONS = {
+  // help / version
   help: { type: 'boolean', short: 'h' },
   version: { type: 'boolean' },
+  // existing
   'snippet-base-path': { type: 'string', multiple: true },
   'dry-run': { type: 'boolean' },
   explain: { type: 'boolean' },
   check: { type: 'boolean' },
+  'no-check': { type: 'boolean' },
   'check-timeout': { type: 'string' },
-  yes: { type: 'boolean', short: 'y' }, // reserved for wizard tasks; no-op here
+  // global wizard surface
+  yes: { type: 'boolean', short: 'y' },
+  'no-interactive': { type: 'boolean' },
+  ci: { type: 'boolean' },
+  force: { type: 'boolean', short: 'f' },
+  quiet: { type: 'boolean', short: 'q' },
+  json: { type: 'boolean' },
+  color: { type: 'boolean' },
+  'no-color': { type: 'boolean' },
+  dir: { type: 'string', short: 'C' },
+  'package-manager': { type: 'string' },
+  // Tier 1
+  tabs: { type: 'string' },
+  'sidebar-topics': { type: 'boolean' },
+  'no-sidebar-topics': { type: 'boolean' },
+  rss: { type: 'boolean' },
+  'no-rss': { type: 'boolean' },
+  'mike-versions': { type: 'string', multiple: true },
+  palette: { type: 'string' },
+  'extra-asset': { type: 'string', multiple: true },
+  locale: { type: 'string', multiple: true },
+  'snippet-max-depth': { type: 'string' },
+  'snippet-dedent-subsections': { type: 'boolean' },
+  // Tier 2
+  'links-validator': { type: 'boolean' },
+  'no-links-validator': { type: 'boolean' },
+  'expressive-code-theme': { type: 'string' },
+  cards: { type: 'string' },
+  'mdx-mode': { type: 'string' },
+  'logo-replaces-title': { type: 'boolean' },
+  'admonition-map': { type: 'string' },
+  'keep-explicit-heading-ids': { type: 'boolean' },
+  'no-smart-symbols': { type: 'boolean' },
+  'no-emoji-shortcodes': { type: 'boolean' },
+  'no-inline-marks': { type: 'boolean' },
+  'no-auto-append': { type: 'boolean' },
+  suppress: { type: 'string', multiple: true },
+  'config-format': { type: 'string' },
+  'package-name': { type: 'string' },
 } as const;
 
 const COMPARE_OPTIONS = {
@@ -108,15 +181,173 @@ function parseConvertArgs(argv: ReadonlyArray<string>): Command {
       ? null
       : (Array.isArray(snippetBasePathsRaw) ? (snippetBasePathsRaw as ReadonlyArray<string>) : null);
 
+  if (parsed.values.check === true && parsed.values['no-check'] === true) {
+    return { kind: 'error', message: '--check and --no-check are mutually exclusive' };
+  }
+  const check = parsed.values.check === true
+    ? true
+    : parsed.values['no-check'] === true
+      ? false
+      : false;
+
+  const dirOverride = (parsed.values.dir as string | undefined) ?? null;
+
+  let snippetMaxDepth: number | null = null;
+  const sm = parsed.values['snippet-max-depth'];
+  if (sm !== undefined) {
+    const n = Number(sm);
+    if (!Number.isFinite(n) || !Number.isInteger(n) || n <= 0) {
+      return { kind: 'error', message: `--snippet-max-depth must be a positive integer (got "${sm}")` };
+    }
+    snippetMaxDepth = n;
+  }
+
+  const wizardResult = resolveWizardFlags(parsed.values);
+  if (wizardResult.kind === 'error') return wizardResult;
+
   return {
     kind: 'convert',
     projectDir: positionals[0] ?? '',
-    outputDir: positionals[1] ?? '',
+    outputDir: dirOverride ?? positionals[1] ?? '',
     snippetBasePaths,
     dryRun: parsed.values['dry-run'] === true,
-    check: parsed.values.check === true,
+    check,
     checkTimeoutMs,
+    yes: parsed.values.yes === true,
+    noInteractive: parsed.values['no-interactive'] === true,
+    ci: parsed.values.ci === true,
+    force: parsed.values.force === true,
+    quiet: parsed.values.quiet === true,
+    json: parsed.values.json === true,
+    color:
+      parsed.values.color === true ? true :
+      parsed.values['no-color'] === true ? false : null,
+    packageManager: wizardResult.packageManager,
+    tabs: wizardResult.tabs,
+    sidebarTopics: resolveBoolPair(
+      parsed.values['sidebar-topics'] as boolean | undefined,
+      parsed.values['no-sidebar-topics'] as boolean | undefined,
+    ),
+    rss: resolveBoolPair(
+      parsed.values.rss as boolean | undefined,
+      parsed.values['no-rss'] as boolean | undefined,
+    ),
+    mikeVersions: (parsed.values['mike-versions'] as string[] | undefined) ?? [],
+    palette: wizardResult.palette,
+    extraAssets: (parsed.values['extra-asset'] as string[] | undefined) ?? [],
+    locales: (parsed.values.locale as string[] | undefined) ?? [],
+    snippetMaxDepth,
+    snippetDedentSubsections: parsed.values['snippet-dedent-subsections'] === true,
+    linksValidator: resolveBoolPair(
+      parsed.values['links-validator'] as boolean | undefined,
+      parsed.values['no-links-validator'] as boolean | undefined,
+    ),
+    expressiveCodeTheme: (parsed.values['expressive-code-theme'] as string | undefined) ?? null,
+    cards: wizardResult.cards,
+    mdxMode: wizardResult.mdxMode,
+    logoReplacesTitle: parsed.values['logo-replaces-title'] === true,
+    admonitionMapPath: (parsed.values['admonition-map'] as string | undefined) ?? null,
+    keepExplicitHeadingIds: parsed.values['keep-explicit-heading-ids'] === true,
+    noSmartSymbols: parsed.values['no-smart-symbols'] === true,
+    noEmojiShortcodes: parsed.values['no-emoji-shortcodes'] === true,
+    noInlineMarks: parsed.values['no-inline-marks'] === true,
+    noAutoAppend: parsed.values['no-auto-append'] === true,
+    suppressRules: (parsed.values.suppress as string[] | undefined) ?? [],
+    configFormat: wizardResult.configFormat,
+    packageName: (parsed.values['package-name'] as string | undefined) ?? null,
   };
+}
+
+type ParsedValues = ReturnType<typeof nodeParseArgs>['values'];
+
+type WizardFlagsResult =
+  | {
+      kind: 'ok';
+      packageManager: 'npm' | 'pnpm' | 'yarn' | 'bun' | null;
+      tabs: 'mdx' | 'html' | null;
+      palette: 'translate' | 'skip' | 'custom' | null;
+      cards: 'mdx' | 'html' | 'skip' | null;
+      mdxMode: 'auto' | 'always' | 'never' | null;
+      configFormat: 'mjs' | 'ts' | null;
+    }
+  | { kind: 'error'; message: string };
+
+function resolveWizardFlags(values: ParsedValues): WizardFlagsResult {
+  const pmResult = parseEnum(
+    values['package-manager'] as string | undefined,
+    ['npm', 'pnpm', 'yarn', 'bun'] as const,
+    '--package-manager',
+  );
+  if (!pmResult.ok) return { kind: 'error', message: pmResult.message };
+
+  const tabsResult = parseEnum(
+    values['tabs'] as string | undefined,
+    ['mdx', 'html'] as const,
+    '--tabs',
+  );
+  if (!tabsResult.ok) return { kind: 'error', message: tabsResult.message };
+
+  const paletteResult = parseEnum(
+    values['palette'] as string | undefined,
+    ['translate', 'skip', 'custom'] as const,
+    '--palette',
+  );
+  if (!paletteResult.ok) return { kind: 'error', message: paletteResult.message };
+
+  const cardsResult = parseEnum(
+    values['cards'] as string | undefined,
+    ['mdx', 'html', 'skip'] as const,
+    '--cards',
+  );
+  if (!cardsResult.ok) return { kind: 'error', message: cardsResult.message };
+
+  const mdxModeResult = parseEnum(
+    values['mdx-mode'] as string | undefined,
+    ['auto', 'always', 'never'] as const,
+    '--mdx-mode',
+  );
+  if (!mdxModeResult.ok) return { kind: 'error', message: mdxModeResult.message };
+
+  const configFormatResult = parseEnum(
+    values['config-format'] as string | undefined,
+    ['mjs', 'ts'] as const,
+    '--config-format',
+  );
+  if (!configFormatResult.ok) return { kind: 'error', message: configFormatResult.message };
+
+  return {
+    kind: 'ok',
+    packageManager: pmResult.value,
+    tabs: tabsResult.value,
+    palette: paletteResult.value,
+    cards: cardsResult.value,
+    mdxMode: mdxModeResult.value,
+    configFormat: configFormatResult.value,
+  };
+}
+
+function parseEnum<T extends string>(
+  raw: string | undefined,
+  allowed: ReadonlyArray<T>,
+  flag: string,
+): { ok: true; value: T | null } | { ok: false; message: string } {
+  if (raw === undefined) return { ok: true, value: null };
+  if ((allowed as ReadonlyArray<string>).includes(raw)) {
+    return { ok: true, value: raw as T };
+  }
+  return {
+    ok: false,
+    message: `${flag} must be one of ${allowed.join('|')} (got "${raw}")`,
+  };
+}
+
+function resolveBoolPair(
+  on: boolean | undefined,
+  off: boolean | undefined,
+): boolean | null {
+  if (on === true) return true;
+  if (off === true) return false;
+  return null;
 }
 
 function parseCompareArgs(argv: ReadonlyArray<string>): Command {

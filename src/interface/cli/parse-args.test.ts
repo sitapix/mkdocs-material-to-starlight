@@ -25,6 +25,37 @@ describe('parseArgs', () => {
       dryRun: false,
       check: false,
       checkTimeoutMs: null,
+      yes: false,
+      noInteractive: false,
+      ci: false,
+      force: false,
+      quiet: false,
+      json: false,
+      color: null,
+      packageManager: null,
+      tabs: null,
+      sidebarTopics: null,
+      rss: null,
+      mikeVersions: [],
+      palette: null,
+      extraAssets: [],
+      locales: [],
+      snippetMaxDepth: null,
+      snippetDedentSubsections: false,
+      linksValidator: null,
+      expressiveCodeTheme: null,
+      cards: null,
+      mdxMode: null,
+      logoReplacesTitle: false,
+      admonitionMapPath: null,
+      keepExplicitHeadingIds: false,
+      noSmartSymbols: false,
+      noEmojiShortcodes: false,
+      noInlineMarks: false,
+      noAutoAppend: false,
+      suppressRules: [],
+      configFormat: null,
+      packageName: null,
     });
   });
 
@@ -191,5 +222,64 @@ describe('parseArgs', () => {
     // -y currently sets no field but must not cause an "unknown option" error.
     const result = parseArgs(['./project', './output', '-y']);
     expect(result.kind).toBe('convert');
+  });
+});
+
+describe('parseArgs — wizard flag surface', () => {
+  it('parses --no-check (negation)', () => {
+    const r = parseArgs(['./p', './o', '--no-check']);
+    expect(r.kind).toBe('convert');
+    if (r.kind === 'convert') expect(r.check).toBe(false);
+  });
+
+  it('parses --tabs=mdx and --tabs=html', () => {
+    const a = parseArgs(['./p', './o', '--tabs=mdx']);
+    expect(a.kind).toBe('convert');
+    if (a.kind === 'convert') expect(a.tabs).toBe('mdx');
+    const b = parseArgs(['./p', './o', '--tabs=html']);
+    if (b.kind === 'convert') expect(b.tabs).toBe('html');
+  });
+
+  it('rejects invalid --tabs value', () => {
+    const r = parseArgs(['./p', './o', '--tabs=bogus']);
+    expect(r.kind).toBe('error');
+  });
+
+  it('parses repeated --suppress', () => {
+    const r = parseArgs(['./p', './o', '--suppress=a', '--suppress=b']);
+    expect(r.kind).toBe('convert');
+    if (r.kind === 'convert') expect(r.suppressRules).toEqual(['a', 'b']);
+  });
+
+  it('parses --yes and --force as short aliases too', () => {
+    const r = parseArgs(['./p', './o', '-y', '-f']);
+    expect(r.kind).toBe('convert');
+    if (r.kind === 'convert') {
+      expect(r.yes).toBe(true);
+      expect(r.force).toBe(true);
+    }
+  });
+
+  it('parses --json + --quiet', () => {
+    const r = parseArgs(['./p', './o', '--json', '-q']);
+    expect(r.kind).toBe('convert');
+    if (r.kind === 'convert') {
+      expect(r.json).toBe(true);
+      expect(r.quiet).toBe(true);
+    }
+  });
+
+  it('parses --no-color and --color', () => {
+    const a = parseArgs(['./p', './o', '--no-color']);
+    expect(a.kind).toBe('convert');
+    if (a.kind === 'convert') expect(a.color).toBe(false);
+    const b = parseArgs(['./p', './o', '--color']);
+    if (b.kind === 'convert') expect(b.color).toBe(true);
+  });
+
+  it('parses --package-manager pnpm', () => {
+    const r = parseArgs(['./p', './o', '--package-manager=pnpm']);
+    expect(r.kind).toBe('convert');
+    if (r.kind === 'convert') expect(r.packageManager).toBe('pnpm');
   });
 });
