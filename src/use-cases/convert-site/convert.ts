@@ -21,7 +21,7 @@
 
 import { ok, err, type Result } from '../../domain/result.js';
 import type { FileSystem } from '../../domain/ports/file-system.js';
-import type { Diagnostic } from '../../domain/diagnostics/diagnostic.js';
+import { createDiagnostic, type Diagnostic } from '../../domain/diagnostics/diagnostic.js';
 import type { RepoContext } from '../../domain/config/repo-context.js';
 import { buildSlugMap, type SlugMap } from '../../domain/starlight/slug-map.js';
 import { convertFile } from '../convert-file/convert.js';
@@ -40,6 +40,7 @@ import { normalizeMkdocstringsCrossRefs } from '../normalize/mkdocstrings-crossr
 import { normalizeLinkAttrLists } from '../normalize/link-attr-list.js';
 import { normalizeContentTabs } from '../normalize/content-tabs.js';
 import { normalizePackageManagerTabs } from '../normalize/package-manager-tabs.js';
+import { detectLandingPage } from '../transform/landing-page.js';
 
 export interface ConvertSiteInput {
   readonly docsDir: string;
@@ -198,6 +199,22 @@ export async function convertSite(
       for (const diagnostic of expansion.diagnostics) {
         diagnostics.push({ sourcePath, diagnostic });
       }
+    }
+
+    // Detect landing-style root index.md and rewrite to Starlight splash template.
+    // Runs after all text expansion so the final Markdown content is available.
+    const landingResult = detectLandingPage(source, sourcePath);
+    if (landingResult.isLanding) {
+      source = landingResult.text;
+      diagnostics.push({
+        sourcePath,
+        diagnostic: createDiagnostic({
+          severity: 'info',
+          ruleId: 'landing-page-promoted',
+          source: 'convert-site/landing-page',
+          message: `Landing-style index.md detected and rewritten to Starlight template: splash with hero: frontmatter block. Review the generated hero.title, hero.tagline, hero.image, and hero.actions fields in the output.`,
+        }),
+      });
     }
 
     // Detect package-manager tab groups (npm/yarn/pnpm/bun) and promote them
