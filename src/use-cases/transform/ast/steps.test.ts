@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { promoteSteps, type StepsResult } from './steps.js';
+import { promoteSteps } from './steps.js';
 
 describe('promoteSteps', () => {
   describe('positive — promotes qualifying ordered lists', () => {

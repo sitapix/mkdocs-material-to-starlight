@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { normalizeFileTrees, type FileTreeResult } from './file-tree.js';
+import { normalizeFileTrees } from './file-tree.js';
 
 const ASCII_TREE = [
   '```',
