@@ -113,7 +113,11 @@ function renderCardGrid(
   const items = splitListItems(bodyLines);
   for (const item of items) {
     out.push(`${indent}:::card`);
-    for (const line of item) {
+    // Dedent the card body to remove excess leading whitespace. Without
+    // dedenting, lines with 4+ spaces of indent are treated as CommonMark
+    // indented code blocks, turning list-of-links card bodies into code fences.
+    const dedented = dedentLines(item);
+    for (const line of dedented) {
       out.push(line.length === 0 ? '' : `${indent}${line}`);
     }
     out.push(`${indent}:::`);
@@ -174,4 +178,19 @@ function trimTrailingBlanks(item: ReadonlyArray<string>): ReadonlyArray<string> 
     end -= 1;
   }
   return item.slice(0, end);
+}
+
+/**
+ * Strip the common leading indentation from all non-blank lines so card body
+ * content starts at column 0. This prevents 4-space-indented lines from being
+ * misread as CommonMark indented code blocks.
+ */
+function dedentLines(lines: ReadonlyArray<string>): ReadonlyArray<string> {
+  const nonBlank = lines.filter((l) => l.trim().length > 0);
+  if (nonBlank.length === 0) return lines;
+  const minIndent = Math.min(
+    ...nonBlank.map((l) => (l.match(/^ */)?.[0] ?? '').length),
+  );
+  if (minIndent === 0) return lines;
+  return lines.map((l) => (l.trim().length === 0 ? '' : l.slice(minIndent)));
 }

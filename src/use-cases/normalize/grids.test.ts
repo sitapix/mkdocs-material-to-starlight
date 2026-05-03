@@ -132,4 +132,40 @@ describe('normalizeCardGrids', () => {
     const once = normalizeCardGrids(src);
     expect(normalizeCardGrids(once)).toBe(once);
   });
+
+  it('dedents card body so inner list items are not treated as indented code', () => {
+    // When a card has nested list items, the body lines may carry leading
+    // whitespace that exceeds 4 spaces (CommonMark indented-code threshold).
+    // The normalizer must dedent each card's body to remove this excess.
+    const src = [
+      '<div class="grid cards" markdown>',
+      '',
+      '*   Field validators',
+      '',
+      '    ---',
+      '',
+      '    * [field after](#field-after)',
+      '    * [field before](#field-before)',
+      '',
+      '</div>',
+      '',
+    ].join('\n');
+    const out = normalizeCardGrids(src);
+    // After normalization, no line inside a :::card block should have
+    // 4+ spaces of leading indentation (which would trigger code blocks).
+    const cardLines = out.split('\n');
+    const inCard: string[] = [];
+    let inside = false;
+    for (const line of cardLines) {
+      if (line === ':::card') { inside = true; continue; }
+      if (line === ':::') { inside = false; continue; }
+      if (inside) inCard.push(line);
+    }
+    // None of the body lines should have 4+ spaces of leading indent
+    // (which CommonMark interprets as an indented code block).
+    const codeLikeLines = inCard.filter((l) => /^ {4,}\S/.test(l));
+    expect(codeLikeLines).toHaveLength(0);
+    // The links should be present and accessible
+    expect(out).toContain('[field after](#field-after)');
+  });
 });
