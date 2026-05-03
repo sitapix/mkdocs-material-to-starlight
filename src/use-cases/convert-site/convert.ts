@@ -33,6 +33,7 @@ import { validateJsxComponents } from '../validate-output/jsx-components.js';
 import { renameI18nPath } from '../detect-features/i18n-rename.js';
 import { expandIncludeMarkdown } from '../include-markdown/expand.js';
 import { scanMacroOccurrences } from '../detect-macros/scan.js';
+import { scanMacroExpressions } from '../detect-macros/scan-expressions.js';
 import { normalizeTyperSnippetDirectives } from '../normalize/typer-snippet-directives.js';
 
 export interface ConvertSiteInput {
@@ -127,6 +128,13 @@ export async function convertSite(
     const snippetResult = normalizeTyperSnippetDirectives(source);
     source = snippetResult.text;
     for (const diagnostic of snippetResult.diagnostics) {
+      diagnostics.push({ sourcePath, diagnostic });
+    }
+    // Unconditionally scan for {{ expr }} expressions outside code fences.
+    // Runs on the original source so line numbers match the user's file.
+    // This covers projects (like pydantic) that use macro syntax without
+    // declaring the macros plugin in mkdocs.yml.
+    for (const diagnostic of scanMacroExpressions(read.value)) {
       diagnostics.push({ sourcePath, diagnostic });
     }
     if (input.macrosScanEnabled === true) {
