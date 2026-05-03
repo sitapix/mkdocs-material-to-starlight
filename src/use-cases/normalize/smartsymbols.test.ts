@@ -74,4 +74,23 @@ describe('normalizeSmartSymbols', () => {
     const src = '---\n';
     expect(normalizeSmartSymbols(src)).toBe(src);
   });
+
+  it('preserves HTML comment delimiters <!-- ... --> intact', () => {
+    // The `-->` inside an HTML comment is a comment terminator, NOT an arrow.
+    // SmartSymbols must not convert `-->` to `→` when it is preceded by `-`.
+    const src = '<!-- only-mkdocs -->\n\nNormal text -- prose dash.\n';
+    const out = normalizeSmartSymbols(src);
+    // HTML comment must be preserved verbatim.
+    expect(out).toContain('<!-- only-mkdocs -->');
+    expect(out).not.toContain('<!-- only-mkdocs →');
+  });
+
+  it('still converts --> in prose after preserving HTML comments', () => {
+    // Both rules must coexist: HTML comment terminators preserved, prose
+    // arrows still converted.
+    const src = 'Step A --> Step B.\n\n<!-- metadata -->\n';
+    const out = normalizeSmartSymbols(src);
+    expect(out).toContain('Step A → Step B.');
+    expect(out).toContain('<!-- metadata -->');
+  });
 });

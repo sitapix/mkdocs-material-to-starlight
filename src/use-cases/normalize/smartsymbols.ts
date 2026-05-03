@@ -76,7 +76,52 @@ export function normalizeSmartSymbols(source: string): string {
 }
 
 function rewriteLine(line: string): string {
-  return splitOutOfBackticks(line, rewriteSegment).join('');
+  // Mask HTML comment spans before applying substitutions so that `-->`
+  // inside `<!-- ... -->` is never rewritten as an arrow. We split the line
+  // into [outside-comment, comment, outside-comment, ...] segments and only
+  // rewrite the outside parts.
+  return splitOutOfHtmlComments(line, (seg) =>
+    splitOutOfBackticks(seg, rewriteSegment).join(''),
+  ).join('');
+}
+
+/**
+ * Split a line around HTML comment spans (`<!-- ... -->`), applying
+ * `rewriter` only to the non-comment portions and returning comment spans
+ * verbatim. A single line may contain at most one HTML comment span (the
+ * common case for MkDocs marker comments like `<!-- only-mkdocs -->`).
+ */
+function splitOutOfHtmlComments(
+  line: string,
+  rewriter: (segment: string) => string,
+): ReadonlyArray<string> {
+  const out: string[] = [];
+  let cursor = 0;
+  const COMMENT_START = '<!--';
+  const COMMENT_END = '-->';
+  let start = line.indexOf(COMMENT_START, cursor);
+  while (start !== -1) {
+    // Process text before the comment opener.
+    if (start > cursor) {
+      out.push(rewriter(line.slice(cursor, start)));
+    }
+    const end = line.indexOf(COMMENT_END, start + COMMENT_START.length);
+    if (end === -1) {
+      // Unclosed comment — treat the rest of the line as a comment (verbatim).
+      out.push(line.slice(start));
+      cursor = line.length;
+      break;
+    }
+    // Include the full comment span verbatim.
+    out.push(line.slice(start, end + COMMENT_END.length));
+    cursor = end + COMMENT_END.length;
+    start = line.indexOf(COMMENT_START, cursor);
+  }
+  // Any remaining text after the last comment.
+  if (cursor < line.length) {
+    out.push(rewriter(line.slice(cursor)));
+  }
+  return out;
 }
 
 function rewriteSegment(segment: string): string {
