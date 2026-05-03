@@ -36,6 +36,7 @@ import { scanMacroOccurrences } from '../detect-macros/scan.js';
 import { scanMacroExpressions } from '../detect-macros/scan-expressions.js';
 import { normalizeTyperSnippetDirectives } from '../normalize/typer-snippet-directives.js';
 import { scanHeadingAnchors } from '../normalize/scan-heading-anchors.js';
+import { normalizeMkdocstringsCrossRefs } from '../normalize/mkdocstrings-crossref.js';
 
 export interface ConvertSiteInput {
   readonly docsDir: string;
@@ -142,6 +143,14 @@ export async function convertSite(
     // normalizeHeadingAttrList. Emits a per-occurrence info diagnostic so
     // users can locate every cross-page deep link that needs manual repair.
     for (const diagnostic of scanHeadingAnchors(read.value)) {
+      diagnostics.push({ sourcePath, diagnostic });
+    }
+    // Reduce mkdocstrings [`X`][] and [`X`][module.Path] cross-references to
+    // plain inline code `X`. This must run before remark sees the source,
+    // because remark-stringify would otherwise escape the brackets to \[ \].
+    const crossRefResult = normalizeMkdocstringsCrossRefs(source);
+    source = crossRefResult.text;
+    for (const diagnostic of crossRefResult.diagnostics) {
       diagnostics.push({ sourcePath, diagnostic });
     }
     if (input.macrosScanEnabled === true) {
