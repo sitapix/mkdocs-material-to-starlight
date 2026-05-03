@@ -15,6 +15,7 @@
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { parseArgs } from './parse-args.js';
+import { resolveInteractivity } from '../../infrastructure/env/tty-detection.js';
 import { formatReport } from './format-report.js';
 import { convertSiteFromDisk } from '../api/convert-site.js';
 import { createJsYamlDecoder } from '../../infrastructure/yaml/js-yaml-decoder.js';
@@ -76,6 +77,30 @@ export async function runCli(
   io: CliIo,
   overrides: CliOverrides = {},
 ): Promise<number> {
+  // Zero-arg launch on a TTY → wizard
+  if (argv.length === 0) {
+    const decision = resolveInteractivity({
+      flags: {},
+      env: process.env,
+      stdoutIsTTY: Boolean(process.stdout.isTTY),
+      stdinIsTTY: Boolean(process.stdin.isTTY),
+    });
+    if (!decision.interactive) {
+      io.stderr(
+        'error: no arguments and not a TTY. Pass --yes to accept defaults, or run from a terminal to use the wizard.',
+      );
+      return 2;
+    }
+    const { runWizardFlow } = await import('./wizard-runner.js');
+    const wizard = await runWizardFlow(process.cwd(), io);
+    if (wizard.kind === 'cancelled') return 130;
+    if (wizard.kind === 'non-interactive') return 2;
+    io.stdout(
+      `Equivalent command: mkdocs-to-starlight ${wizard.equivalentFlags.join(' ')}`,
+    );
+    return runConvert(wizard.command, io, overrides);
+  }
+
   const command = parseArgs(argv);
 
   switch (command.kind) {

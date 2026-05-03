@@ -47,10 +47,12 @@ describe('runCli', () => {
     expect(stdout.join('\n').trim().length).toBeGreaterThan(0);
   });
 
-  it('exits 2 with a usage message on bad args', async () => {
+  it('exits 2 with a usage message on zero args in non-interactive env', async () => {
     const code = await runCli([], makeIo());
     expect(code).toBe(2);
-    expect(stderr.join('\n')).toMatch(/missing/i);
+    // In CI/non-TTY environments the wizard branch fires and directs the user
+    // to either pass --yes or use a terminal.
+    expect(stderr.join('\n')).toMatch(/--yes|missing/i);
   });
 
   it('converts a project end-to-end and exits 0', async () => {
