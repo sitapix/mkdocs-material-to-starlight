@@ -35,6 +35,7 @@ import { expandIncludeMarkdown } from '../include-markdown/expand.js';
 import { scanMacroOccurrences } from '../detect-macros/scan.js';
 import { scanMacroExpressions } from '../detect-macros/scan-expressions.js';
 import { normalizeTyperSnippetDirectives } from '../normalize/typer-snippet-directives.js';
+import { scanHeadingAnchors } from '../normalize/scan-heading-anchors.js';
 
 export interface ConvertSiteInput {
   readonly docsDir: string;
@@ -135,6 +136,12 @@ export async function convertSite(
     // This covers projects (like pydantic) that use macro syntax without
     // declaring the macros plugin in mkdocs.yml.
     for (const diagnostic of scanMacroExpressions(read.value)) {
+      diagnostics.push({ sourcePath, diagnostic });
+    }
+    // Scan for explicit heading IDs ({ #slug }) before they are stripped by
+    // normalizeHeadingAttrList. Emits a per-occurrence info diagnostic so
+    // users can locate every cross-page deep link that needs manual repair.
+    for (const diagnostic of scanHeadingAnchors(read.value)) {
       diagnostics.push({ sourcePath, diagnostic });
     }
     if (input.macrosScanEnabled === true) {
