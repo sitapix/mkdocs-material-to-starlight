@@ -206,6 +206,7 @@ interface ConvertCommand {
   // wizard surface — Commit A (easy parametrizations)
   readonly linksValidator: boolean | null;
   readonly tabs: 'mdx' | 'html' | null;
+  readonly sidebarTopics: boolean | null;
   readonly rss: boolean | null;
   readonly palette: 'translate' | 'skip' | 'custom' | null;
   readonly configFormat: 'mjs' | 'ts' | null;
@@ -266,6 +267,7 @@ async function runConvert(
     ...(command.extraAssets.length > 0 ? { extraAssets: command.extraAssets } : {}),
     ...(command.locales.length > 0 ? { locales: command.locales } : {}),
     ...(command.suppressRules.length > 0 ? { suppressRules: command.suppressRules } : {}),
+    ...(command.sidebarTopics !== null ? { sidebarTopics: command.sidebarTopics } : {}),
   };
   const result = await convertSiteFromDisk(input);
   if (!result.ok) {

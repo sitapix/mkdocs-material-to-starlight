@@ -189,8 +189,6 @@ describe('full feature coverage end-to-end', () => {
       noAutoAppend: false,
       snippetMaxDepth: 8,
       snippetDedentSubsections: false,
-      expressiveCodeTheme: null,
-      admonitionMapPath: null,
     };
 
     const firstRun = await convertSiteFromDisk({

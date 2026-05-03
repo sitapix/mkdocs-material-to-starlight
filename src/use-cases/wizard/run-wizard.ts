@@ -34,8 +34,6 @@ export async function runWizard(
 ): Promise<Result<WizardAnswers, WizardCancelled>> {
   const { projectDir, plan, defaults, prompter } = input;
 
-  prompter.intro('mkdocs-to-starlight');
-
   const tier0 = await runTier0(prompter, plan, defaults);
   if (!tier0.ok) return tier0;
 

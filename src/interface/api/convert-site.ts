@@ -128,6 +128,8 @@ export interface ConvertSiteFromDiskInput {
   readonly locales?: ReadonlyArray<string>;
   /** Rule IDs to suppress in the diagnostic stream. Deferred. */
   readonly suppressRules?: ReadonlyArray<string>;
+  /** When false, user opted out of starlight-sidebar-topics auto-install. Deferred. */
+  readonly sidebarTopics?: boolean;
 }
 
 export interface ConvertSiteFromDiskOutput {
@@ -1116,6 +1118,11 @@ function buildDeferredDiagnostics(
   if (input.suppressRules !== undefined && input.suppressRules.length > 0) {
     add(
       `Configured: --suppress rules requested (${input.suppressRules.join(', ')}). Rule suppression is not yet implemented in this build; all diagnostics are emitted. (Tracked for v2.)`,
+    );
+  }
+  if (input.sidebarTopics === false) {
+    add(
+      `Configured: sidebarTopics: false requested. The starlight-sidebar-topics auto-install path is not implemented in this build; sidebar remains flat. (Tracked for v2.)`,
     );
   }
   return diags;
