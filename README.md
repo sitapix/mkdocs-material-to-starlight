@@ -34,6 +34,25 @@ output/
 
 Then `cd output && npm install && npm run dev`.
 
+## Usage
+
+```sh
+# Interactive wizard (recommended for first-time conversions)
+npx mkdocs-to-starlight
+
+# Unattended (CI / scripted)
+npx mkdocs-to-starlight ./mkdocs-project ./starlight-out --yes
+
+# See what will happen, without writing anything
+npx mkdocs-to-starlight ./mkdocs-project --explain
+```
+
+The wizard auto-detects features in your `mkdocs.yml` (tabs, snippets, RSS,
+mike versions, i18n, palette) and only asks about decisions that actually
+apply to your site. Every wizard answer maps to a CLI flag, so you can
+reproduce a wizard run unattended by pasting the equivalent command the
+wizard prints at the end.
+
 ## CLI
 
 ```

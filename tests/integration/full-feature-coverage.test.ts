@@ -165,6 +165,56 @@ describe('full feature coverage end-to-end', () => {
       expect(tree2[path]).toBe(tree1[path]);
     }
   });
+
+  it('wizard --yes idempotency — running twice with explicit wizard defaults yields byte-equal output', async () => {
+    // The wizard derives defaults (deriveDefaults.ts) and passes them to the API.
+    // This test asserts that running the conversion twice with those same
+    // explicit wizard defaults produces byte-equal output. This verifies that
+    // the conversion is deterministic and idempotent when the wizard runs
+    // `mkdocs-to-starlight --yes` twice.
+    const wizardDefaults = {
+      snippetBasePaths: ['docs'],
+      linksValidator: true,
+      tabs: 'mdx' as const,
+      rss: true,
+      palette: 'translate' as const,
+      configFormat: 'mjs' as const,
+      cards: 'html' as const,
+      mdxMode: 'auto' as const,
+      logoReplacesTitle: false,
+      keepExplicitHeadingIds: false,
+      noSmartSymbols: false,
+      noEmojiShortcodes: false,
+      noInlineMarks: false,
+      noAutoAppend: false,
+      snippetMaxDepth: 8,
+      snippetDedentSubsections: false,
+      expressiveCodeTheme: null,
+      admonitionMapPath: null,
+    };
+
+    const firstRun = await convertSiteFromDisk({
+      projectDir,
+      outputDir,
+      ...wizardDefaults,
+    });
+    expect(firstRun.ok).toBe(true);
+
+    const secondRun = await convertSiteFromDisk({
+      projectDir,
+      outputDir: outputDir2,
+      ...wizardDefaults,
+    });
+    expect(secondRun.ok).toBe(true);
+
+    const tree1 = collectTextFiles(outputDir);
+    const tree2 = collectTextFiles(outputDir2);
+
+    expect(Object.keys(tree2).sort()).toEqual(Object.keys(tree1).sort());
+    for (const path of Object.keys(tree1)) {
+      expect(tree2[path]).toBe(tree1[path]);
+    }
+  });
 });
 
 function setupProject(projectDir: string): void {
