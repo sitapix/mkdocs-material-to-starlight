@@ -740,6 +740,30 @@ const REGISTRY_ENTRIES: ReadonlyArray<DiagnosticEntry> = [
       'For per-block line numbers, add the `:line-numbers` annotation to individual fenced code blocks. For inline-style highlighting (noclasses), accept that ExpressiveCode always emits class-based markup — it is the recommended approach for theme switching anyway. The remaining options have no straightforward port; reimplement via an ExpressiveCode plugin if needed.',
     relatedFeatureId: 'expressive-code-theme',
   },
+  {
+    id: 'wizard-decision-applied',
+    severity: 'info',
+    description:
+      'A wizard answer (or equivalent CLI flag) overrode a converter default. Recorded in MIGRATION_NOTES.md so the run is reproducible without re-running the wizard.',
+    fix:
+      'No action required. To restore the default, remove the corresponding flag from the next invocation.',
+  },
+  {
+    id: 'wizard-non-interactive-fallback',
+    severity: 'info',
+    description:
+      'The wizard was skipped because stdout/stdin are not TTYs (or --no-interactive / --ci was passed) and `--yes` was not provided.',
+    fix:
+      'Pass `--yes` to accept defaults non-interactively, or run from a TTY to use the wizard.',
+  },
+  {
+    id: 'wizard-cancelled',
+    severity: 'info',
+    description:
+      'The user cancelled the wizard (Ctrl+C). No conversion was performed.',
+    fix:
+      'Re-run the wizard, or invoke with explicit flags + `--yes` to skip prompts.',
+  },
 ];
 
 export const DIAGNOSTIC_REGISTRY: ReadonlyMap<string, DiagnosticEntry> = new Map(
