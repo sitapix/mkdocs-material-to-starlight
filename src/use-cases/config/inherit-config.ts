@@ -23,6 +23,8 @@
 
 import { load as yamlLoad, dump as yamlDump } from 'js-yaml';
 import type { FileSystem } from '../../domain/ports/file-system.js';
+import { preprocessMkdocsEnvTags } from './preprocess-mkdocs-env-tags.js';
+import { preprocessMkdocsPythonTags } from './preprocess-mkdocs-python-tags.js';
 
 const INHERIT_RE = /^INHERIT:\s*(\S+)\s*$/m;
 const MAX_DEPTH = 8;
@@ -85,12 +87,18 @@ async function expand(
  * Falls back to the string-concatenation approach only when one or both sides
  * cannot be parsed as a mapping (e.g., an empty file or a scalar root).
  */
+function stripCustomTags(source: string): string {
+  return preprocessMkdocsPythonTags(preprocessMkdocsEnvTags(source)).source;
+}
+
 function mergeYamlSources(baseSource: string, derivedSource: string): string {
   let baseObj: unknown;
   let derivedObj: unknown;
   try {
-    baseObj = baseSource.trim().length === 0 ? {} : yamlLoad(baseSource);
-    derivedObj = derivedSource.trim().length === 0 ? {} : yamlLoad(derivedSource);
+    const baseStripped = stripCustomTags(baseSource);
+    const derivedStripped = stripCustomTags(derivedSource);
+    baseObj = baseStripped.trim().length === 0 ? {} : yamlLoad(baseStripped);
+    derivedObj = derivedStripped.trim().length === 0 ? {} : yamlLoad(derivedStripped);
   } catch {
     // If either side is not parseable YAML at this point, fall back to the
     // old concatenation so downstream gets the raw error rather than a silent

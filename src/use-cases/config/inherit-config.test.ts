@@ -141,6 +141,39 @@ describe('resolveInherits', () => {
     expect(parsed['plugins']).toEqual(['rss']);
   });
 
+  it('handles !ENV custom tags in inherited yaml without crashing (FastAPI/typer regression)', async () => {
+    const fs = memFs({
+      '/p/mkdocs.env.yml': [
+        'markdown_extensions:',
+        '  pymdownx.highlight:',
+        '    linenums: !ENV [LINENUMS, false]',
+        '',
+      ].join('\n'),
+      '/p/mkdocs.yml': [
+        'INHERIT: ./mkdocs.env.yml',
+        'site_name: T',
+        'theme:',
+        '  name: material',
+        'markdown_extensions:',
+        '  pymdownx.highlight:',
+        '    line_spans: __span',
+        '',
+      ].join('\n'),
+    });
+    const result = await resolveInherits(
+      await fs.readText('/p/mkdocs.yml').then(r => (r as { value: string }).value),
+      '/p/mkdocs.yml',
+      fs,
+    );
+    // Must not produce duplicate top-level keys (which would crash the downstream yaml-decode-failed).
+    const keyCount = (result.source.match(/^markdown_extensions:/gm) ?? []).length;
+    expect(keyCount).toBe(1);
+    expect(result.source).toMatch(/pymdownx\.highlight/);
+    expect(result.source).toMatch(/line_spans/);
+    // Both options should be present after deep-merge.
+    expect(result.source).toMatch(/linenums/);
+  });
+
   it('handles duplicate scalar keys without crashing (FastAPI/typer regression)', async () => {
     // Both base and derived list pymdownx.highlight but with different sub-options.
     // The merged result must parse without "duplicated mapping key" and
