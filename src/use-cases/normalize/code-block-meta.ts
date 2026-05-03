@@ -27,6 +27,11 @@ export function normalizeCodeBlockMeta(source: string): string {
   });
 }
 
+// Option keywords that can appear at the start of fence metadata without a
+// language token. If the first whitespace-delimited token starts with one of
+// these, it is an option — not a language identifier.
+const OPTION_PREFIX_RE = /^(hl_lines|linenums|title|highlight)=/i;
+
 function translateRest(rest: string): string {
   if (rest.includes('showLineNumbers') || rest.includes('{')) {
     // Already translated or already an EC marker — preserve.
@@ -35,9 +40,17 @@ function translateRest(rest: string): string {
   let parts: string[] = [];
   let working = rest.trimStart();
 
-  // Capture language id (first whitespace-delimited token).
+  // Capture language id (first whitespace-delimited token), but only when the
+  // token is not itself an option keyword (e.g. hl_lines="3 4" with no lang).
   const langMatch = working.match(/^[A-Za-z0-9_+\-#.]+/);
-  const lang = langMatch === null ? '' : langMatch[0];
+  const langCandidate = langMatch === null ? '' : langMatch[0];
+  // A token that includes `=` or starts with a known option prefix is not a
+  // language id — treat it as part of the options that follow.
+  const isOption =
+    langCandidate.length === 0 ||
+    langCandidate.includes('=') ||
+    OPTION_PREFIX_RE.test(working);
+  const lang = isOption ? '' : langCandidate;
   if (lang.length > 0) {
     parts.push(lang);
     working = working.slice(lang.length).trimStart();

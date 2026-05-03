@@ -63,4 +63,12 @@ describe('normalizeCodeBlockMeta', () => {
     );
     expect(out).toContain('{3}');
   });
+
+  it('handles hl_lines option with no language token (typer regression)', () => {
+    // ``` hl_lines="3 4" with NO language token must not treat hl_lines
+    // as the language identifier.
+    const out = normalizeCodeBlockMeta('``` hl_lines="3 4"\ncode\n```\n');
+    expect(out).not.toContain('```hl_lines');
+    expect(out).toContain('{3,4}');
+  });
 });
