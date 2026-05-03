@@ -132,6 +132,40 @@ describe('detectLandingPage', () => {
     });
   });
 
+  describe('hero text cleaning', () => {
+    it('strips {#anchor} suffix from extracted hero title', () => {
+      const source = '# FastAPI { #fastapi }\n\n## A short tagline\n\n![logo](logo.svg)\n';
+      const r = detectLandingPage(source, 'index.md');
+      expect(r.isLanding).toBe(true);
+      expect(r.frontmatter.hero?.title).toBe('FastAPI');
+      expect(r.frontmatter.hero?.tagline).toBe('A short tagline');
+    });
+
+    it('rejects single-word section-header taglines', () => {
+      const source = '# FastAPI\n\n## Sponsors { #sponsors }\n\n![logo](logo.svg)\n';
+      const r = detectLandingPage(source, 'index.md');
+      if (r.isLanding) {
+        expect(r.frontmatter.hero?.tagline).toBeUndefined();
+      }
+    });
+
+    it('rejects common section-header words as tagline', () => {
+      for (const word of ['Installation', 'Usage', 'Examples', 'API', 'License']) {
+        const r = detectLandingPage(`# Title\n\n## ${word}\n\n![logo](logo.svg)\n`, 'index.md');
+        if (r.isLanding) {
+          expect(r.frontmatter.hero?.tagline).toBeUndefined();
+        }
+      }
+    });
+
+    it('preserves multi-word h2 that is not a known section header as tagline', () => {
+      const source = '# My Project\n\n## The blazing fast framework\n\n![logo](logo.svg)\n';
+      const r = detectLandingPage(source, 'index.md');
+      expect(r.isLanding).toBe(true);
+      expect(r.frontmatter.hero?.tagline).toBe('The blazing fast framework');
+    });
+  });
+
   describe('edge cases', () => {
     it('detects page with only a hero image (no grid, no CTA)', () => {
       const imageOnly = [

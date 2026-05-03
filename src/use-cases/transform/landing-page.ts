@@ -25,11 +25,24 @@
  * Pure function: text × pathRel → { isLanding, result }. No I/O.
  */
 
+export interface HeroFrontmatter {
+  readonly title?: string;
+  readonly tagline?: string;
+  readonly image?: { readonly file: string };
+  readonly actions?: ReadonlyArray<{
+    readonly text: string;
+    readonly link: string;
+    readonly variant: 'primary' | 'secondary';
+  }>;
+}
+
 export interface LandingPageResult {
   readonly isLanding: boolean;
   /** When isLanding is true: the fully transformed page text with splash
    *  frontmatter. When false: the original source unchanged. */
   readonly text: string;
+  /** Structured hero frontmatter data (always present but may be empty). */
+  readonly frontmatter: { readonly hero?: HeroFrontmatter };
 }
 
 const FRONTMATTER_RE = /^---\r?\n([\s\S]*?)\r?\n---(\r?\n|$)/;
@@ -47,24 +60,61 @@ const GRID_CARDS_RE = /<div[^>]+class="[^"]*grid[^"]*cards[^"]*"[^>]*>/i;
 const H1_RE = /^# (.+)$/m;
 // H2 heading (subtitle)
 const H2_RE = /^## (.+)$/m;
+// Matches `{ #anchor-id }` attribute suffix (Python-Markdown attribute lists)
+const HEADING_ANCHOR_SUFFIX_RE = /\s*\{\s*#[^}]+\}\s*$/;
+
+/** Section-header words that should never be treated as a tagline. */
+const SECTION_HEADER_WORDS = new Set([
+  'installation',
+  'getting started',
+  'usage',
+  'examples',
+  'api',
+  'reference',
+  'sponsors',
+  'contributors',
+  'license',
+  'changelog',
+  'faq',
+  'support',
+  'links',
+  'acknowledgments',
+  'requirements',
+]);
+
+/**
+ * Remove the `{ #anchor }` attribute-list suffix that Python-Markdown
+ * appends to headings (e.g. `FastAPI { #fastapi }` → `FastAPI`).
+ */
+function cleanHeadingText(s: string): string {
+  return s.replace(HEADING_ANCHOR_SUFFIX_RE, '').trim();
+}
+
+/**
+ * Return true when `text` looks like a section header rather than a tagline.
+ * A single word OR a word that matches a known section-header name is rejected.
+ */
+function isSectionHeader(text: string): boolean {
+  const lower = text.trim().toLowerCase();
+  if (!lower.includes(' ')) return true; // single word
+  return SECTION_HEADER_WORDS.has(lower);
+}
 
 export function detectLandingPage(
   source: string,
   pathRel: string,
 ): LandingPageResult {
+  const empty: LandingPageResult = { isLanding: false, text: source, frontmatter: {} };
+
   // Guard 1: must be root index.md.
   const normPath = pathRel.replace(/\\/g, '/').replace(/^\/+/, '');
-  if (normPath !== 'index.md') {
-    return { isLanding: false, text: source };
-  }
+  if (normPath !== 'index.md') return empty;
 
   // Guard 2: idempotency — if already has template: splash, skip.
   const fmMatch = source.match(FRONTMATTER_RE);
   if (fmMatch !== null) {
     const fmBody = fmMatch[1] ?? '';
-    if (/^template:\s*splash/m.test(fmBody)) {
-      return { isLanding: false, text: source };
-    }
+    if (/^template:\s*splash/m.test(fmBody)) return empty;
   }
 
   // Determine the body region (after frontmatter) for detection.
@@ -80,13 +130,11 @@ export function detectLandingPage(
     gridCardsMatch !== null && countListItemsAfter(body, gridCardsMatch.index) >= 3;
 
   const qualifies = hasHeroImage || hasCTAButton || hasGridCards;
-  if (!qualifies) {
-    return { isLanding: false, text: source };
-  }
+  if (!qualifies) return empty;
 
   // Build the transformed page.
-  const transformed = buildSplashPage(fmMatch, body);
-  return { isLanding: true, text: transformed };
+  const { text, hero } = buildSplashPage(fmMatch, body);
+  return { isLanding: true, text, frontmatter: { hero } };
 }
 
 /**
@@ -104,12 +152,17 @@ function countListItemsAfter(text: string, fromIndex: number): number {
 function buildSplashPage(
   fmMatch: RegExpMatchArray | null,
   body: string,
-): string {
-  // Extract hero data from body.
+): { text: string; hero: HeroFrontmatter } {
+  // Extract and clean hero data from body.
   const h1Match = H1_RE.exec(body);
   const h2Match = H2_RE.exec(body);
-  const heroTitle = h1Match?.[1]?.trim() ?? null;
-  const heroTagline = h2Match?.[1]?.trim() ?? null;
+  const rawTitle = h1Match?.[1]?.trim() ?? null;
+  const rawTagline = h2Match?.[1]?.trim() ?? null;
+
+  const heroTitle = rawTitle !== null ? cleanHeadingText(rawTitle) : null;
+  const cleanedTagline = rawTagline !== null ? cleanHeadingText(rawTagline) : null;
+  const heroTagline =
+    cleanedTagline !== null && !isSectionHeader(cleanedTagline) ? cleanedTagline : null;
 
   // Extract hero image path.
   const heroImgMd = HERO_IMAGE_MD.exec(body);
@@ -137,6 +190,14 @@ function buildSplashPage(
       variant: actions.length === 0 ? 'primary' : 'secondary',
     });
   }
+
+  // Build structured hero frontmatter object.
+  const hero: HeroFrontmatter = {
+    ...(heroTitle !== null ? { title: heroTitle } : {}),
+    ...(heroTagline !== null ? { tagline: heroTagline } : {}),
+    ...(heroImagePath !== null ? { image: { file: heroImagePath } } : {}),
+    ...(actions.length > 0 ? { actions } : {}),
+  };
 
   // Build hero YAML block.
   const heroLines: string[] = ['hero:'];
@@ -166,5 +227,5 @@ function buildSplashPage(
 
   // The body stays unchanged (hero elements remain in body for reference;
   // Starlight splash template renders hero: frontmatter above body content).
-  return fmBlock + body;
+  return { text: fmBlock + body, hero };
 }
