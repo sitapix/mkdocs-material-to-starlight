@@ -79,6 +79,46 @@ describe('normalizeCardGrids', () => {
     expect(out).toContain('<div class="grid cards"');
   });
 
+  it('recognises asterisk (*) list markers in card-grid bodies (pydantic style)', () => {
+    const src = [
+      '<div class="grid cards" markdown>',
+      '',
+      '*   Field validators',
+      '',
+      '    ---',
+      '',
+      '    * [after](#after)',
+      '',
+      '*   Model validators',
+      '',
+      '</div>',
+      '',
+    ].join('\n');
+    const out = normalizeCardGrids(src);
+    expect(out).toContain(':::card-grid');
+    const cardOpens = out.match(/^:::card$/gm);
+    expect(cardOpens?.length).toBe(2);
+    expect(out).toContain('Field validators');
+    expect(out).toContain('Model validators');
+  });
+
+  it('recognises plus (+) list markers in card-grid bodies', () => {
+    const src = [
+      '<div class="grid cards" markdown>',
+      '',
+      '+   Alpha',
+      '+   Beta',
+      '',
+      '</div>',
+      '',
+    ].join('\n');
+    const out = normalizeCardGrids(src);
+    const cardOpens = out.match(/^:::card$/gm);
+    expect(cardOpens?.length).toBe(2);
+    expect(out).toContain('Alpha');
+    expect(out).toContain('Beta');
+  });
+
   it('is idempotent', () => {
     const src = [
       '<div class="grid cards" markdown>',

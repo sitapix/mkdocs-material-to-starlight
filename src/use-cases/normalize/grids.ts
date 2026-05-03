@@ -122,16 +122,33 @@ function renderCardGrid(
   return out;
 }
 
+/**
+ * Split the body of a `<div class="grid cards">` into per-card line groups.
+ *
+ * Top-level list items (dash `-`, asterisk `*`, or plus `+`) each become one
+ * card. The "top-level" indent is determined by the first list-marker line
+ * found; only lines at that exact indent are treated as new-item boundaries.
+ * Nested list items (indented deeper) are retained as body content of the
+ * enclosing card.
+ */
 function splitListItems(
   bodyLines: ReadonlyArray<string>,
 ): ReadonlyArray<ReadonlyArray<string>> {
   const items: string[][] = [];
   let current: string[] | null = null;
+  let topIndent: number | null = null;
+
   for (const line of bodyLines) {
-    if (isListItemStart(line)) {
-      current = [stripListMarker(line)];
-      items.push(current);
-      continue;
+    const markerIndent = listItemIndent(line);
+    if (markerIndent !== null) {
+      if (topIndent === null) {
+        topIndent = markerIndent;
+      }
+      if (markerIndent === topIndent) {
+        current = [stripListMarker(line)];
+        items.push(current);
+        continue;
+      }
     }
     if (current === null) {
       continue;
@@ -141,12 +158,14 @@ function splitListItems(
   return items.map(trimTrailingBlanks);
 }
 
-function isListItemStart(line: string): boolean {
-  return /^- /.test(line.trimStart());
+/** Returns the number of leading spaces before a list marker, or null. */
+function listItemIndent(line: string): number | null {
+  const match = line.match(/^( *)[-*+] /);
+  return match !== null ? (match[1] ?? '').length : null;
 }
 
 function stripListMarker(line: string): string {
-  return line.replace(/^(\s*)- /, '$1');
+  return line.replace(/^(\s*)[-*+] /, '$1');
 }
 
 function trimTrailingBlanks(item: ReadonlyArray<string>): ReadonlyArray<string> {
