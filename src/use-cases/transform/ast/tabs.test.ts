@@ -65,4 +65,26 @@ describe('transformTabDirectives', () => {
     const second = process(first);
     expect(second).toBe(first);
   });
+
+  it('preserves backtick-quoted tab labels (pydantic regression)', () => {
+    // Tab labels like `pydantic<3` are inlineCode nodes in the AST, not text
+    // nodes. The label extractor must include inlineCode values so the label
+    // is not silently dropped.
+    const out = process('::::tabs\n:::tab[`pydantic<3`]\nbody\n:::\n::::\n');
+    expect(out).toContain('data-label="pydantic<3"');
+    expect(out).not.toContain('data-label=""');
+  });
+
+  it('preserves backtick tab labels in MDX mode (<TabItem>)', () => {
+    const source = '::::tabs\n:::tab[`pydantic>=1.10.17,<3`]\nbody\n:::\n::::\n';
+    const file = unified()
+      .use(remarkParse)
+      .use(remarkDirective)
+      .use(transformTabDirectives, { emitMdxTabs: true })
+      .use(remarkStringify, { bullet: '-', emphasis: '_', fences: true })
+      .processSync(source);
+    const out = String(file);
+    expect(out).toContain('label="pydantic>=1.10.17,<3"');
+    expect(out).not.toContain('label="Tab"');
+  });
 });

@@ -172,8 +172,11 @@ function readDirectiveLabel(directive: ContainerDirectiveLike): string | null {
   if (first === undefined || first.data?.directiveLabel !== true) {
     return null;
   }
+  // Both plain text nodes and inlineCode nodes (backtick-quoted labels like
+  // `pydantic<3`) contribute to the label string. Without inlineCode, a label
+  // like "`pydantic<3`" produces an empty string and falls back to "Tab".
   const text = (first.children ?? [])
-    .filter((c) => c.type === 'text')
+    .filter((c) => c.type === 'text' || c.type === 'inlineCode')
     .map((c) => c.value ?? '')
     .join('');
   return text.length > 0 ? text : null;
