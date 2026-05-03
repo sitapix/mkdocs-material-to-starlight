@@ -68,6 +68,7 @@ import { serializeRssEndpoint } from '../../use-cases/serialize-config/rss-endpo
 import { serializeStyleSheet } from '../../use-cases/serialize-config/styles.js';
 import { mapMaterialPaletteToStarlight } from '../../domain/starlight/palette-mapping.js';
 import { classifyThemeFeature } from '../../domain/starlight/theme-feature-catalog.js';
+import { detectLongtailFeatures } from '../../use-cases/detect-features/theme-features-longtail.js';
 import type { SidebarEntry } from '../../domain/starlight/sidebar.js';
 
 export interface ConvertSiteFromDiskInput {
@@ -510,6 +511,24 @@ export async function convertSiteFromDisk(
     });
   }
 
+  // Per-flag info diagnostics for long-tail theme.features entries not covered
+  // by the primary classifier. Each entry gets its own diagnostic with a rich
+  // Starlight-approximation recommendation so users can find each affected flag
+  // in MIGRATION_NOTES.md.
+  const longtailEntries = detectLongtailFeatures(themeFeatures);
+  const longtailDiagnostics: Array<{
+    sourcePath: string;
+    diagnostic: ReturnType<typeof createDiagnostic>;
+  }> = longtailEntries.map((entry) => ({
+    sourcePath: 'mkdocs.yml',
+    diagnostic: createDiagnostic({
+      severity: 'info',
+      ruleId: 'theme-feature-longtail-detected',
+      source: 'mkdocs-to-starlight',
+      message: `theme.features \`${entry.flag}\`: ${entry.recommendation}`,
+    }),
+  }));
+
   const pythonTagDiagnostics = pythonStripped.stripped.map((tag) => ({
     sourcePath: 'mkdocs.yml',
     diagnostic: createDiagnostic({
@@ -648,6 +667,7 @@ export async function convertSiteFromDisk(
     ...paletteDiagnostics,
     ...pythonTagDiagnostics,
     ...themeFeatureDiagnostics,
+    ...longtailDiagnostics,
     ...hookDiagnostics,
     ...expressiveCodeDiagnostics,
     ...themeLanguageDiagnostics,
