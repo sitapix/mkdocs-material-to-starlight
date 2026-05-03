@@ -41,6 +41,7 @@ import { normalizeLinkAttrLists } from '../normalize/link-attr-list.js';
 import { normalizeContentTabs } from '../normalize/content-tabs.js';
 import { normalizePackageManagerTabs } from '../normalize/package-manager-tabs.js';
 import { detectLandingPage } from '../transform/landing-page.js';
+import { promoteSteps } from '../transform/ast/steps.js';
 
 export interface ConvertSiteInput {
   readonly docsDir: string;
@@ -215,6 +216,15 @@ export async function convertSite(
           message: `Landing-style index.md detected and rewritten to Starlight template: splash with hero: frontmatter block. Review the generated hero.title, hero.tagline, hero.image, and hero.actions fields in the output.`,
         }),
       });
+    }
+
+    // Promote tutorial-style ordered lists to <Steps> MDX component.
+    const stepsResult = promoteSteps(source);
+    if (stepsResult.promoted) {
+      source = stepsResult.text;
+      for (const diagnostic of stepsResult.diagnostics) {
+        diagnostics.push({ sourcePath, diagnostic });
+      }
     }
 
     // Detect package-manager tab groups (npm/yarn/pnpm/bun) and promote them

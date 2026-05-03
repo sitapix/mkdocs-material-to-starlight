@@ -841,6 +841,15 @@ const REGISTRY_ENTRIES: ReadonlyArray<DiagnosticEntry> = [
     relatedFeatureId: 'landing-page-splash',
   },
   {
+    id: 'ordered-list-promoted-to-steps',
+    severity: 'info',
+    description:
+      'A top-level ordered list that meets the tutorial-step heuristic (≥3 items, each multi-line, preceded by a tutorial-style heading) was promoted to a `<Steps>` component.',
+    fix:
+      'No action required. Verify the emitted `<Steps>` block renders correctly in your Starlight project. The file has been promoted to `.mdx` to support the JSX component.',
+    relatedFeatureId: 'ordered-list-steps',
+  },
+  {
     id: 'grid-card-promoted-to-linkcard',
     severity: 'info',
     description:

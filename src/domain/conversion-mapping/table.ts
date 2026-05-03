@@ -627,6 +627,17 @@ const TABLE: ReadonlyArray<MappingRow> = [
     risk: 'high',
   },
   {
+    featureId: 'ordered-list-steps',
+    materialInput:
+      'A top-level ordered list with ≥3 multi-line items preceded by a tutorial-style heading (containing "step", "tutorial", "guide", "getting started", or starting with a verb like Setup/Install/Create/Build)',
+    requiredExtensions: [],
+    starlightOutput:
+      '`<Steps>` Starlight built-in component wrapping the ordered list; file promoted to `.mdx`',
+    fileExt: 'mdx',
+    conversionType: 'ast-transform',
+    risk: 'medium',
+  },
+  {
     featureId: 'grid-cards-linkcard',
     materialInput:
       'A `<div class="grid cards">` card whose body is a single bullet containing a single link (`- [Title](href)`) — a pure navigation card',
