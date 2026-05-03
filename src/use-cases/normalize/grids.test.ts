@@ -119,6 +119,74 @@ describe('normalizeCardGrids', () => {
     expect(out).toContain('Beta');
   });
 
+  describe('single-link card → <LinkCard> promotion', () => {
+    it('promotes a card with a single bullet link to <LinkCard>', () => {
+      const src = [
+        '<div class="grid cards" markdown>',
+        '',
+        '- [Quick Start](getting-started.md)',
+        '',
+        '</div>',
+        '',
+      ].join('\n');
+      const out = normalizeCardGrids(src);
+      expect(out).toContain('<LinkCard');
+      expect(out).toContain('title="Quick Start"');
+      expect(out).toContain('getting-started.md');
+      expect(out).not.toContain(':::card\n');
+    });
+
+    it('does NOT promote a card with multiple links', () => {
+      const src = [
+        '<div class="grid cards" markdown>',
+        '',
+        '-   Field validators',
+        '',
+        '    * [after](#after)',
+        '    * [before](#before)',
+        '',
+        '</div>',
+        '',
+      ].join('\n');
+      const out = normalizeCardGrids(src);
+      expect(out).not.toContain('<LinkCard');
+      expect(out).toContain(':::card');
+    });
+
+    it('does NOT promote a card with paragraph content + link', () => {
+      const src = [
+        '<div class="grid cards" markdown>',
+        '',
+        '-   :material-rocket: **Fast**',
+        '',
+        '    Blazing fast. [Learn more](docs.md)',
+        '',
+        '</div>',
+        '',
+      ].join('\n');
+      const out = normalizeCardGrids(src);
+      expect(out).not.toContain('<LinkCard');
+    });
+
+    it('mixed grid: single-link card gets LinkCard, multi-content card stays :::card', () => {
+      const src = [
+        '<div class="grid cards" markdown>',
+        '',
+        '- [Quick Start](getting-started.md)',
+        '',
+        '-   :material-rocket: **Fast**',
+        '',
+        '    Blazing fast.',
+        '',
+        '</div>',
+        '',
+      ].join('\n');
+      const out = normalizeCardGrids(src);
+      expect(out).toContain('<LinkCard');
+      expect(out).toContain(':::card');
+    });
+  });
+
   it('is idempotent', () => {
     const src = [
       '<div class="grid cards" markdown>',

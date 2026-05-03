@@ -15,7 +15,10 @@
  *   ...arbitrary blocks...                      ...arbitrary blocks...
  *   </div>                                     :::
  *
- * The card variant unwraps each top-level list item into a :::card directive.
+ * The card variant unwraps each top-level list item into a :::card directive,
+ * UNLESS the card body is a single bare Markdown link — in that case it is
+ * promoted directly to `<LinkCard title="..." href="...">` (Starlight native).
+ *
  * The generic variant simply wraps the body in :::grid. Unclosed grid blocks
  * are passed through verbatim — the caller may emit a diagnostic by searching
  * for unconverted `<div class="grid` patterns.
@@ -31,6 +34,16 @@ import {
 } from '../../domain/syntax/grid-line.js';
 
 const FENCE = /^ {0,3}(```|~~~)/;
+
+/**
+ * Matches a bare Markdown link as the sole non-blank content of a card body.
+ * Captures (1) link text and (2) href.
+ *
+ * Link text must be plain (no markdown formatting: no `*`, `_`, `:`, `!`, `[`).
+ * This avoids promoting cards whose link text would render as literal markdown
+ * escapes inside an HTML attribute (e.g. `__Validators__` → bad).
+ */
+const BARE_LINK_RE = /^\[([^\]_*:!\[]+)\]\(([^)]+)\)\s*$/;
 
 export function normalizeCardGrids(source: string): string {
   const lines = source.split('\n');
@@ -112,11 +125,16 @@ function renderCardGrid(
   const out: string[] = [`${indent}::::card-grid`];
   const items = splitListItems(bodyLines);
   for (const item of items) {
-    out.push(`${indent}:::card`);
     // Dedent the card body to remove excess leading whitespace. Without
     // dedenting, lines with 4+ spaces of indent are treated as CommonMark
     // indented code blocks, turning list-of-links card bodies into code fences.
     const dedented = dedentLines(item);
+    const linkCard = tryRenderLinkCard(indent, dedented);
+    if (linkCard !== null) {
+      out.push(...linkCard);
+      continue;
+    }
+    out.push(`${indent}:::card`);
     for (const line of dedented) {
       out.push(line.length === 0 ? '' : `${indent}${line}`);
     }
@@ -124,6 +142,24 @@ function renderCardGrid(
   }
   out.push(`${indent}::::`);
   return out;
+}
+
+/**
+ * If the card body has a single non-blank line that is a bare Markdown link
+ * and nothing else, return a `<LinkCard>` JSX self-closing tag. Otherwise null.
+ */
+function tryRenderLinkCard(
+  indent: string,
+  dedented: ReadonlyArray<string>,
+): ReadonlyArray<string> | null {
+  const nonBlank = dedented.filter((l) => l.trim().length > 0);
+  if (nonBlank.length !== 1) return null;
+  const only = (nonBlank[0] ?? '').trim();
+  const m = BARE_LINK_RE.exec(only);
+  if (m === null) return null;
+  const title = (m[1] ?? '').trim();
+  const href = (m[2] ?? '').trim();
+  return [`${indent}<LinkCard title="${title}" href="${href}" />`];
 }
 
 /**

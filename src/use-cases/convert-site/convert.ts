@@ -254,6 +254,19 @@ export async function convertSite(
     for (const diagnostic of converted.diagnostics) {
       diagnostics.push({ sourcePath, diagnostic });
     }
+    // Emit one info diagnostic per LinkCard promotion in this file.
+    const linkCardCount = (converted.text.match(/<LinkCard\b/g) ?? []).length;
+    if (linkCardCount > 0) {
+      diagnostics.push({
+        sourcePath,
+        diagnostic: createDiagnostic({
+          severity: 'info',
+          ruleId: 'grid-card-promoted-to-linkcard',
+          source: 'convert-site/grids',
+          message: `${linkCardCount} single-link grid card${linkCardCount === 1 ? '' : 's'} promoted to <LinkCard> in ${sourcePath}.`,
+        }),
+      });
+    }
     for (const diagnostic of validateFrontmatter(converted.text)) {
       diagnostics.push({ sourcePath, diagnostic });
     }

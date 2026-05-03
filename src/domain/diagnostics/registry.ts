@@ -840,6 +840,15 @@ const REGISTRY_ENTRIES: ReadonlyArray<DiagnosticEntry> = [
       'No action required. Review the generated `hero:` frontmatter in the output `index.md` and adjust `title`, `tagline`, `image`, and `actions` to match your design intent. The original body content (including any feature grid) is preserved below the hero block.',
     relatedFeatureId: 'landing-page-splash',
   },
+  {
+    id: 'grid-card-promoted-to-linkcard',
+    severity: 'info',
+    description:
+      'A grid card whose body contained a single link was promoted to a `<LinkCard>` component. Single-link navigation cards map cleanly to `<LinkCard title="..." href="...">` which is the Starlight native equivalent.',
+    fix:
+      'No action required. Verify the emitted `<LinkCard>` title and href are correct. The file has been promoted to `.mdx` to support the JSX component.',
+    relatedFeatureId: 'grid-cards-linkcard',
+  },
 ];
 
 export const DIAGNOSTIC_REGISTRY: ReadonlyMap<string, DiagnosticEntry> = new Map(

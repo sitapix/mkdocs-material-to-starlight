@@ -627,6 +627,17 @@ const TABLE: ReadonlyArray<MappingRow> = [
     risk: 'high',
   },
   {
+    featureId: 'grid-cards-linkcard',
+    materialInput:
+      'A `<div class="grid cards">` card whose body is a single bullet containing a single link (`- [Title](href)`) — a pure navigation card',
+    requiredExtensions: ['attr_list', 'md_in_html'],
+    starlightOutput:
+      '`<LinkCard title="Title" href="/slug">` Starlight built-in component; file promoted to `.mdx`',
+    fileExt: 'mdx',
+    conversionType: 'text-pre-parse',
+    risk: 'low',
+  },
+  {
     featureId: 'landing-page-splash',
     materialInput:
       'Project root `index.md` with hero image (top-level `![logo]()` or `<img>`), CTA buttons (`.md-button` links), and/or a `<div class="grid cards">` feature grid — a Material "landing page" pattern',
