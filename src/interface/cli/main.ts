@@ -45,31 +45,70 @@ export interface CliOverrides {
   readonly imageDiffer?: ImageDiffer;
 }
 
-const VERSION = '0.0.0';
+const VERSION = '0.1.0';
 
 const HELP_TEXT = `mkdocs-to-starlight — convert a MkDocs Material site to Astro Starlight
 
 Usage:
+  mkdocs-to-starlight                                  (interactive wizard)
   mkdocs-to-starlight <project-dir> <output-dir> [options]
-  mkdocs-to-starlight --help
-  mkdocs-to-starlight --version
+  mkdocs-to-starlight <project-dir> --explain
+  mkdocs-to-starlight compare <baseline-url> <converted-url> [options]
 
-Options:
-  --snippet-base-path <path>   Resolve PyMdown snippets against this directory.
-                               Repeatable; the first match wins.
-  --dry-run                    Run the conversion in memory without writing files.
-  --check                      Run \`astro check\` against the converted site
-                               and report build-blocking errors.
-  --check-timeout <ms>         Override the astro-check timeout (default: 5min).
-  -h, --help                   Show this help.
-  --version                    Print the version.
+General:
+  -y, --yes                Accept defaults non-interactively (CI-safe)
+  --no-interactive         Disable prompts; fail if required args missing
+  --ci                     Implies --no-interactive; disables color
+  -f, --force              Overwrite a non-empty output directory
+  -q, --quiet              Suppress info logs
+  --json                   Emit conversion plan/report as JSON to stdout
+  --color / --no-color     Override TTY/env color detection
+  -C, --dir <path>         Output directory (alternative to positional[1])
+  -h, --help               Show this help
+  --version                Print the version
+
+Convert:
+  --check                  Run \`astro check\` after conversion
+  --no-check               Skip astro check
+  --check-timeout <ms>     Override astro-check timeout (default 5min)
+  --dry-run                In-memory only; no files written
+  --snippet-base-path <p>  Resolve PyMdown snippets here (repeatable)
+  --package-manager <pm>   npm | pnpm | yarn | bun (next-steps hint only)
+
+Wizard decisions (Tier 1 — also surfaced as flags):
+  --tabs <mdx|html>        Tabs strategy when content.tabs.link is set
+  --sidebar-topics         Install starlight-sidebar-topics for nav.tabs
+  --no-sidebar-topics      Skip the topics split
+  --rss / --no-rss         Generate / skip src/pages/rss.xml.ts
+  --mike-versions <v>      Versions slug list (repeatable)
+  --palette <translate|skip|custom>
+  --extra-asset <path>     Carry over (repeatable; default: all detected)
+  --locale <code>          Locale to carry over (repeatable)
+
+Advanced (Tier 2):
+  --no-links-validator           Skip starlight-links-validator
+  --expressive-code-theme <name> Override Shiki theme pair
+  --cards <mdx|html|skip>        Card / grid output format
+  --mdx-mode <auto|always|never> .mdx promotion strategy
+  --logo-replaces-title          Set Starlight logo.replacesTitle: true
+  --admonition-map <path.json>   Override 12→4 admonition collapse
+  --keep-explicit-heading-ids    Emit <a id="…"> instead of dropping
+  --no-smart-symbols             Disable (c)/(tm) etc rewrites
+  --no-emoji-shortcodes          Disable :emoji: rewrites
+  --no-inline-marks              Disable ==mark== / ~sub~ / ^sup^
+  --no-auto-append               Don't append auto_append to every page
+  --snippet-max-depth <N>        Snippet recursion limit (default 8)
+  --snippet-dedent-subsections   Enable PyMdown dedent_subsections
+  --suppress <ruleId>            Mute info diagnostic (repeatable)
+  --config-format <mjs|ts>       astro.config extension
+  --package-name <name>          Override slugified package name
 
 Subcommands:
-  compare <baseline-url> <converted-url> [--pages a,b,c] [--threshold 0.01] [--report file.md]
-                               Visually diff the rendered pages between the
-                               baseline (MkDocs) and converted (Starlight)
-                               sites. Requires Playwright + pixelmatch
-                               (\`npm install playwright pixelmatch pngjs\`).
+  compare <baseline-url> <converted-url> [--pages a,b,c]
+                                 [--threshold 0.01] [--report file.md]
+                                 Visual diff (requires Playwright + pixelmatch)
+
+Exit codes: 0 success, 1 runtime, 2 usage, 130 cancelled.
 `;
 
 export async function runCli(
