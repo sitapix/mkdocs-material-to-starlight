@@ -408,6 +408,30 @@ const REGISTRY_ENTRIES: ReadonlyArray<DiagnosticEntry> = [
       'No action required — the converter has emitted `syncKey` on each generated tab block.',
   },
   {
+    id: 'feature-tabs-link-occurrence',
+    severity: 'info',
+    description:
+      'A `=== "Tab"` content-tab block in a source file is affected by `content.tabs.link`. Each such file will get `<Tabs syncKey="…">` components in the output.',
+    fix:
+      'No action required. Verify the emitted `syncKey` attribute on `<Tabs>` in the output file.',
+  },
+  {
+    id: 'extension-codehilite-linenums-occurrence',
+    severity: 'info',
+    description:
+      'A fenced code block with `linenums` option was found in a source file while `codehilite` (linenums: true) is enabled. Expressive Code renders line numbers natively.',
+    fix:
+      'No action required. Expressive Code in Starlight handles `linenums` automatically via the `showLineNumbers` frame option.',
+  },
+  {
+    id: 'plugin-meta-config-detected',
+    severity: 'warning',
+    description:
+      'A `.meta.yml` file was found in the docs directory. The Material `meta` plugin applies frontmatter from these files recursively; Starlight has no equivalent folder-scoped frontmatter cascade.',
+    fix:
+      'Inline the frontmatter from each `.meta.yml` into every affected page, or implement a custom remark plugin that reads `.meta.yml` files and applies their values to the page frontmatter.',
+  },
+  {
     id: 'feature-navigation-tabs-recommend-topics',
     severity: 'info',
     description:

@@ -69,6 +69,11 @@ import { serializeStyleSheet } from '../../use-cases/serialize-config/styles.js'
 import { mapMaterialPaletteToStarlight } from '../../domain/starlight/palette-mapping.js';
 import { classifyThemeFeature } from '../../domain/starlight/theme-feature-catalog.js';
 import { detectLongtailFeatures } from '../../use-cases/detect-features/theme-features-longtail.js';
+import {
+  scanTabsLinkOccurrences,
+  scanCodehiliteLinenumsOccurrences,
+  scanMetaYmlFiles,
+} from '../../use-cases/detect-features/scan-bulk-diagnostics.js';
 import type { SidebarEntry } from '../../domain/starlight/sidebar.js';
 
 export interface ConvertSiteFromDiskInput {
@@ -658,6 +663,53 @@ export async function convertSiteFromDisk(
 
   const deferredDiagnostics = buildDeferredDiagnostics(input);
 
+  // Per-occurrence scans for the three previously bulk-emitted diagnostics.
+  // Reads source files to find per-file occurrences of the affected patterns.
+  const bulkOccurrenceDiagnostics: Array<{ sourcePath: string; diagnostic: ReturnType<typeof createDiagnostic> }> = [];
+  const hasCodehilite = config.value.markdownExtensions.some(
+    (ext) => (typeof ext === 'string' ? ext : Object.keys(ext)[0] ?? '') === 'codehilite',
+  );
+  const hasMetaPlugin = config.value.plugins.some((p) => p.name === 'meta');
+  if (hasTabsLink || hasCodehilite || hasMetaPlugin) {
+    // Read all source files once for the scans.
+    const sourceEntries: Array<readonly [string, string]> = [];
+    const metaEntries: Array<readonly [string, string]> = [];
+    for (const relPath of sourceListing.value) {
+      const absPath = join(docsDir, relPath);
+      const readResult = await fs.readText(absPath);
+      if (!readResult.ok) continue;
+      sourceEntries.push([relPath, readResult.value]);
+    }
+    // Scan for .meta.yml files separately (they're not in sourceListing which only lists .md/.mdx)
+    if (hasMetaPlugin) {
+      const allDocFiles = await dirReader.list(docsDir, ['.yml', '.yaml']);
+      if (allDocFiles.ok) {
+        for (const relPath of allDocFiles.value) {
+          if (!relPath.endsWith('.meta.yml')) continue;
+          const absPath = join(docsDir, relPath);
+          const readResult = await fs.readText(absPath);
+          if (!readResult.ok) continue;
+          metaEntries.push([relPath, readResult.value]);
+        }
+      }
+    }
+    if (hasTabsLink) {
+      for (const d of scanTabsLinkOccurrences(sourceEntries)) {
+        bulkOccurrenceDiagnostics.push(d);
+      }
+    }
+    if (hasCodehilite) {
+      for (const d of scanCodehiliteLinenumsOccurrences(sourceEntries)) {
+        bulkOccurrenceDiagnostics.push(d);
+      }
+    }
+    if (hasMetaPlugin && metaEntries.length > 0) {
+      for (const d of scanMetaYmlFiles(metaEntries)) {
+        bulkOccurrenceDiagnostics.push(d);
+      }
+    }
+  }
+
   const allDiagnostics = [
     ...siteResult.value.diagnostics,
     ...pluginDiagnostics,
@@ -674,6 +726,7 @@ export async function convertSiteFromDisk(
     ...themeFontsDiagnostics,
     ...analyticsDiagnostics,
     ...deferredDiagnostics,
+    ...bulkOccurrenceDiagnostics,
   ];
 
   const i18nFromThemeLanguage =
