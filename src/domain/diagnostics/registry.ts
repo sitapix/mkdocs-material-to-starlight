@@ -841,6 +841,15 @@ const REGISTRY_ENTRIES: ReadonlyArray<DiagnosticEntry> = [
     relatedFeatureId: 'landing-page-splash',
   },
   {
+    id: 'code-fence-promoted-to-filetree',
+    severity: 'info',
+    description:
+      'A fenced code block containing an ASCII directory tree (box-drawing characters ├/└/│) was promoted to a `<FileTree>` component.',
+    fix:
+      'No action required. Verify the emitted `<FileTree>` block renders correctly. The file has been promoted to `.mdx` to support the JSX component.',
+    relatedFeatureId: 'code-fence-filetree',
+  },
+  {
     id: 'ordered-list-promoted-to-steps',
     severity: 'info',
     description:

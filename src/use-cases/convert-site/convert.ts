@@ -42,6 +42,7 @@ import { normalizeContentTabs } from '../normalize/content-tabs.js';
 import { normalizePackageManagerTabs } from '../normalize/package-manager-tabs.js';
 import { detectLandingPage } from '../transform/landing-page.js';
 import { promoteSteps } from '../transform/ast/steps.js';
+import { normalizeFileTrees } from '../normalize/file-tree.js';
 
 export interface ConvertSiteInput {
   readonly docsDir: string;
@@ -216,6 +217,15 @@ export async function convertSite(
           message: `Landing-style index.md detected and rewritten to Starlight template: splash with hero: frontmatter block. Review the generated hero.title, hero.tagline, hero.image, and hero.actions fields in the output.`,
         }),
       });
+    }
+
+    // Promote ASCII directory tree code fences to <FileTree> MDX component.
+    const fileTreeResult = normalizeFileTrees(source);
+    if (fileTreeResult.promoted) {
+      source = fileTreeResult.text;
+      for (const diagnostic of fileTreeResult.diagnostics) {
+        diagnostics.push({ sourcePath, diagnostic });
+      }
     }
 
     // Promote tutorial-style ordered lists to <Steps> MDX component.

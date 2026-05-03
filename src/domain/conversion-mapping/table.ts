@@ -627,6 +627,17 @@ const TABLE: ReadonlyArray<MappingRow> = [
     risk: 'high',
   },
   {
+    featureId: 'code-fence-filetree',
+    materialInput:
+      'A fenced code block (text or unspecified language) with ≥3 lines, ≥2 containing box-drawing chars (├/└/│), and a directory-name first line (ends with `/`)',
+    requiredExtensions: [],
+    starlightOutput:
+      '`<FileTree>` Starlight built-in component wrapping a nested unordered Markdown list; file promoted to `.mdx`',
+    fileExt: 'mdx',
+    conversionType: 'text-pre-parse',
+    risk: 'low',
+  },
+  {
     featureId: 'ordered-list-steps',
     materialInput:
       'A top-level ordered list with ≥3 multi-line items preceded by a tutorial-style heading (containing "step", "tutorial", "guide", "getting started", or starting with a verb like Setup/Install/Create/Build)',
