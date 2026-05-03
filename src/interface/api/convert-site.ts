@@ -201,17 +201,19 @@ export async function convertSiteFromDisk(
   }
 
   // Idempotency guard: if output dir exists and is non-empty, demand --force.
-  let existing: string[] = [];
-  try {
-    existing = await readdir(input.outputDir);
-  } catch {
-    // dir doesn't exist — fine
-  }
-  if (existing.length > 0 && input.force !== true) {
-    return err({
-      code: 'output-not-empty',
-      message: `Output directory ${input.outputDir} is not empty. Re-run with --force to overwrite, or pick a different output directory.`,
-    });
+  if (input.force !== true) {
+    let existing: string[] = [];
+    try {
+      existing = await readdir(input.outputDir);
+    } catch {
+      // dir doesn't exist — fine
+    }
+    if (existing.length > 0) {
+      return err({
+        code: 'output-not-empty',
+        message: `Output directory ${input.outputDir} is not empty. Re-run with --force to overwrite, or pick a different output directory.`,
+      });
+    }
   }
 
   const docsDir = join(input.projectDir, config.value.docsDir);

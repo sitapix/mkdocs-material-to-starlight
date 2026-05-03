@@ -11,6 +11,19 @@ export async function runTier2(
   prompter: Prompter,
   defaults: DefaultAnswers,
 ): Promise<Result<Partial<WizardAnswers>, WizardCancelled>> {
+  prompter.note(
+    [
+      'Additional advanced flags (set via CLI only in this build):',
+      '  --expressive-code-theme <name>  --logo-replaces-title',
+      '  --admonition-map <path>         --keep-explicit-heading-ids',
+      '  --no-smart-symbols              --no-emoji-shortcodes',
+      '  --no-inline-marks               --no-auto-append',
+      '  --snippet-max-depth <N>         --snippet-dedent-subsections',
+      '  --suppress <ruleId>             --package-name <name>',
+    ].join('\n'),
+    'Tier 2 advanced',
+  );
+
   const linksValidator = await prompter.confirm({
     message: 'Run `starlight-links-validator` on every build? (slow on first run)',
     initialValue: defaults.linksValidator,
