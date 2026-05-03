@@ -804,6 +804,42 @@ const REGISTRY_ENTRIES: ReadonlyArray<DiagnosticEntry> = [
     fix:
       'Re-add the desired attributes as MDX `<a>` props if needed, or use an Astro component.',
   },
+  {
+    id: 'package-managers-tabs-promoted',
+    severity: 'info',
+    description:
+      'A tab group using npm/yarn/pnpm/bun as tab labels was detected and promoted to a `<PackageManagers>` component from the `starlight-package-managers` package.',
+    fix:
+      'No action required. Verify the `pkg` prop on the emitted `<PackageManagers>` component is correct. Install `starlight-package-managers` (`npm install starlight-package-managers`) and wire it into your Astro config if not already done.',
+    relatedFeatureId: 'package-managers-tabs',
+  },
+  {
+    id: 'plugin-swagger-ui-mapped',
+    severity: 'info',
+    description:
+      'mkdocs.yml lists `mkdocs-swagger-ui-tag` which has a Starlight equivalent: `starlight-openapi`.',
+    fix:
+      'Install `starlight-openapi` and add it to your Astro Starlight integration. See https://starlight-openapi.vercel.app for setup. Each `<swagger-ui>` tag in source must be manually replaced with the appropriate Starlight Openapi component or page route.',
+    relatedFeatureId: 'plugin-swagger-ui',
+  },
+  {
+    id: 'theme-feature-longtail-detected',
+    severity: 'info',
+    description:
+      'A `theme.features` flag was detected that has a known Starlight approximation but is not automatically converted. The diagnostic message includes the recommended Starlight config snippet or component override path.',
+    fix:
+      'Follow the recommendation in the diagnostic message to approximate the Material behavior in your Starlight project.',
+    relatedFeatureId: 'theme-features',
+  },
+  {
+    id: 'landing-page-promoted',
+    severity: 'info',
+    description:
+      'The root `index.md` was detected as a landing-style page (hero image + CTA buttons or feature grid) and its frontmatter was rewritten to use Starlight\'s `template: splash` with a `hero:` block.',
+    fix:
+      'No action required. Review the generated `hero:` frontmatter in the output `index.md` and adjust `title`, `tagline`, `image`, and `actions` to match your design intent. The original body content (including any feature grid) is preserved below the hero block.',
+    relatedFeatureId: 'landing-page-splash',
+  },
 ];
 
 export const DIAGNOSTIC_REGISTRY: ReadonlyMap<string, DiagnosticEntry> = new Map(

@@ -31,7 +31,9 @@ export type DetectedFeature =
   | 'blog'
   | 'tags'
   | 'last-updated'
-  | 'rss';
+  | 'rss'
+  | 'package-managers'
+  | 'swagger-ui';
 
 export interface PackageJsonInput {
   readonly siteName: string;
@@ -59,6 +61,8 @@ const FEATURE_DEPENDENCIES: Readonly<Record<DetectedFeature, ReadonlyArray<reado
   // last-updated is a Starlight built-in (`lastUpdated: true`) — no extra deps.
   'last-updated': [],
   rss: [['@astrojs/rss', '^4.0.0']],
+  'package-managers': [['starlight-package-managers', '^0.8.0']],
+  'swagger-ui': [['starlight-openapi', '^0.20.0']],
 };
 
 export function serializePackageJson(input: PackageJsonInput): string {

@@ -604,4 +604,37 @@ const TABLE: ReadonlyArray<MappingRow> = [
     conversionType: 'recommended-dep',
     risk: 'medium',
   },
+  {
+    featureId: 'package-managers-tabs',
+    materialInput:
+      'pymdownx.tabbed tab group where all tabs are labeled with package manager names (npm, yarn, pnpm, bun — any subset ≥2)',
+    requiredExtensions: ['pymdownx.tabbed'],
+    starlightOutput:
+      '`<PackageManagers pkg="...">` component from `starlight-package-managers`; pkg value extracted from the install command in the npm tab body',
+    fileExt: 'mdx',
+    conversionType: 'ast-transform',
+    risk: 'medium',
+  },
+  {
+    featureId: 'plugin-swagger-ui',
+    materialInput:
+      'mkdocs.yml `plugins: mkdocs-swagger-ui-tag` (renders Swagger/OpenAPI specs via the `<swagger-ui>` custom element in Markdown)',
+    requiredExtensions: [],
+    starlightOutput:
+      '`starlight-openapi` Starlight plugin auto-wired in astro.config.mjs; each `<swagger-ui>` tag must be manually replaced with the appropriate Starlight Openapi route or component',
+    fileExt: 'md',
+    conversionType: 'recommended-dep',
+    risk: 'high',
+  },
+  {
+    featureId: 'landing-page-splash',
+    materialInput:
+      'Project root `index.md` with hero image (top-level `![logo]()` or `<img>`), CTA buttons (`.md-button` links), and/or a `<div class="grid cards">` feature grid — a Material "landing page" pattern',
+    requiredExtensions: ['attr_list', 'md_in_html'],
+    starlightOutput:
+      'frontmatter rewritten to `template: splash` + `hero: { title, tagline, image, actions }` block; page body kept below the hero for the feature grid; Starlight splash template renders the hero above body content automatically',
+    fileExt: 'md',
+    conversionType: 'text-pre-parse',
+    risk: 'high',
+  },
 ];

@@ -38,6 +38,8 @@ import { normalizeTyperSnippetDirectives } from '../normalize/typer-snippet-dire
 import { scanHeadingAnchors } from '../normalize/scan-heading-anchors.js';
 import { normalizeMkdocstringsCrossRefs } from '../normalize/mkdocstrings-crossref.js';
 import { normalizeLinkAttrLists } from '../normalize/link-attr-list.js';
+import { normalizeContentTabs } from '../normalize/content-tabs.js';
+import { normalizePackageManagerTabs } from '../normalize/package-manager-tabs.js';
 
 export interface ConvertSiteInput {
   readonly docsDir: string;
@@ -196,6 +198,23 @@ export async function convertSite(
       for (const diagnostic of expansion.diagnostics) {
         diagnostics.push({ sourcePath, diagnostic });
       }
+    }
+
+    // Detect package-manager tab groups (npm/yarn/pnpm/bun) and promote them
+    // to <PackageManagers pkg="..."> MDX components. This must run after all
+    // text-level transformations (snippets, include-markdown, auto-append) but
+    // before convertFile so the PM component is visible to MDX detection.
+    // We pre-run normalizeContentTabs here so the PM normalizer sees the
+    // directive form; convertFile's own normalize() will re-run content-tabs
+    // idempotently.
+    const pmSource = normalizeContentTabs(source);
+    const pmResult = normalizePackageManagerTabs(pmSource, sourcePath);
+    for (const diagnostic of pmResult.diagnostics) {
+      diagnostics.push({ sourcePath, diagnostic });
+    }
+    if (pmResult.promoted) {
+      featureUnion.add('package-managers');
+      source = pmResult.text;
     }
 
     const converted = convertFile({
