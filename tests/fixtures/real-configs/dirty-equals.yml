@@ -1,0 +1,104 @@
+site_name: dirty-equals
+site_description: Doing dirty (but extremely useful) things with equals.
+site_url: https://dirty-equals.helpmanual.io
+
+theme:
+  name: material
+  palette:
+  - scheme: default
+    primary: blue grey
+    accent: indigo
+    toggle:
+      icon: material/lightbulb
+      name: Switch to dark mode
+  - scheme: slate
+    primary: blue grey
+    accent: indigo
+    toggle:
+      icon: material/lightbulb-outline
+      name: Switch to light mode
+  features:
+  - search.suggest
+  - search.highlight
+  - content.tabs.link
+  - content.code.annotate
+  icon:
+    repo: fontawesome/brands/github-alt
+  logo: img/logo-white.svg
+  favicon: img/favicon.png
+  language: en
+
+repo_name: samuelcolvin/dirty-equals
+repo_url: https://github.com/samuelcolvin/dirty-equals
+edit_uri: ''
+nav:
+  - Introduction: index.md
+  - Usage: usage.md
+  - Types:
+      - types/numeric.md
+      - types/datetime.md
+      - types/dict.md
+      - types/sequence.md
+      - types/string.md
+      - types/inspection.md
+      - types/boolean.md
+      - types/other.md
+      - types/custom.md
+  - Internals: internals.md
+
+markdown_extensions:
+  - toc:
+      permalink: true
+  - admonition
+  - pymdownx.details
+  - pymdownx.superfences
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - attr_list
+  - md_in_html
+  - pymdownx.emoji:
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
+
+extra:
+  version:
+    provider: mike
+  analytics:
+    provider: google
+    property: G-FLP20728CW
+  social:
+  - icon: fontawesome/brands/github-alt
+    link: https://github.com/samuelcolvin/dirty-equals
+  - icon: fontawesome/brands/twitter
+    link: https://twitter.com/samuel_colvin
+
+watch:
+  - dirty_equals
+
+plugins:
+  - mike:
+      alias_type: symlink
+      canonical_version: latest
+  - search
+  - mkdocstrings:
+      handlers:
+        python:
+          options:
+            show_root_heading: true
+            show_root_full_path: false
+            show_source: false
+            heading_level: 2
+            merge_init_into_class: true
+            show_signature_annotations: true
+            separate_signature: true
+            signature_crossrefs: true
+          import:
+            - url: https://docs.python.org/3/objects.inv
+            - url: https://docs.pydantic.dev/latest/objects.inv
+  - mkdocs-simple-hooks:
+      hooks:
+        on_pre_build: 'docs.plugins:on_pre_build'
+        on_files: 'docs.plugins:on_files'
+        on_page_markdown: 'docs.plugins:on_page_markdown'
