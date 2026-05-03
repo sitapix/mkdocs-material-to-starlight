@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { normalizeAdmonitions } from './admonitions.js';
+import { normalizeAdmonitions, ADMONITION_FENCE_DEPTH } from './admonitions.js';
+
+const FENCE = ':'.repeat(ADMONITION_FENCE_DEPTH);
 
 describe('normalizeAdmonitions', () => {
   it('passes through text containing no admonitions', () => {
@@ -7,37 +9,37 @@ describe('normalizeAdmonitions', () => {
     expect(normalizeAdmonitions(src)).toBe(src);
   });
 
-  it('rewrites a bare !!! note block into :::note', () => {
+  it('rewrites a bare !!! note block into a directive with ADMONITION_FENCE_DEPTH colons', () => {
     const src = '!!! note\n    Body line one.\n    Body line two.\n\nAfter.\n';
-    const expected = ':::note\nBody line one.\nBody line two.\n:::\n\nAfter.\n';
+    const expected = `${FENCE}note\nBody line one.\nBody line two.\n${FENCE}\n\nAfter.\n`;
     expect(normalizeAdmonitions(src)).toBe(expected);
   });
 
   it('preserves a quoted title with bracketed-attribute syntax', () => {
     const src = '!!! warning "Heads up"\n    Read this.\n';
     expect(normalizeAdmonitions(src)).toBe(
-      ':::warning[Heads up]\nRead this.\n:::\n',
+      `${FENCE}warning[Heads up]\nRead this.\n${FENCE}\n`,
     );
   });
 
   it('translates ??? as a collapsible directive (data-collapsible attribute)', () => {
     const src = '??? tip\n    Hidden by default.\n';
     expect(normalizeAdmonitions(src)).toBe(
-      ':::tip{collapsible="closed"}\nHidden by default.\n:::\n',
+      `${FENCE}tip{collapsible="closed"}\nHidden by default.\n${FENCE}\n`,
     );
   });
 
   it('translates ???+ as a collapsible-open directive', () => {
     const src = '???+ tip\n    Visible by default.\n';
     expect(normalizeAdmonitions(src)).toBe(
-      ':::tip{collapsible="open"}\nVisible by default.\n:::\n',
+      `${FENCE}tip{collapsible="open"}\nVisible by default.\n${FENCE}\n`,
     );
   });
 
   it('preserves an inline-end modifier in attribute form', () => {
     const src = '!!! info inline end "Aside"\n    Floats right.\n';
     expect(normalizeAdmonitions(src)).toBe(
-      ':::info[Aside]{inline="end"}\nFloats right.\n:::\n',
+      `${FENCE}info[Aside]{inline="end"}\nFloats right.\n${FENCE}\n`,
     );
   });
 
@@ -45,14 +47,14 @@ describe('normalizeAdmonitions', () => {
     const src =
       '!!! note\n    First.\n\n!!! warning\n    Second.\n';
     expect(normalizeAdmonitions(src)).toBe(
-      ':::note\nFirst.\n:::\n\n:::warning\nSecond.\n:::\n',
+      `${FENCE}note\nFirst.\n${FENCE}\n\n${FENCE}warning\nSecond.\n${FENCE}\n`,
     );
   });
 
   it('leaves an admonition with empty body as a marker-only directive', () => {
     const src = '!!! note\n\nNext paragraph.\n';
     expect(normalizeAdmonitions(src)).toBe(
-      ':::note\n:::\n\nNext paragraph.\n',
+      `${FENCE}note\n${FENCE}\n\nNext paragraph.\n`,
     );
   });
 

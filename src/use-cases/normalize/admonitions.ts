@@ -24,6 +24,23 @@ import { readIndentedBlock } from '../../domain/syntax/indented-block.js';
 const FENCE = /^ {0,3}(```|~~~)/;
 const BODY_INDENT = 4;
 
+/**
+ * The number of colons used for admonition directive fences.
+ *
+ * Must be GREATER than the maximum fence depth used by any directive that may
+ * appear inside an admonition body. remark-directive's closing rule terminates
+ * ALL open fences with depth ≤ the closing fence depth, so inner directives at
+ * depth ≤ N would prematurely close an admonition at the same depth N.
+ *
+ * Current inner directive depths:
+ *   - :::tab / :::card   (depth 3)
+ *   - ::::tabs / ::::card-grid (depth 4)
+ *
+ * Using depth 6 leaves a comfortable gap above the current maximum (4) while
+ * staying well within remark-directive's supported range.
+ */
+export const ADMONITION_FENCE_DEPTH = 6;
+
 export function normalizeAdmonitions(source: string): string {
   const lines = source.split('\n');
   const output: string[] = [];
@@ -62,7 +79,7 @@ export function normalizeAdmonitions(source: string): string {
     for (const bodyLine of block.bodyLines) {
       output.push(opening.indent === 0 ? bodyLine : ' '.repeat(opening.indent) + bodyLine);
     }
-    output.push(`${' '.repeat(opening.indent)}:::`);
+    output.push(`${' '.repeat(opening.indent)}${':'.repeat(ADMONITION_FENCE_DEPTH)}`);
     i = block.nextIndex;
   }
 
@@ -73,7 +90,8 @@ function renderOpening(opening: AdmonitionOpening): string {
   const indent = ' '.repeat(opening.indent);
   const label = opening.title === null ? '' : `[${opening.title}]`;
   const attrs = renderAttributes(opening);
-  return `${indent}:::${opening.type}${label}${attrs}`;
+  const fence = ':'.repeat(ADMONITION_FENCE_DEPTH);
+  return `${indent}${fence}${opening.type}${label}${attrs}`;
 }
 
 function renderAttributes(opening: AdmonitionOpening): string {

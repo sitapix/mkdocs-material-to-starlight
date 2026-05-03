@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { normalizeBlocks } from './blocks.js';
+import { ADMONITION_FENCE_DEPTH } from './admonitions.js';
+
+const F = ':'.repeat(ADMONITION_FENCE_DEPTH);
 
 describe('normalizeBlocks', () => {
   it('passes through text containing no blocks fences', () => {
@@ -7,16 +10,16 @@ describe('normalizeBlocks', () => {
     expect(normalizeBlocks(src)).toBe(src);
   });
 
-  it('rewrites a bare /// note block into :::note', () => {
+  it('rewrites a bare /// note block into an admonition directive', () => {
     const src = '/// note\nBody line one.\nBody line two.\n///\n\nAfter.\n';
-    const expected = ':::note\nBody line one.\nBody line two.\n:::\n\nAfter.\n';
+    const expected = `${F}note\nBody line one.\nBody line two.\n${F}\n\nAfter.\n`;
     expect(normalizeBlocks(src)).toBe(expected);
   });
 
   it('preserves a pipe-delimited title with bracketed-attribute syntax', () => {
     const src = '/// warning | Heads up\nRead this.\n///\n';
     expect(normalizeBlocks(src)).toBe(
-      ':::warning[Heads up]\nRead this.\n:::\n',
+      `${F}warning[Heads up]\nRead this.\n${F}\n`,
     );
   });
 
@@ -24,7 +27,7 @@ describe('normalizeBlocks', () => {
     const src =
       '/// note\nFirst.\n///\n\n/// warning\nSecond.\n///\n';
     expect(normalizeBlocks(src)).toBe(
-      ':::note\nFirst.\n:::\n\n:::warning\nSecond.\n:::\n',
+      `${F}note\nFirst.\n${F}\n\n${F}warning\nSecond.\n${F}\n`,
     );
   });
 
@@ -48,10 +51,10 @@ describe('normalizeBlocks', () => {
   });
 
   it('matches closer to opener by fence length, allowing nested 3-slash inside 4-slash', () => {
-    // `/// admonition` (with no `type:` override) defaults to `note` because
-    // `:::admonition` has no downstream handler. The fence-length matching
-    // here is the load-bearing behavior under test — the inner 3-slash close
-    // must NOT be mistaken for the outer 4-slash close.
+    // Both outer (4-slash) and inner (3-slash) admonition blocks become
+    // ADMONITION_FENCE_DEPTH directives. The fence-length matching in the
+    // normalizer's OWN tokenizer is the load-bearing behavior under test —
+    // the inner 3-slash close must NOT be mistaken for the outer 4-slash close.
     const src = [
       '//// admonition | Outer',
       '/// note',
@@ -61,11 +64,11 @@ describe('normalizeBlocks', () => {
       '',
     ].join('\n');
     const expected = [
-      ':::note[Outer]',
-      ':::note',
+      `${F}note[Outer]`,
+      `${F}note`,
       'inner body',
-      ':::',
-      ':::',
+      F,
+      F,
       '',
     ].join('\n');
     expect(normalizeBlocks(src)).toBe(expected);
@@ -119,7 +122,7 @@ describe('normalizeBlocks', () => {
   it('rewrites /// details as a collapsible-closed admonition', () => {
     const src = '/// details | More info\nDetail body.\n///\n';
     expect(normalizeBlocks(src)).toBe(
-      ':::note[More info]{collapsible="closed"}\nDetail body.\n:::\n',
+      `${F}note[More info]{collapsible="closed"}\nDetail body.\n${F}\n`,
     );
   });
 
@@ -154,9 +157,9 @@ describe('normalizeBlocks', () => {
     );
   });
 
-  it('defaults a bare /// admonition (no type:) to :::note', () => {
+  it('defaults a bare /// admonition (no type:) to note directive', () => {
     const src = '/// admonition | Heads up\nbody.\n///\n';
-    expect(normalizeBlocks(src)).toBe(':::note[Heads up]\nbody.\n:::\n');
+    expect(normalizeBlocks(src)).toBe(`${F}note[Heads up]\nbody.\n${F}\n`);
   });
 
   it('honors a 4-space-indented `type: warning` option as the directive name', () => {
@@ -168,7 +171,7 @@ describe('normalizeBlocks', () => {
       '',
     ].join('\n');
     expect(normalizeBlocks(src)).toBe(
-      ':::warning[Title]\nbody.\n:::\n',
+      `${F}warning[Title]\nbody.\n${F}\n`,
     );
   });
 
@@ -181,7 +184,7 @@ describe('normalizeBlocks', () => {
       '',
     ].join('\n');
     expect(normalizeBlocks(src)).toBe(
-      ':::tip[Pro tip]\nhelpful.\n:::\n',
+      `${F}tip[Pro tip]\nhelpful.\n${F}\n`,
     );
   });
 
@@ -195,14 +198,14 @@ describe('normalizeBlocks', () => {
       '',
     ].join('\n');
     expect(normalizeBlocks(src)).toBe(
-      ':::danger[Title]\nbody.\n:::\n',
+      `${F}danger[Title]\nbody.\n${F}\n`,
     );
   });
 
   it('rewrites a bare /// details (no title) as a collapsible-closed admonition', () => {
     const src = '/// details\nDetail body.\n///\n';
     expect(normalizeBlocks(src)).toBe(
-      ':::note{collapsible="closed"}\nDetail body.\n:::\n',
+      `${F}note{collapsible="closed"}\nDetail body.\n${F}\n`,
     );
   });
 
@@ -222,9 +225,9 @@ describe('normalizeBlocks', () => {
       '',
     ].join('\n');
     const out = normalizeBlocks(src);
-    // Two distinct tab groups, with a :::note between them.
-    expect(out).toContain('::::tabs\n:::tab[C]\nc-body\n:::\n::::');
-    expect(out).toContain(':::note\nnote-body\n:::');
-    expect(out).toContain('::::tabs\n:::tab[C++]\ncpp-body\n:::\n::::');
+    // Two distinct tab groups, with an admonition between them.
+    expect(out).toContain(`::::tabs\n:::tab[C]\nc-body\n:::\n::::`);
+    expect(out).toContain(`${F}note\nnote-body\n${F}`);
+    expect(out).toContain(`::::tabs\n:::tab[C++]\ncpp-body\n:::\n::::`);
   });
 });

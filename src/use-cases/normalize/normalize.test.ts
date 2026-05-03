@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { normalize } from './normalize.js';
-import { normalizeAdmonitions } from './admonitions.js';
+import { normalizeAdmonitions, ADMONITION_FENCE_DEPTH } from './admonitions.js';
 import { normalizeContentTabs } from './content-tabs.js';
+
+const F = ':'.repeat(ADMONITION_FENCE_DEPTH);
 
 describe('normalize (composed pre-parse pipeline)', () => {
   it('passes through plain markdown unchanged', () => {
@@ -22,7 +24,7 @@ describe('normalize (composed pre-parse pipeline)', () => {
       '',
     ].join('\n');
     const out = normalize(src);
-    expect(out).toContain(':::note[Setup]');
+    expect(out).toContain(`${F}note[Setup]`);
     expect(out).toContain('Read this first.');
     expect(out).toContain(':::tabs');
     expect(out).toContain(':::tab[macOS]');
@@ -151,9 +153,9 @@ describe('normalize (composed pre-parse pipeline)', () => {
       '',
     ].join('\n');
     const out = normalize(src);
-    expect(out).toContain(':::note[Modern]');
+    expect(out).toContain(`${F}note[Modern]`);
     expect(out).toContain('New syntax.');
-    expect(out).toContain(':::warning[Legacy]');
+    expect(out).toContain(`${F}warning[Legacy]`);
     expect(out).toContain('Old syntax.');
   });
 });

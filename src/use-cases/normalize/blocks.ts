@@ -32,6 +32,7 @@ import {
   parseBlocksLine,
   type BlocksOpening,
 } from '../../domain/syntax/blocks-line.js';
+import { ADMONITION_FENCE_DEPTH } from './admonitions.js';
 
 const FENCE = /^ {0,3}(```|~~~)/;
 const TAB_NAME = 'tab';
@@ -148,7 +149,7 @@ export function normalizeBlocks(source: string): string {
     if (bodySlice.length > 0) {
       output.push(normalizeBlocks(bodySlice));
     }
-    output.push(`${' '.repeat(parsed.indent)}:::`);
+    output.push(`${' '.repeat(parsed.indent)}${':'.repeat(ADMONITION_FENCE_DEPTH)}`);
     i = closeIndex + 1;
   }
 
@@ -294,6 +295,7 @@ function renderHtmlBlock(title: string | null, body: string): ReadonlyArray<stri
 function renderOpening(opening: BlocksOpening, effectiveName: string): string {
   const indent = ' '.repeat(opening.indent);
   const label = opening.title === null ? '' : `[${opening.title}]`;
+  const fence = ':'.repeat(ADMONITION_FENCE_DEPTH);
   // pymdownx.blocks.details has no Starlight equivalent of its own, but the
   // existing admonition pipeline already maps `:::note[Title]{collapsible}`
   // through to a `<details><summary>` HTML pair. Rewriting `/// details` into
@@ -301,7 +303,7 @@ function renderOpening(opening: BlocksOpening, effectiveName: string): string {
   // for collapsible-only directives. Directive syntax order is name → label →
   // attrs, matching `remark-directive`'s parser.
   if (effectiveName === DETAILS_NAME) {
-    return `${indent}:::note${label}{collapsible="closed"}`;
+    return `${indent}${fence}note${label}{collapsible="closed"}`;
   }
-  return `${indent}:::${effectiveName}${label}`;
+  return `${indent}${fence}${effectiveName}${label}`;
 }
