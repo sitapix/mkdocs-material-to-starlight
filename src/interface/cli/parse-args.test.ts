@@ -282,4 +282,16 @@ describe('parseArgs — wizard flag surface', () => {
     expect(r.kind).toBe('convert');
     if (r.kind === 'convert') expect(r.packageManager).toBe('pnpm');
   });
+
+  it('rejects --dir + positional output directory together (mutually exclusive)', () => {
+    const r = parseArgs(['./project', './output', '--dir', './alt']);
+    expect(r.kind).toBe('error');
+    if (r.kind === 'error') expect(r.message).toMatch(/--dir.*mutually exclusive/i);
+  });
+
+  it('accepts --dir without a second positional', () => {
+    const r = parseArgs(['./project', '--dir', './output']);
+    expect(r.kind).toBe('convert');
+    if (r.kind === 'convert') expect(r.outputDir).toBe('./output');
+  });
 });

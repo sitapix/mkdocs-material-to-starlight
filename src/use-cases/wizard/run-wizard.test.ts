@@ -19,7 +19,7 @@ function makePlan(over: Partial<MkdocsConfig> = {}): ConversionPlan {
     theme: null,
     plugins: [],
     markdownExtensions: [],
-    extras: { record: {}, hooks: null },
+    extras: {},
     ...over,
   };
   return {

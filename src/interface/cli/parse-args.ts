@@ -158,7 +158,8 @@ function parseConvertArgs(argv: ReadonlyArray<string>): Command {
   if (positionals.length < 1) {
     return { kind: 'error', message: 'missing project directory' };
   }
-  if (positionals.length < 2) {
+  const hasDirOverride = (parsed.values.dir as string | undefined) !== undefined;
+  if (positionals.length < 2 && !hasDirOverride) {
     return { kind: 'error', message: 'missing output directory' };
   }
 
@@ -191,6 +192,13 @@ function parseConvertArgs(argv: ReadonlyArray<string>): Command {
       : false;
 
   const dirOverride = (parsed.values.dir as string | undefined) ?? null;
+
+  if (dirOverride !== null && positionals.length >= 2) {
+    return {
+      kind: 'error',
+      message: '--dir and a positional output directory are mutually exclusive',
+    };
+  }
 
   let snippetMaxDepth: number | null = null;
   const sm = parsed.values['snippet-max-depth'];

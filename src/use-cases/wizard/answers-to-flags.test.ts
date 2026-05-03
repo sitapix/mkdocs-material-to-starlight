@@ -108,6 +108,25 @@ describe('answersToFlags ↔ parseArgs round-trip', () => {
     if (parsed.kind === 'convert') expect(parsed.check).toBe(true);
   });
 
+  it('round-trips sidebarTopics: false', () => {
+    const a = answersFor({ sidebarTopics: false });
+    const flags = answersToFlags(a);
+    expect(flags).toContain('--no-sidebar-topics');
+    const parsed = parseArgs([...flags]);
+    expect(parsed.kind).toBe('convert');
+    if (parsed.kind === 'convert') expect(parsed.sidebarTopics).toBe(false);
+  });
+
+  it('round-trips sidebarTopics: true (default; flag omitted)', () => {
+    const a = answersFor({ sidebarTopics: true });
+    const flags = answersToFlags(a);
+    expect(flags).not.toContain('--no-sidebar-topics');
+    expect(flags).not.toContain('--sidebar-topics');
+    const parsed = parseArgs([...flags]);
+    expect(parsed.kind).toBe('convert');
+    if (parsed.kind === 'convert') expect(parsed.sidebarTopics).toBe(null);
+  });
+
   it('round-trips an override-heavy answer set', () => {
     const a = answersFor({
       check: true,
