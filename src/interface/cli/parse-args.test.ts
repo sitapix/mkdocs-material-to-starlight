@@ -186,4 +186,10 @@ describe('parseArgs', () => {
     const result = parseArgs(['--explain', './project']);
     expect(result.kind).toBe('explain');
   });
+
+  it('accepts -y as a no-op short alias to be used by later wizard work', () => {
+    // -y currently sets no field but must not cause an "unknown option" error.
+    const result = parseArgs(['./project', './output', '-y']);
+    expect(result.kind).toBe('convert');
+  });
 });

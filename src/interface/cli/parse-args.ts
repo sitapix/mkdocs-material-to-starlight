@@ -1,19 +1,12 @@
 /**
- * Pure CLI argument parser. Takes the raw `argv` slice (without `node` and
- * the script name) and returns a typed `Command` describing what to do.
+ * CLI argument parser. Built on Node 20's `node:util` `parseArgs` for strict
+ * POSIX-style parsing with short aliases and `--no-*` negation.
  *
- * Pure: no side effects, no `process` access, no console output. The CLI
- * `main.ts` calls this, then dispatches based on the returned variant.
- *
- * Supported invocations:
- *   --help, -h                          → help
- *   --version                           → version
- *   <project-dir> <output-dir> [opts]   → convert
- *
- * Options:
- *   --snippet-base-path <path>  (repeatable) — enables snippet expansion
- *   --dry-run                                — runs conversion in memory only
+ * Pure: no side effects, no `process` access, no console output. Returns a
+ * tagged `Command` describing what to do; the CLI shell dispatches.
  */
+
+import { parseArgs as nodeParseArgs } from 'node:util';
 
 export type Command =
   | { readonly kind: 'help' }
@@ -38,160 +31,140 @@ export type Command =
       readonly reportPath: string | null;
     };
 
+const CONVERT_OPTIONS = {
+  help: { type: 'boolean', short: 'h' },
+  version: { type: 'boolean' },
+  'snippet-base-path': { type: 'string', multiple: true },
+  'dry-run': { type: 'boolean' },
+  explain: { type: 'boolean' },
+  check: { type: 'boolean' },
+  'check-timeout': { type: 'string' },
+  yes: { type: 'boolean', short: 'y' }, // reserved for wizard tasks; no-op here
+} as const;
+
+const COMPARE_OPTIONS = {
+  pages: { type: 'string' },
+  threshold: { type: 'string' },
+  report: { type: 'string' },
+} as const;
+
 export function parseArgs(argv: ReadonlyArray<string>): Command {
   if (argv.length === 0) {
     return { kind: 'error', message: 'missing project directory' };
   }
-  if (argv.includes('--help') || argv.includes('-h')) {
-    return { kind: 'help' };
-  }
-  if (argv.includes('--version')) {
-    return { kind: 'version' };
-  }
-
   if (argv[0] === 'compare') {
     return parseCompareArgs(argv.slice(1));
   }
+  return parseConvertArgs(argv);
+}
 
-  const positionals: string[] = [];
-  const snippetBasePaths: string[] = [];
-  let dryRun = false;
-  let explain = false;
-  let check = false;
-  let checkTimeoutMs: number | null = null;
-  let i = 0;
-  while (i < argv.length) {
-    const token = argv[i] ?? '';
-    if (token === '--snippet-base-path') {
-      const value = argv[i + 1];
-      if (value === undefined) {
-        return { kind: 'error', message: '--snippet-base-path requires a value' };
-      }
-      snippetBasePaths.push(value);
-      i += 2;
-      continue;
+function parseConvertArgs(argv: ReadonlyArray<string>): Command {
+  let parsed: ReturnType<typeof nodeParseArgs>;
+  try {
+    parsed = nodeParseArgs({
+      args: [...argv],
+      options: CONVERT_OPTIONS,
+      allowPositionals: true,
+      strict: true,
+    } as Parameters<typeof nodeParseArgs>[0]);
+  } catch (cause) {
+    return { kind: 'error', message: extractParseError(cause) };
+  }
+
+  if (parsed.values.help === true) return { kind: 'help' };
+  if (parsed.values.version === true) return { kind: 'version' };
+
+  const positionals = parsed.positionals;
+  if (parsed.values.explain === true) {
+    if (positionals.length < 1) {
+      return { kind: 'error', message: 'missing project directory' };
     }
-    if (token === '--dry-run') {
-      dryRun = true;
-      i += 1;
-      continue;
-    }
-    if (token === '--explain') {
-      explain = true;
-      i += 1;
-      continue;
-    }
-    if (token === '--check') {
-      check = true;
-      i += 1;
-      continue;
-    }
-    if (token === '--check-timeout') {
-      const value = argv[i + 1];
-      if (value === undefined) {
-        return { kind: 'error', message: '--check-timeout requires a value' };
-      }
-      const parsed = Number(value);
-      if (!Number.isFinite(parsed) || parsed <= 0) {
-        return {
-          kind: 'error',
-          message: `--check-timeout must be a positive number of milliseconds (got "${value}")`,
-        };
-      }
-      checkTimeoutMs = parsed;
-      i += 2;
-      continue;
-    }
-    if (token.startsWith('--')) {
-      return { kind: 'error', message: `unknown option ${token}` };
-    }
-    positionals.push(token);
-    i += 1;
+    return { kind: 'explain', projectDir: positionals[0] ?? '' };
   }
 
   if (positionals.length < 1) {
     return { kind: 'error', message: 'missing project directory' };
   }
-
-  if (explain) {
-    return { kind: 'explain', projectDir: positionals[0] ?? '' };
-  }
-
   if (positionals.length < 2) {
     return { kind: 'error', message: 'missing output directory' };
   }
+
+  const checkTimeoutRaw = parsed.values['check-timeout'];
+  let checkTimeoutMs: number | null = null;
+  if (checkTimeoutRaw !== undefined) {
+    const n = Number(checkTimeoutRaw);
+    if (!Number.isFinite(n) || n <= 0) {
+      return {
+        kind: 'error',
+        message: `--check-timeout must be a positive number of milliseconds (got "${checkTimeoutRaw}")`,
+      };
+    }
+    checkTimeoutMs = n;
+  }
+
+  const snippetBasePathsRaw = parsed.values['snippet-base-path'];
+  const snippetBasePaths =
+    snippetBasePathsRaw === undefined || (Array.isArray(snippetBasePathsRaw) && snippetBasePathsRaw.length === 0)
+      ? null
+      : (Array.isArray(snippetBasePathsRaw) ? (snippetBasePathsRaw as ReadonlyArray<string>) : null);
 
   return {
     kind: 'convert',
     projectDir: positionals[0] ?? '',
     outputDir: positionals[1] ?? '',
-    snippetBasePaths: snippetBasePaths.length === 0 ? null : snippetBasePaths,
-    dryRun,
-    check,
+    snippetBasePaths,
+    dryRun: parsed.values['dry-run'] === true,
+    check: parsed.values.check === true,
     checkTimeoutMs,
   };
 }
 
 function parseCompareArgs(argv: ReadonlyArray<string>): Command {
-  const positionals: string[] = [];
-  const paths: string[] = [];
-  let threshold = 0.01;
-  let reportPath: string | null = null;
-  let i = 0;
-  while (i < argv.length) {
-    const token = argv[i] ?? '';
-    if (token === '--pages') {
-      const value = argv[i + 1];
-      if (value === undefined) {
-        return { kind: 'error', message: '--pages requires a value' };
-      }
-      for (const p of value.split(',')) {
-        const trimmed = p.trim();
-        if (trimmed.length > 0) paths.push(trimmed);
-      }
-      i += 2;
-      continue;
-    }
-    if (token === '--threshold') {
-      const value = argv[i + 1];
-      if (value === undefined) {
-        return { kind: 'error', message: '--threshold requires a value' };
-      }
-      const parsed = Number(value);
-      if (!Number.isFinite(parsed) || parsed < 0 || parsed > 1) {
-        return {
-          kind: 'error',
-          message: `--threshold must be a number between 0 and 1 (got "${value}")`,
-        };
-      }
-      threshold = parsed;
-      i += 2;
-      continue;
-    }
-    if (token === '--report') {
-      const value = argv[i + 1];
-      if (value === undefined) {
-        return { kind: 'error', message: '--report requires a path' };
-      }
-      reportPath = value;
-      i += 2;
-      continue;
-    }
-    if (token.startsWith('--')) {
-      return { kind: 'error', message: `unknown option ${token}` };
-    }
-    positionals.push(token);
-    i += 1;
+  let parsed: ReturnType<typeof nodeParseArgs>;
+  try {
+    parsed = nodeParseArgs({
+      args: [...argv],
+      options: COMPARE_OPTIONS,
+      allowPositionals: true,
+      strict: true,
+    } as Parameters<typeof nodeParseArgs>[0]);
+  } catch (cause) {
+    return { kind: 'error', message: extractParseError(cause) };
   }
+
+  const positionals = parsed.positionals;
   if (positionals.length < 2) {
     return {
       kind: 'error',
       message: 'compare requires <baseline-url> and <converted-url>',
     };
   }
-  if (paths.length === 0) {
-    paths.push('/');
+
+  let threshold = 0.01;
+  if (parsed.values.threshold !== undefined) {
+    const n = Number(parsed.values.threshold);
+    if (!Number.isFinite(n) || n < 0 || n > 1) {
+      return {
+        kind: 'error',
+        message: `--threshold must be a number between 0 and 1 (got "${parsed.values.threshold}")`,
+      };
+    }
+    threshold = n;
   }
+
+  const paths: string[] = [];
+  const pagesRaw = parsed.values.pages;
+  if (pagesRaw !== undefined && typeof pagesRaw === 'string') {
+    for (const p of pagesRaw.split(',')) {
+      const trimmed = p.trim();
+      if (trimmed.length > 0) paths.push(trimmed);
+    }
+  }
+  if (paths.length === 0) paths.push('/');
+
+  const reportRaw = parsed.values.report;
+  const reportPath = reportRaw !== undefined && typeof reportRaw === 'string' ? reportRaw : null;
+
   return {
     kind: 'compare',
     baselineUrl: positionals[0] ?? '',
@@ -200,4 +173,12 @@ function parseCompareArgs(argv: ReadonlyArray<string>): Command {
     threshold,
     reportPath,
   };
+}
+
+function extractParseError(cause: unknown): string {
+  if (cause instanceof Error) {
+    // node:util parseArgs throws ERR_PARSE_ARGS_UNKNOWN_OPTION etc.
+    return cause.message.replace(/^.*?: /, '').replace(/\.\s*$/, '');
+  }
+  return String(cause);
 }
