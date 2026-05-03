@@ -163,6 +163,7 @@ interface ConvertCommand {
   readonly snippetBasePaths: ReadonlyArray<string> | null;
   readonly check: boolean;
   readonly checkTimeoutMs: number | null;
+  readonly force: boolean;
   // wizard surface — Commit A (easy parametrizations)
   readonly linksValidator: boolean | null;
   readonly tabs: 'mdx' | 'html' | null;
@@ -201,6 +202,7 @@ async function runConvert(
   const input = {
     projectDir: command.projectDir,
     outputDir: command.outputDir,
+    ...(command.force ? { force: true } : {}),
     ...(command.snippetBasePaths !== null ? { snippetBasePaths: command.snippetBasePaths } : {}),
     ...(command.linksValidator !== null ? { linksValidator: command.linksValidator } : {}),
     ...(command.tabs !== null ? { tabs: command.tabs } : {}),

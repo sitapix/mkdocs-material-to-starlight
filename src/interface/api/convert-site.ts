@@ -19,7 +19,7 @@
  * input; only on programmer error or OS conditions outside the contract.
  */
 
-import { copyFile, mkdir, writeFile } from 'node:fs/promises';
+import { copyFile, mkdir, writeFile, readdir } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { ok, err, type Result } from '../../domain/result.js';
 import { planAssetCopies, type AssetCopy } from '../../use-cases/copy-assets/plan.js';
@@ -92,6 +92,8 @@ export interface ConvertSiteFromDiskInput {
   /** Explicit version slugs for starlight-versions. Overrides the placeholder when the
    *  versions feature is detected. Empty array emits `versions: []`. */
   readonly mikeVersions?: ReadonlyArray<string>;
+  /** When true, allow overwriting a non-empty output directory. */
+  readonly force?: boolean;
 
   // ── Deferred options (v2) ────────────────────────────────────────────────
   // These are accepted so the wizard can pass them through, but the actual
@@ -145,7 +147,8 @@ export interface ConvertSiteFromDiskError {
     | 'slug-conflict'
     | 'file-read-failed'
     | 'file-write-failed'
-    | 'nav-compile-failed';
+    | 'nav-compile-failed'
+    | 'output-not-empty';
   readonly message: string;
 }
 
@@ -193,6 +196,20 @@ export async function convertSiteFromDisk(
   const config = parseMkdocsConfig(decoded.value);
   if (!config.ok) {
     return err({ code: 'config-invalid', message: config.error.message });
+  }
+
+  // Idempotency guard: if output dir exists and is non-empty, demand --force.
+  let existing: string[] = [];
+  try {
+    existing = await readdir(input.outputDir);
+  } catch {
+    // dir doesn't exist — fine
+  }
+  if (existing.length > 0 && input.force !== true) {
+    return err({
+      code: 'output-not-empty',
+      message: `Output directory ${input.outputDir} is not empty. Re-run with --force to overwrite, or pick a different output directory.`,
+    });
   }
 
   const docsDir = join(input.projectDir, config.value.docsDir);
