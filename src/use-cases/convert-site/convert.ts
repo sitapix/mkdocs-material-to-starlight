@@ -33,6 +33,7 @@ import { validateJsxComponents } from '../validate-output/jsx-components.js';
 import { renameI18nPath } from '../detect-features/i18n-rename.js';
 import { expandIncludeMarkdown } from '../include-markdown/expand.js';
 import { scanMacroOccurrences } from '../detect-macros/scan.js';
+import { normalizeTyperSnippetDirectives } from '../normalize/typer-snippet-directives.js';
 
 export interface ConvertSiteInput {
   readonly docsDir: string;
@@ -120,6 +121,14 @@ export async function convertSite(
     }
 
     let source = read.value;
+    // Normalize typer-style {* path *} snippet directives before any other
+    // processing. This must run on the original source so line numbers match
+    // the user's file, and before the mkautodoc normalizer fences them.
+    const snippetResult = normalizeTyperSnippetDirectives(source);
+    source = snippetResult.text;
+    for (const diagnostic of snippetResult.diagnostics) {
+      diagnostics.push({ sourcePath, diagnostic });
+    }
     if (input.macrosScanEnabled === true) {
       // Scan the ORIGINAL source so line numbers match the user's file. The
       // include-markdown expansion below would shift them otherwise.

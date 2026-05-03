@@ -764,6 +764,46 @@ const REGISTRY_ENTRIES: ReadonlyArray<DiagnosticEntry> = [
     fix:
       'Re-run the wizard, or invoke with explicit flags + `--yes` to skip prompts.',
   },
+  {
+    id: 'typer-snippet-directive-detected',
+    severity: 'info',
+    description:
+      'A typer-style `{* path *}` source-include directive was found. The converter cannot run the MkDocs macros plugin to inline the file; a TODO comment with the path is emitted instead.',
+    fix:
+      'Manually inline the referenced file\'s contents at the marked location, or write an Astro component / remark plugin that reads the file at build time.',
+  },
+  {
+    id: 'macros-expression-detected',
+    severity: 'info',
+    description:
+      'A Jinja2/macros expression `{{ ... }}` was found in a source file outside a code block. The macros plugin runtime is not reproducible by the converter.',
+    fix:
+      'Replace the expression with literal Markdown or an Astro component that produces equivalent content.',
+  },
+  {
+    id: 'heading-explicit-id-stripped',
+    severity: 'info',
+    description:
+      'An explicit heading ID (`{#slug}`) was stripped. Cross-page deep links to `#slug` will not resolve in Starlight.',
+    fix:
+      'Re-add the anchor as an inline anchor `<a id="slug"></a>` next to the heading, or use `--keep-explicit-heading-ids` (deferred to v2).',
+  },
+  {
+    id: 'mkdocstrings-cross-ref-stripped',
+    severity: 'info',
+    description:
+      'A mkdocstrings cross-reference (`` [`X`][] `` or `` [`X`][module.Path] ``) was reduced to inline code. The Python autodoc target cannot be resolved by Starlight.',
+    fix:
+      'If the cross-reference should link to an API page, manually add the appropriate URL after conversion.',
+  },
+  {
+    id: 'link-attr-list-stripped',
+    severity: 'info',
+    description:
+      'A `{.class attr=value}` link attribute list following an inline link was stripped. Starlight has no equivalent HTML attribute syntax for Markdown links.',
+    fix:
+      'Re-add the desired attributes as MDX `<a>` props if needed, or use an Astro component.',
+  },
 ];
 
 export const DIAGNOSTIC_REGISTRY: ReadonlyMap<string, DiagnosticEntry> = new Map(
