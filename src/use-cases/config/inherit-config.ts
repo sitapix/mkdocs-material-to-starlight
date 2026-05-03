@@ -1,20 +1,27 @@
 /**
- * Resolve MkDocs `INHERIT:` directives by inlining the referenced YAML
- * before decoding.
+ * Resolve MkDocs `INHERIT:` directives by deep-merging the referenced YAML
+ * config objects.
  *
  * MkDocs (since 1.5) treats a top-level `INHERIT:` key as a deep-merge base
  * config. The value is a path resolved relative to the config file location.
  * Multiple levels of INHERIT chain transitively.
  *
- * For our purposes (we don't need MkDocs's full deep-merge semantics; the
- * downstream parser tolerates duplicate top-level keys with later values
- * winning), inlining the base file's content above the deriver's content
- * is sufficient.
+ * Merge semantics (matching MkDocs's documented behaviour):
+ *   - For each key in the derived object, if the base has the same key AND
+ *     both values are plain objects (not arrays), recursively merge.
+ *   - Otherwise the derived value wins outright — including arrays, which are
+ *     NOT merged element-wise. The derived array fully replaces the base array.
+ *   - Keys present only in the base are preserved as-is.
+ *   - Keys present only in the derived are kept as-is.
  *
- * Pure given the FileSystem port. Returns the inlined source plus tracking
- * info (included files for diagnostics, missing references for warnings).
+ * The merged JS object is re-encoded to YAML (via js-yaml.dump) so the
+ * existing downstream parser sees a clean, duplicate-free string.
+ *
+ * Pure given the FileSystem port. Returns the merged source plus tracking info
+ * (included files for diagnostics, missing references for warnings).
  */
 
+import { load as yamlLoad, dump as yamlDump } from 'js-yaml';
 import type { FileSystem } from '../../domain/ports/file-system.js';
 
 const INHERIT_RE = /^INHERIT:\s*(\S+)\s*$/m;
@@ -65,7 +72,70 @@ async function expand(
     missing,
     depth + 1,
   );
-  return `${expandedBase.trimEnd()}\n${remainder}`;
+
+  // Deep-merge: parse both YAML strings into JS objects, merge at the
+  // object level, then re-encode to a clean YAML string free of duplicate keys.
+  return mergeYamlSources(expandedBase, remainder);
+}
+
+/**
+ * Parse two YAML strings, deep-merge them (derived wins on conflicts, arrays
+ * are replaced not concatenated), and re-encode the result.
+ *
+ * Falls back to the string-concatenation approach only when one or both sides
+ * cannot be parsed as a mapping (e.g., an empty file or a scalar root).
+ */
+function mergeYamlSources(baseSource: string, derivedSource: string): string {
+  let baseObj: unknown;
+  let derivedObj: unknown;
+  try {
+    baseObj = baseSource.trim().length === 0 ? {} : yamlLoad(baseSource);
+    derivedObj = derivedSource.trim().length === 0 ? {} : yamlLoad(derivedSource);
+  } catch {
+    // If either side is not parseable YAML at this point, fall back to the
+    // old concatenation so downstream gets the raw error rather than a silent
+    // merge failure.
+    return `${baseSource.trimEnd()}\n${derivedSource}`;
+  }
+
+  if (!isPlainObject(baseObj) || !isPlainObject(derivedObj)) {
+    // Non-mapping roots (arrays, scalars) cannot be deep-merged; concatenate
+    // and let downstream handle the error.
+    return `${baseSource.trimEnd()}\n${derivedSource}`;
+  }
+
+  const merged = deepMerge(baseObj, derivedObj);
+  return yamlDump(merged, { lineWidth: -1, noRefs: true });
+}
+
+/**
+ * Deep-merge two plain objects. Derived wins on scalar/array conflicts.
+ * Both values must be plain objects for recursive merging to apply.
+ */
+function deepMerge(
+  base: Record<string, unknown>,
+  derived: Record<string, unknown>,
+): Record<string, unknown> {
+  const result: Record<string, unknown> = { ...base };
+  for (const key of Object.keys(derived)) {
+    const baseVal = result[key];
+    const derivedVal = derived[key];
+    if (isPlainObject(baseVal) && isPlainObject(derivedVal)) {
+      result[key] = deepMerge(baseVal, derivedVal);
+    } else {
+      result[key] = derivedVal;
+    }
+  }
+  return result;
+}
+
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    !Array.isArray(value) &&
+    Object.getPrototypeOf(value) === Object.prototype
+  );
 }
 
 function resolveRelative(fromFile: string, relPath: string): string {
