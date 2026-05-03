@@ -99,6 +99,15 @@ describe('serializePackageJson', () => {
     expect(parsed.dependencies).not.toHaveProperty('astro-mermaid');
   });
 
+  it('uses packageName directly when provided, bypassing slugification', () => {
+    const out = serializePackageJson({
+      siteName: 'My Docs Site',
+      siteDescription: null,
+      packageName: 'my-pkg',
+    });
+    expect(JSON.parse(out).name).toBe('my-pkg');
+  });
+
   it('pins @astrojs/starlight to ^0.34.0 or newer (sidebar slug resolver fix)', () => {
     // Starlight 0.30 has a sidebar slug-resolution bug: `astro build` rejects
     // every entry with "The slug X does not exist" even though the entry's

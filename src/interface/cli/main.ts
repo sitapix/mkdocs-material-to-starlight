@@ -138,6 +138,30 @@ interface ConvertCommand {
   readonly snippetBasePaths: ReadonlyArray<string> | null;
   readonly check: boolean;
   readonly checkTimeoutMs: number | null;
+  // wizard surface — Commit A (easy parametrizations)
+  readonly linksValidator: boolean | null;
+  readonly tabs: 'mdx' | 'html' | null;
+  readonly rss: boolean | null;
+  readonly palette: 'translate' | 'skip' | 'custom' | null;
+  readonly configFormat: 'mjs' | 'ts' | null;
+  readonly packageName: string | null;
+  readonly logoReplacesTitle: boolean;
+  readonly mikeVersions: ReadonlyArray<string>;
+  // wizard surface — Commit B (deferred)
+  readonly cards: 'mdx' | 'html' | 'skip' | null;
+  readonly mdxMode: 'auto' | 'always' | 'never' | null;
+  readonly keepExplicitHeadingIds: boolean;
+  readonly noSmartSymbols: boolean;
+  readonly noEmojiShortcodes: boolean;
+  readonly noInlineMarks: boolean;
+  readonly noAutoAppend: boolean;
+  readonly snippetMaxDepth: number | null;
+  readonly snippetDedentSubsections: boolean;
+  readonly expressiveCodeTheme: string | null;
+  readonly admonitionMapPath: string | null;
+  readonly extraAssets: ReadonlyArray<string>;
+  readonly locales: ReadonlyArray<string>;
+  readonly suppressRules: ReadonlyArray<string>;
 }
 
 async function runConvert(
@@ -149,15 +173,35 @@ async function runConvert(
     io.stderr('--dry-run is not yet supported in this build');
     return 1;
   }
-  const result = await convertSiteFromDisk(
-    command.snippetBasePaths === null
-      ? { projectDir: command.projectDir, outputDir: command.outputDir }
-      : {
-          projectDir: command.projectDir,
-          outputDir: command.outputDir,
-          snippetBasePaths: command.snippetBasePaths,
-        },
-  );
+  const input = {
+    projectDir: command.projectDir,
+    outputDir: command.outputDir,
+    ...(command.snippetBasePaths !== null ? { snippetBasePaths: command.snippetBasePaths } : {}),
+    ...(command.linksValidator !== null ? { linksValidator: command.linksValidator } : {}),
+    ...(command.tabs !== null ? { tabs: command.tabs } : {}),
+    ...(command.rss !== null ? { rss: command.rss } : {}),
+    ...(command.palette !== null ? { palette: command.palette } : {}),
+    ...(command.configFormat !== null ? { configFormat: command.configFormat } : {}),
+    ...(command.packageName !== null ? { packageName: command.packageName } : {}),
+    ...(command.logoReplacesTitle ? { logoReplacesTitle: true } : {}),
+    ...(command.mikeVersions.length > 0 ? { mikeVersions: command.mikeVersions } : {}),
+    // deferred (still passed so the diagnostic fires)
+    ...(command.cards !== null ? { cards: command.cards } : {}),
+    ...(command.mdxMode !== null ? { mdxMode: command.mdxMode } : {}),
+    ...(command.keepExplicitHeadingIds ? { keepExplicitHeadingIds: true } : {}),
+    ...(command.noSmartSymbols ? { noSmartSymbols: true } : {}),
+    ...(command.noEmojiShortcodes ? { noEmojiShortcodes: true } : {}),
+    ...(command.noInlineMarks ? { noInlineMarks: true } : {}),
+    ...(command.noAutoAppend ? { noAutoAppend: true } : {}),
+    ...(command.snippetMaxDepth !== null ? { snippetMaxDepth: command.snippetMaxDepth } : {}),
+    ...(command.snippetDedentSubsections ? { snippetDedentSubsections: true } : {}),
+    ...(command.expressiveCodeTheme !== null ? { expressiveCodeTheme: command.expressiveCodeTheme } : {}),
+    ...(command.admonitionMapPath !== null ? { admonitionMapPath: command.admonitionMapPath } : {}),
+    ...(command.extraAssets.length > 0 ? { extraAssets: command.extraAssets } : {}),
+    ...(command.locales.length > 0 ? { locales: command.locales } : {}),
+    ...(command.suppressRules.length > 0 ? { suppressRules: command.suppressRules } : {}),
+  };
+  const result = await convertSiteFromDisk(input);
   if (!result.ok) {
     io.stderr(`error: ${result.error.code}: ${result.error.message}`);
     return 1;

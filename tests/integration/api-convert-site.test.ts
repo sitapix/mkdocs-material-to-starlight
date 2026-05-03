@@ -1154,6 +1154,61 @@ describe('interface/api/convertSiteFromDisk', () => {
     expect(cfg).toContain('Inherited description');
   });
 
+  it('tabs: "html" forces HTML divs even when content.tabs.link is set in mkdocs.yml', async () => {
+    writeFileSync(
+      join(projectDir, 'docs', 'index.md'),
+      ['# Tabs demo', '', '=== "A"', '    body a', '=== "B"', '    body b', ''].join('\n'),
+    );
+    writeFileSync(
+      join(projectDir, 'mkdocs.yml'),
+      [
+        'site_name: Demo',
+        'docs_dir: docs',
+        'theme:',
+        '  name: material',
+        '  features:',
+        '    - content.tabs.link',
+        'nav:',
+        '  - Home: index.md',
+        '',
+      ].join('\n'),
+    );
+    const result = await convertSiteFromDisk({ projectDir, outputDir, tabs: 'html' });
+    expect(result.ok).toBe(true);
+    // Should produce .md (HTML), not .mdx
+    expect(existsSync(join(outputDir, 'src', 'content', 'docs', 'index.md'))).toBe(true);
+    const md = readFileSync(join(outputDir, 'src', 'content', 'docs', 'index.md'), 'utf8');
+    expect(md).toContain('class="sl-tabs"');
+    expect(md).not.toContain('<Tabs syncKey');
+  });
+
+  it('rss: false suppresses rss.xml.ts output even when rss plugin is configured', async () => {
+    writeFileSync(join(projectDir, 'docs', 'index.md'), '# Home\n');
+    writeFileSync(
+      join(projectDir, 'mkdocs.yml'),
+      [
+        'site_name: Demo',
+        'docs_dir: docs',
+        'plugins:',
+        '  - rss',
+        'nav:',
+        '  - Home: index.md',
+        '',
+      ].join('\n'),
+    );
+    const result = await convertSiteFromDisk({ projectDir, outputDir, rss: false });
+    expect(result.ok).toBe(true);
+    expect(existsSync(join(outputDir, 'src', 'pages', 'rss.xml.ts'))).toBe(false);
+  });
+
+  it('configFormat: "ts" produces astro.config.ts instead of astro.config.mjs', async () => {
+    writeFileSync(join(projectDir, 'docs', 'index.md'), '# Home\n');
+    const result = await convertSiteFromDisk({ projectDir, outputDir, configFormat: 'ts' });
+    expect(result.ok).toBe(true);
+    expect(existsSync(join(outputDir, 'astro.config.ts'))).toBe(true);
+    expect(existsSync(join(outputDir, 'astro.config.mjs'))).toBe(false);
+  });
+
   it('emits Starlight locales config when the i18n plugin is configured', async () => {
     writeFileSync(
       join(projectDir, 'mkdocs.yml'),

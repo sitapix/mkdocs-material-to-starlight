@@ -74,6 +74,24 @@ export interface ConvertSiteFromDiskInput {
   readonly projectDir: string;
   readonly outputDir: string;
   readonly snippetBasePaths?: ReadonlyArray<string>;
+  /** When false, omits starlight-links-validator from generated config. Defaults to true. */
+  readonly linksValidator?: boolean;
+  /** Override for tab output mode. 'mdx' forces Starlight <Tabs>, 'html' forces HTML divs,
+   *  undefined falls back to auto-detection from content.tabs.link. */
+  readonly tabs?: 'mdx' | 'html';
+  /** When false, suppresses rss.xml.ts output even if the rss plugin is detected. */
+  readonly rss?: boolean;
+  /** Palette override strategy. 'skip' or 'custom' omits the :root accent block. */
+  readonly palette?: 'translate' | 'skip' | 'custom';
+  /** Output filename for the Astro config: 'mjs' (default) or 'ts'. */
+  readonly configFormat?: 'mjs' | 'ts';
+  /** Override for the package.json name field; bypasses slugification. */
+  readonly packageName?: string;
+  /** When true and a logo is present, emits replacesTitle: true in the logo block. */
+  readonly logoReplacesTitle?: boolean;
+  /** Explicit version slugs for starlight-versions. Overrides the placeholder when the
+   *  versions feature is detected. Empty array emits `versions: []`. */
+  readonly mikeVersions?: ReadonlyArray<string>;
 }
 
 export interface ConvertSiteFromDiskOutput {
@@ -203,6 +221,10 @@ export async function convertSiteFromDisk(
   })();
   const hasTabsLink = themeFeatures.includes('content.tabs.link');
   const hasNavigationTabs = themeFeatures.includes('navigation.tabs');
+  const emitMdxTabs =
+    input.tabs === 'mdx' ? true :
+    input.tabs === 'html' ? false :
+    hasTabsLink;
 
   const siteResult = await convertSite({
     docsDir,
@@ -213,7 +235,7 @@ export async function convertSiteFromDisk(
     i18nLocales,
     includeMarkdownEnabled,
     macrosScanEnabled,
-    emitMdxTabs: hasTabsLink,
+    emitMdxTabs,
     snippetDedentSubsections: snippetExtensionOptions(
       config.value.markdownExtensions,
     )['dedent_subsections'] === true,
@@ -619,6 +641,16 @@ export async function convertSiteFromDisk(
   const themeOptions = config.value.theme?.options ?? {};
   const logoSrc = typeof themeOptions.logo === 'string' ? themeOptions.logo : null;
   const faviconRaw = typeof themeOptions.favicon === 'string' ? themeOptions.favicon : null;
+  const enableLinksValidator = input.linksValidator !== false;
+  const logoEntry =
+    logoSrc === null
+      ? {}
+      : {
+          logo: {
+            src: `./src/assets/${basenameOf(logoSrc)}`,
+            ...(input.logoReplacesTitle === true ? { replacesTitle: true as const } : {}),
+          },
+        };
   const astroConfigSource = serializeAstroConfig({
     siteName: config.value.siteName,
     siteDescription: config.value.siteDescription,
@@ -626,14 +658,14 @@ export async function convertSiteFromDisk(
     sidebar: sidebarWithPages,
     detectedFeatures: allFeatures,
     redirects,
-    enableLinksValidator: true,
+    enableLinksValidator,
     extraCssEntries: [...extraCssEntries, ...fontCssImports],
     extraJsEntries,
     ...(i18n === null ? {} : { i18n }),
     ...(social.length > 0 ? { social } : {}),
     ...(editLinkBaseUrl === null ? {} : { editLinkBaseUrl }),
     ...(tableOfContents === undefined ? {} : { tableOfContents }),
-    ...(logoSrc === null ? {} : { logo: { src: `./src/assets/${basenameOf(logoSrc)}` } }),
+    ...logoEntry,
     ...(faviconRaw === null ? {} : { favicon: `/${basenameOf(faviconRaw)}` }),
     ...(expressiveCodeConfig === undefined
       ? {}
@@ -641,12 +673,14 @@ export async function convertSiteFromDisk(
     ...(analytics === null
       ? {}
       : { extraHeadEntries: analytics.headEntries }),
+    ...(input.mikeVersions !== undefined ? { mikeVersions: input.mikeVersions } : {}),
   });
   const packageJsonSource = serializePackageJson({
     siteName: config.value.siteName,
     siteDescription: config.value.siteDescription,
     detectedFeatures: allFeatures,
     extraDependencies: fontDependencies,
+    ...(input.packageName !== undefined ? { packageName: input.packageName } : {}),
   });
   const sourceDocs = Object.values(siteResult.value.files).map((source) => ({
     source,
@@ -657,8 +691,12 @@ export async function convertSiteFromDisk(
     sourceDocs,
   });
 
-  const stylesheetSource = serializeStyleSheet(palette, themeFonts ?? null);
-  const rssEnabled = allFeatures.includes('rss');
+  const paletteStrategy = input.palette;
+  const stylesheetSource = serializeStyleSheet(palette, themeFonts ?? null, paletteStrategy);
+  const rssEnabled =
+    input.rss === false ? false :
+    input.rss === true ? true :
+    allFeatures.includes('rss');
   const rssEndpointSource = rssEnabled
     ? serializeRssEndpoint({
         siteName: config.value.siteName,
@@ -674,6 +712,7 @@ export async function convertSiteFromDisk(
     migrationNotesSource,
     stylesheetSource,
     rssEndpointSource,
+    configFormat: input.configFormat ?? 'mjs',
   });
   if (!writeResult.ok) {
     return err({ code: 'file-write-failed', message: writeResult.error });
@@ -898,6 +937,7 @@ interface WriteOutputsInput {
   readonly migrationNotesSource: string;
   readonly stylesheetSource: string;
   readonly rssEndpointSource: string | null;
+  readonly configFormat: 'mjs' | 'ts';
 }
 
 async function writeOutputs(input: WriteOutputsInput): Promise<Result<true, string>> {
@@ -908,8 +948,9 @@ async function writeOutputs(input: WriteOutputsInput): Promise<Result<true, stri
       return writeRes;
     }
   }
+  const astroConfigFilename = `astro.config.${input.configFormat}`;
   const scaffold: Array<readonly [ReadonlyArray<string>, string]> = [
-    [['astro.config.mjs'], input.astroConfigSource],
+    [[astroConfigFilename], input.astroConfigSource],
     [['package.json'], input.packageJsonSource],
     [['MIGRATION_NOTES.md'], input.migrationNotesSource],
     [['src', 'content.config.ts'], serializeContentConfig()],

@@ -79,12 +79,16 @@ const STYLESHEET = `/*
 }
 `;
 
+export type PaletteStrategy = 'translate' | 'skip' | 'custom';
+
 export function serializeStyleSheet(
   palette?: StarlightPalette | null,
   fonts?: MaterialFontConfig | null,
+  paletteStrategy?: PaletteStrategy,
 ): string {
   let out = STYLESHEET;
-  if (palette !== undefined && palette !== null && !palette.isCustom) {
+  const skipAccent = paletteStrategy === 'skip' || paletteStrategy === 'custom';
+  if (!skipAccent && palette !== undefined && palette !== null && !palette.isCustom) {
     out += buildPaletteOverride(palette);
   }
   if (fonts !== undefined && fonts !== null) {

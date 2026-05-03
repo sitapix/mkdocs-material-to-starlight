@@ -61,6 +61,11 @@ export interface AstroConfigInput {
   /** ExpressiveCode theme pair derived from `pymdownx.highlight.pygments_style`.
    *  Both light and dark themes are required for Starlight's theme switcher. */
   readonly expressiveCode?: { readonly themes: readonly [string, string] };
+  /** Version slugs for the `starlight-versions` plugin. When provided,
+   *  replaces the hardcoded `[{ slug: '2.0' }]` placeholder. When provided
+   *  as an empty array, emits `versions: []`. When omitted, uses the
+   *  placeholder. */
+  readonly mikeVersions?: ReadonlyArray<string>;
   /** Arbitrary entries to inject into Starlight's head[] config. Generalizes
    *  `extraJsEntries`: each entry can be a `<script>` (with src or inline
    *  content), a `<link>`, or a `<meta>` tag. Used today for analytics
@@ -224,7 +229,15 @@ export function serializeAstroConfig(input: AstroConfigInput): string {
       lines.push('        imageZoom(),');
     }
     if (hasVersions) {
-      lines.push('        starlightVersions({ versions: [{ slug: \'2.0\' }] }),');
+      const versionSlugs = input.mikeVersions;
+      if (versionSlugs === undefined) {
+        lines.push('        starlightVersions({ versions: [{ slug: \'2.0\' }] }),');
+      } else if (versionSlugs.length === 0) {
+        lines.push('        starlightVersions({ versions: [] }),');
+      } else {
+        const vList = versionSlugs.map((s) => `{ slug: ${quote(s)} }`).join(', ');
+        lines.push(`        starlightVersions({ versions: [${vList}] }),`);
+      }
     }
     if (hasBlog) {
       lines.push('        starlightBlog(),');

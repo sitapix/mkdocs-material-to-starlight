@@ -310,3 +310,93 @@ describe('serializeAstroConfig', () => {
     expect(out).not.toContain('astro-mermaid');
   });
 });
+
+describe('serializeAstroConfig enableLinksValidator', () => {
+  it('omits starlight-links-validator import when enableLinksValidator is false', () => {
+    const out = serializeAstroConfig({
+      siteName: 'X',
+      siteDescription: null,
+      siteUrl: null,
+      sidebar: [],
+      enableLinksValidator: false,
+    });
+    expect(out).not.toContain('starlight-links-validator');
+    expect(out).not.toContain('starlightLinksValidator');
+  });
+
+  it('includes starlight-links-validator import when enableLinksValidator is true', () => {
+    const out = serializeAstroConfig({
+      siteName: 'X',
+      siteDescription: null,
+      siteUrl: null,
+      sidebar: [],
+      enableLinksValidator: true,
+    });
+    expect(out).toContain(`import starlightLinksValidator from 'starlight-links-validator';`);
+    expect(out).toContain('starlightLinksValidator()');
+  });
+});
+
+describe('serializeAstroConfig logoReplacesTitle', () => {
+  it('emits replacesTitle: true when logoReplacesTitle option is set and logo is present', () => {
+    const out = serializeAstroConfig({
+      siteName: 'X',
+      siteDescription: null,
+      siteUrl: null,
+      sidebar: [],
+      logo: { src: './src/assets/logo.png', replacesTitle: true },
+    });
+    expect(out).toContain('replacesTitle: true');
+  });
+
+  it('does not emit replacesTitle when logo is present without the option', () => {
+    const out = serializeAstroConfig({
+      siteName: 'X',
+      siteDescription: null,
+      siteUrl: null,
+      sidebar: [],
+      logo: { src: './src/assets/logo.png' },
+    });
+    expect(out).not.toContain('replacesTitle');
+  });
+});
+
+describe('serializeAstroConfig mikeVersions', () => {
+  it('emits the provided versions list replacing the placeholder', () => {
+    const out = serializeAstroConfig({
+      siteName: 'X',
+      siteDescription: null,
+      siteUrl: null,
+      sidebar: [],
+      detectedFeatures: ['versions'],
+      mikeVersions: ['1.0', '2.0', '3.0'],
+    });
+    expect(out).toContain("{ slug: '1.0' }");
+    expect(out).toContain("{ slug: '2.0' }");
+    expect(out).toContain("{ slug: '3.0' }");
+    expect(out).not.toContain("{ slug: '2.0' }," + "\n" + "          { slug: '3.0' }");
+  });
+
+  it('emits an empty versions array when mikeVersions is an empty array', () => {
+    const out = serializeAstroConfig({
+      siteName: 'X',
+      siteDescription: null,
+      siteUrl: null,
+      sidebar: [],
+      detectedFeatures: ['versions'],
+      mikeVersions: [],
+    });
+    expect(out).toContain('starlightVersions({ versions: [] })');
+  });
+
+  it('uses the placeholder [{ slug: "2.0" }] when mikeVersions is not provided', () => {
+    const out = serializeAstroConfig({
+      siteName: 'X',
+      siteDescription: null,
+      siteUrl: null,
+      sidebar: [],
+      detectedFeatures: ['versions'],
+    });
+    expect(out).toContain("{ slug: '2.0' }");
+  });
+});

@@ -41,6 +41,9 @@ export interface PackageJsonInput {
    *  Used today for Fontsource packages derived from `theme.font`; when no
    *  version is provided, `latest` is pinned. */
   readonly extraDependencies?: ReadonlyArray<readonly [string, string]>;
+  /** Explicit package name override. When set, used directly instead of
+   *  slugifying the site name. */
+  readonly packageName?: string;
 }
 
 const FEATURE_DEPENDENCIES: Readonly<Record<DetectedFeature, ReadonlyArray<readonly [string, string]>>> = {
@@ -59,7 +62,7 @@ const FEATURE_DEPENDENCIES: Readonly<Record<DetectedFeature, ReadonlyArray<reado
 };
 
 export function serializePackageJson(input: PackageJsonInput): string {
-  const name = slugify(input.siteName);
+  const name = input.packageName !== undefined ? input.packageName : slugify(input.siteName);
   const pkg: Record<string, unknown> = {
     name,
     type: 'module',

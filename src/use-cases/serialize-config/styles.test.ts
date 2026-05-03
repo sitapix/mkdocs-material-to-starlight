@@ -120,3 +120,58 @@ describe('serializeStyleSheet', () => {
     expect(out).not.toContain('--sl-font-mono:');
   });
 });
+
+describe('serializeStyleSheet palette strategy', () => {
+  it('omits the :root accent block when strategy is "skip"', () => {
+    const out = serializeStyleSheet(
+      {
+        accentHue: 350,
+        accentChroma: 0.18,
+        isCustom: false,
+        sourceName: 'pink',
+      },
+      null,
+      'skip',
+    );
+    expect(out).not.toContain('--sl-hue-accent');
+    expect(out).not.toContain(':root');
+  });
+
+  it('omits the :root accent block when strategy is "custom"', () => {
+    const out = serializeStyleSheet(
+      {
+        accentHue: 350,
+        accentChroma: 0.18,
+        isCustom: false,
+        sourceName: 'pink',
+      },
+      null,
+      'custom',
+    );
+    expect(out).not.toContain('--sl-hue-accent');
+  });
+
+  it('emits the :root accent block when strategy is "translate" (default behavior)', () => {
+    const out = serializeStyleSheet(
+      {
+        accentHue: 350,
+        accentChroma: 0.18,
+        isCustom: false,
+        sourceName: 'pink',
+      },
+      null,
+      'translate',
+    );
+    expect(out).toContain('--sl-hue-accent: 350');
+  });
+
+  it('emits the :root accent block when no strategy is provided (backwards compatible)', () => {
+    const out = serializeStyleSheet({
+      accentHue: 350,
+      accentChroma: 0.18,
+      isCustom: false,
+      sourceName: 'pink',
+    });
+    expect(out).toContain('--sl-hue-accent: 350');
+  });
+});
