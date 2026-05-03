@@ -57,6 +57,17 @@ describe('preprocessMkdocsPythonTags', () => {
     expect(stripped).toContain('material.extensions.emoji.to_svg');
   });
 
+  it("strips !!python/name: with trailing empty-string YAML marker (fastapi regression)", () => {
+    // MkDocs Material commonly emits this form, where the trailing `''` is the
+    // YAML scalar-presence marker. The regex must match it, otherwise the tag
+    // leaks through and downstream YAML parsing fails on the inherited config.
+    const { source } = preprocessMkdocsPythonTags(
+      "format: !!python/name:pymdownx.superfences.fence_code_format ''\n",
+    );
+    expect(source).not.toContain('!!python/name');
+    expect(source).toContain("'pymdownx.superfences.fence_code_format'");
+  });
+
   it('preserves indentation of the value', () => {
     const src = [
       'pymdownx.emoji:',

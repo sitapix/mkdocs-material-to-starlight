@@ -21,8 +21,11 @@
  * second pass is a no-op (returns empty `stripped` list).
  */
 
+// Trailing `''` or `""` is YAML's scalar-presence marker — MkDocs Material
+// commonly emits e.g. `format: !!python/name:pymdownx.X.fence_code_format ''`.
+// We match and discard it (the value is opaque to us either way).
 const SCALAR_RE =
-  /^(?<indent>\s*)(?<key>[^:#\n]+):\s*!!python\/(?:name|object\/apply):(?<body>[^\s\r\n#]+)\s*$/gm;
+  /^(?<indent>\s*)(?<key>[^:#\n]+):\s*!!python\/(?:name|object\/apply):(?<body>[^\s\r\n#'"]+)(?:\s+(?:''|""))?\s*$/gm;
 
 export interface PreprocessResult {
   readonly source: string;
