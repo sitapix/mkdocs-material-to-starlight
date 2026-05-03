@@ -82,4 +82,25 @@ describe('diagnosePlugins', () => {
     expect(diagnosePlugins(plugins('mike'))).toEqual([]);
     expect(diagnosePlugins(plugins('glightbox'))).toEqual([]);
   });
+
+  it('emits an info diagnostic for mkdocs-swagger-ui-tag mapped to starlight-openapi', () => {
+    const out = diagnosePlugins(plugins('mkdocs-swagger-ui-tag'));
+    expect(out).toHaveLength(1);
+    expect(out[0]?.ruleId).toBe('plugin-swagger-ui-mapped');
+    expect(out[0]?.severity).toBe('info');
+    expect(out[0]?.message).toContain('starlight-openapi');
+    expect(out[0]?.message).toContain('starlight-openapi.vercel.app');
+  });
+
+  it('emits an info diagnostic for the alternate swagger-ui-tag name', () => {
+    const out = diagnosePlugins(plugins('swagger-ui-tag'));
+    expect(out).toHaveLength(1);
+    expect(out[0]?.ruleId).toBe('plugin-swagger-ui-mapped');
+  });
+
+  it('deduplicates swagger-ui-tag diagnostic when both plugin names appear', () => {
+    const out = diagnosePlugins(plugins('mkdocs-swagger-ui-tag', 'swagger-ui-tag'));
+    const swaggerDiags = out.filter((d) => d.ruleId === 'plugin-swagger-ui-mapped');
+    expect(swaggerDiags).toHaveLength(1);
+  });
 });

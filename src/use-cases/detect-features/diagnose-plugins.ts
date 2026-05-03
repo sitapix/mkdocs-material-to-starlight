@@ -231,6 +231,24 @@ const PLUGIN_DIAGNOSTICS: ReadonlyMap<string, PluginDiagnosticSpec> = new Map([
         'mkdocs-macros-plugin (Jinja2) cannot be evaluated by the converter. Every `{{ … }}` and `{% … %}` occurrence in source files is reported in MIGRATION_NOTES with line numbers so you can replace them manually.',
     },
   ],
+  [
+    'mkdocs-swagger-ui-tag',
+    {
+      ruleId: 'plugin-swagger-ui-mapped',
+      severity: 'info',
+      message:
+        'mkdocs-swagger-ui-tag plugin detected. Install `starlight-openapi` and add it to your Astro Starlight integration. See https://starlight-openapi.vercel.app for setup. Each `<swagger-ui>` tag in source must be manually replaced with the appropriate Starlight Openapi component or page route.',
+    },
+  ],
+  [
+    'swagger-ui-tag',
+    {
+      ruleId: 'plugin-swagger-ui-mapped',
+      severity: 'info',
+      message:
+        'mkdocs-swagger-ui-tag plugin detected. Install `starlight-openapi` and add it to your Astro Starlight integration. See https://starlight-openapi.vercel.app for setup. Each `<swagger-ui>` tag in source must be manually replaced with the appropriate Starlight Openapi component or page route.',
+    },
+  ],
 ]);
 
 export function diagnosePlugins(

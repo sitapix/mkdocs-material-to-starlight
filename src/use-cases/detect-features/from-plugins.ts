@@ -33,6 +33,9 @@ const PLUGIN_TO_FEATURE: ReadonlyMap<string, DetectedFeature> = new Map([
   ['rss', 'rss'] as const,
   // mkdocs-mermaid2-plugin → astro-mermaid (alternative to superfences mermaid path).
   ['mermaid2', 'mermaid'] as const,
+  // mkdocs-swagger-ui-tag → starlight-openapi.
+  ['mkdocs-swagger-ui-tag', 'swagger-ui'] as const,
+  ['swagger-ui-tag', 'swagger-ui'] as const,
 ]);
 
 export function detectFeaturesFromPlugins(
