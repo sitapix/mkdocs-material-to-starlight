@@ -37,6 +37,7 @@ import { ensureTitle } from '../transform/ast/ensure-title.js';
 import type { Diagnostic } from '../../domain/diagnostics/diagnostic.js';
 import type { SlugMap } from '../../domain/starlight/slug-map.js';
 import { detectMdxNeeds } from '../mdx-detection/detect.js';
+import { unescapeDirectiveFences } from './unescape-directive-fences.js';
 import { injectStarlightImports } from '../mdx-detection/inject-imports.js';
 import { createDiagnostic } from '../../domain/diagnostics/diagnostic.js';
 
@@ -101,7 +102,7 @@ export function convertFile(input: ConvertFileInput): ConvertFileOutput {
     .use(remarkStringify, STRINGIFY_OPTIONS)
     .processSync(normalized);
 
-  const text = String(file);
+  const text = unescapeDirectiveFences(String(file));
   const decision = detectMdxNeeds(text);
   if (decision.extension === 'mdx') {
     diagnostics.push(
