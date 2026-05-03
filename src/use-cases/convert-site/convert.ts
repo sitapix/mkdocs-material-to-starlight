@@ -37,6 +37,7 @@ import { scanMacroExpressions } from '../detect-macros/scan-expressions.js';
 import { normalizeTyperSnippetDirectives } from '../normalize/typer-snippet-directives.js';
 import { scanHeadingAnchors } from '../normalize/scan-heading-anchors.js';
 import { normalizeMkdocstringsCrossRefs } from '../normalize/mkdocstrings-crossref.js';
+import { normalizeLinkAttrLists } from '../normalize/link-attr-list.js';
 
 export interface ConvertSiteInput {
   readonly docsDir: string;
@@ -151,6 +152,13 @@ export async function convertSite(
     const crossRefResult = normalizeMkdocstringsCrossRefs(source);
     source = crossRefResult.text;
     for (const diagnostic of crossRefResult.diagnostics) {
+      diagnostics.push({ sourcePath, diagnostic });
+    }
+    // Strip {.class attr=val} link attribute lists from inline links. Starlight
+    // has no equivalent syntax; the brace content would appear as visible text.
+    const linkAttrResult = normalizeLinkAttrLists(source);
+    source = linkAttrResult.text;
+    for (const diagnostic of linkAttrResult.diagnostics) {
       diagnostics.push({ sourcePath, diagnostic });
     }
     if (input.macrosScanEnabled === true) {
