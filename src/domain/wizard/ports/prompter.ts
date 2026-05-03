@@ -43,6 +43,8 @@ export interface MultiselectOptions<V extends string> {
 export interface Prompter {
   intro(title: string): void;
   outro(message: string): void;
+  /** Display the cancellation goodbye banner and terminate the prompt session. */
+  cancel(message: string): void;
   note(body: string, title?: string): void;
   text(options: TextOptions): Promise<string | null>;
   confirm(options: ConfirmOptions): Promise<boolean | null>;

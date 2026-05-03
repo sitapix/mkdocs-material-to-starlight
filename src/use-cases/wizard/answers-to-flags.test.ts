@@ -1,12 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import { answersToFlags } from './answers-to-flags.js';
 import type { WizardAnswers } from '../../domain/wizard/answers.js';
+import { parseArgs } from '../../interface/cli/parse-args.js';
 
 const baseline: WizardAnswers = {
   projectDir: './project',
   outputDir: './output',
   packageManager: 'npm',
-  check: true,
+  check: false,
   tabs: 'mdx',
   sidebarTopics: true,
   rss: true,
@@ -38,8 +39,12 @@ describe('answersToFlags', () => {
     expect(answersToFlags(baseline)).toEqual(['./project', './output']);
   });
 
-  it('emits --no-check when check is disabled', () => {
-    expect(answersToFlags({ ...baseline, check: false })).toContain('--no-check');
+  it('does not emit --no-check when check is false (matches parser default)', () => {
+    expect(answersToFlags({ ...baseline, check: false })).not.toContain('--no-check');
+  });
+
+  it('emits --check when check is true', () => {
+    expect(answersToFlags({ ...baseline, check: true })).toContain('--check');
   });
 
   it('emits --tabs html only when non-default', () => {
@@ -75,5 +80,57 @@ describe('answersToFlags', () => {
     expect(answersToFlags({ ...baseline, packageManager: 'pnpm' })).toContain(
       '--package-manager=pnpm',
     );
+  });
+});
+
+describe('answersToFlags ↔ parseArgs round-trip', () => {
+  function answersFor(over: Partial<WizardAnswers> = {}): WizardAnswers {
+    return { ...baseline, ...over };
+  }
+
+  it('round-trips a vanilla all-defaults answer set', () => {
+    const a = answersFor();
+    const parsed = parseArgs([...answersToFlags(a)]);
+    expect(parsed.kind).toBe('convert');
+    if (parsed.kind === 'convert') {
+      expect(parsed.projectDir).toBe(a.projectDir);
+      expect(parsed.outputDir).toBe(a.outputDir);
+      expect(parsed.check).toBe(a.check);
+      expect(parsed.tabs).toBe(null); // null because no override emitted
+      expect(parsed.rss).toBe(null);
+    }
+  });
+
+  it('round-trips check: true', () => {
+    const a = answersFor({ check: true });
+    const parsed = parseArgs([...answersToFlags(a)]);
+    expect(parsed.kind).toBe('convert');
+    if (parsed.kind === 'convert') expect(parsed.check).toBe(true);
+  });
+
+  it('round-trips an override-heavy answer set', () => {
+    const a = answersFor({
+      check: true,
+      tabs: 'html',
+      rss: false,
+      packageManager: 'pnpm',
+      linksValidator: false,
+      configFormat: 'ts',
+      packageName: 'my-pkg',
+      mikeVersions: ['v1', 'v2'],
+      suppressRules: ['mdx-promotion', 'palette-translated'],
+    });
+    const parsed = parseArgs([...answersToFlags(a)]);
+    expect(parsed.kind).toBe('convert');
+    if (parsed.kind === 'convert') {
+      expect(parsed.tabs).toBe('html');
+      expect(parsed.rss).toBe(false);
+      expect(parsed.packageManager).toBe('pnpm');
+      expect(parsed.linksValidator).toBe(false);
+      expect(parsed.configFormat).toBe('ts');
+      expect(parsed.packageName).toBe('my-pkg');
+      expect(parsed.mikeVersions).toEqual(['v1', 'v2']);
+      expect(parsed.suppressRules).toEqual(['mdx-promotion', 'palette-translated']);
+    }
   });
 });

@@ -59,7 +59,10 @@ export async function runWizardFlow(
     message: 'Project directory (containing mkdocs.yml)',
     initialValue: projectDirHint,
   });
-  if (projectDir === null) return { kind: 'cancelled' };
+  if (projectDir === null) {
+    prompter.cancel('Aborted by user');
+    return { kind: 'cancelled' };
+  }
 
   // Step 2: load + parse mkdocs.yml from the chosen dir.
   const yaml = createJsYamlDecoder();
@@ -98,12 +101,16 @@ export async function runWizardFlow(
 
   // Step 4: run the rest of the wizard (outputDir, packageManager, Tier 1, Tier 2).
   const result = await runWizard({ projectDir, plan, defaults, prompter });
-  if (!result.ok) return { kind: 'cancelled' };
+  if (!result.ok) {
+    prompter.cancel('Aborted by user');
+    return { kind: 'cancelled' };
+  }
 
   const flags = answersToFlags(result.value);
   const reparsed = parseArgs(flags);
   if (reparsed.kind !== 'convert') {
     io.stderr(`error: wizard produced an invalid command: ${JSON.stringify(reparsed)}`);
+    prompter.cancel('Aborted by user');
     return { kind: 'cancelled' };
   }
   return { kind: 'success', command: reparsed, equivalentFlags: flags };

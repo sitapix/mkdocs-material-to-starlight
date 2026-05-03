@@ -13,6 +13,7 @@
 import {
   intro as clackIntro,
   outro as clackOutro,
+  cancel as clackCancel,
   note as clackNote,
   text as clackText,
   confirm as clackConfirm,
@@ -33,6 +34,7 @@ export function createClackPrompter(): Prompter {
   return {
     intro: (title: string) => clackIntro(pc.bgCyan(pc.black(` ${title} `))),
     outro: (message: string) => clackOutro(message),
+    cancel: (message: string) => clackCancel(message),
     note: (body: string, title?: string) => clackNote(body, title),
     text: async (o: TextOptions) => {
       const clackOptions: Parameters<typeof clackText>[0] = {

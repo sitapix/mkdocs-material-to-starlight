@@ -11,14 +11,21 @@
 
 import type { WizardAnswers } from '../../domain/wizard/answers.js';
 
-// DEFAULTS here ("what the parser treats as no-override") intentionally
-// duplicates the static fields of derive-defaults.ts. derive-defaults COMPUTES
-// `packageManager` from `npm_config_user_agent`; we need a hardcoded 'npm'
-// baseline so wizard answers like `pnpm` reliably emit `--package-manager=pnpm`
-// regardless of who's invoking the binary.
+// DEFAULTS here mirrors what `parseArgs` returns when no flag is supplied —
+// the "parser no-op baseline". These values are intentionally distinct from
+// derive-defaults.ts, which produces "what the wizard pre-fills in the prompt".
+//
+// Key asymmetry: derive-defaults sets `check: true` (the wizard encourages
+// running astro check). DEFAULTS here sets `check: false` because that is what
+// `parseArgs` returns when --check is absent. With this alignment, a wizard
+// answer of `check: true` emits --check, and parseArgs([...flags]).check === true.
+//
+// derive-defaults COMPUTES `packageManager` from `npm_config_user_agent`; we
+// need a hardcoded 'npm' baseline so wizard answers like `pnpm` reliably emit
+// `--package-manager=pnpm` regardless of who's invoking the binary.
 const DEFAULTS: Omit<WizardAnswers, 'projectDir' | 'outputDir'> = {
   packageManager: 'npm',
-  check: true,
+  check: false,
   tabs: 'mdx',
   sidebarTopics: true,
   rss: true,

@@ -39,6 +39,7 @@ export function createFakePrompter(script: ScriptedAnswers = {}): FakePrompter {
   return {
     intro: () => {},
     outro: () => {},
+    cancel: () => {},
     note: () => {},
     text: async (o: TextOptions) => {
       calls.push({ kind: 'text', message: o.message });
