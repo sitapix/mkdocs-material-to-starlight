@@ -163,8 +163,7 @@ describe('resolveInherits', () => {
 
     // Must parse without error
     const yaml = await import('js-yaml');
-    let parsed: unknown;
-    expect(() => { parsed = yaml.load(out.source); }).not.toThrow();
+    expect(() => { yaml.load(out.source); }).not.toThrow();
 
     // Only ONE markdown_extensions key at the top level
     const keyCount = (out.source.match(/^markdown_extensions:/gm) ?? []).length;
