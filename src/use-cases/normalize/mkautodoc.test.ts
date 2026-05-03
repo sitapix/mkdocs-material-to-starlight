@@ -117,16 +117,19 @@ describe('normalizeMkautodocBlocks', () => {
     expect(twice).toBe(once);
   });
 
-  it('does not wrap a `::: name` line that has no following indented body (malformed)', () => {
-    // If the `::: name` line is not followed by indented body lines, it is
-    // not mkautodoc — could be a malformed admonition, a typo, or some other
-    // extension. Leaving it unchanged is the safe behavior; the existing
-    // remark-stringify escape (\:::) at least preserves the bytes.
+  it('wraps a bare `::: name` line with no following indented body in a fenced code block', () => {
+    // mkdocstrings (pydantic regression): bare ::: lines with no indented body
+    // were NOT being wrapped, causing remark-stringify to escape them to \:::
+    // in the output. Any `::: identifier` line (with a space before the identifier)
+    // must be wrapped, regardless of whether it has an options block.
     const input = [
       '::: httpx.request',
       'Not indented.',
       '',
     ].join('\n');
-    expect(normalizeMkautodocBlocks(input)).toBe(input);
+    const output = normalizeMkautodocBlocks(input);
+    expect(output).toContain('```text');
+    expect(output).toContain('::: httpx.request');
+    expect(output).not.toMatch(/\\:::/);
   });
 });

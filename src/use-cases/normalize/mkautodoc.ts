@@ -66,7 +66,12 @@ export function normalizeMkautodocBlocks(source: string): string {
     }
     const bodyEnd = scanBodyEnd(lines, i + 1);
     if (bodyEnd === null) {
+      // No indented body — bare `::: identifier` line. Wrap just the opener
+      // so remark-stringify does not escape it to \:::. This covers mkdocstrings
+      // directives that carry no inline options (pydantic regression).
+      out.push('```text');
       out.push(line);
+      out.push('```');
       i += 1;
       continue;
     }
