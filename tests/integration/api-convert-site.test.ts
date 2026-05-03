@@ -1209,6 +1209,16 @@ describe('interface/api/convertSiteFromDisk', () => {
     expect(existsSync(join(outputDir, 'astro.config.mjs'))).toBe(false);
   });
 
+  it('emits a wizard-decision-applied diagnostic when cards: "mdx" is passed (deferred option)', async () => {
+    writeFileSync(join(projectDir, 'docs', 'index.md'), '# Home\n');
+    const result = await convertSiteFromDisk({ projectDir, outputDir, cards: 'mdx' });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    const notes = readFileSync(join(outputDir, 'MIGRATION_NOTES.md'), 'utf8');
+    expect(notes).toContain('wizard-decision-applied');
+    expect(notes).toContain('cards');
+  });
+
   it('emits Starlight locales config when the i18n plugin is configured', async () => {
     writeFileSync(
       join(projectDir, 'mkdocs.yml'),

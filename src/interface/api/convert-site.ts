@@ -92,6 +92,40 @@ export interface ConvertSiteFromDiskInput {
   /** Explicit version slugs for starlight-versions. Overrides the placeholder when the
    *  versions feature is detected. Empty array emits `versions: []`. */
   readonly mikeVersions?: ReadonlyArray<string>;
+
+  // ── Deferred options (v2) ────────────────────────────────────────────────
+  // These are accepted so the wizard can pass them through, but the actual
+  // behavior change is not yet implemented. When set to a non-default value
+  // a `wizard-decision-applied` info diagnostic is emitted.
+
+  /** Card output format override. Deferred — no behavior change yet. */
+  readonly cards?: 'mdx' | 'html' | 'skip';
+  /** MDX output mode override. Deferred — no behavior change yet. */
+  readonly mdxMode?: 'auto' | 'always' | 'never';
+  /** Keep explicit heading ID anchors from MkDocs source. Deferred. */
+  readonly keepExplicitHeadingIds?: boolean;
+  /** Disable smart-symbol substitution (arrows, ellipsis, etc.). Deferred. */
+  readonly noSmartSymbols?: boolean;
+  /** Disable emoji shortcode expansion. Deferred. */
+  readonly noEmojiShortcodes?: boolean;
+  /** Disable inline marks (==highlight==, ^^insert^^, etc.). Deferred. */
+  readonly noInlineMarks?: boolean;
+  /** Disable auto-append snippet injection. Deferred. */
+  readonly noAutoAppend?: boolean;
+  /** Maximum snippet inclusion depth override. Deferred. */
+  readonly snippetMaxDepth?: number;
+  /** Dedent subsections in snippet output. Deferred. */
+  readonly snippetDedentSubsections?: boolean;
+  /** ExpressiveCode theme override (Shiki theme name). Deferred. */
+  readonly expressiveCodeTheme?: string;
+  /** Path to a custom admonition type-mapping YAML file. Deferred. */
+  readonly admonitionMapPath?: string;
+  /** Extra asset paths to include in the output. Deferred. */
+  readonly extraAssets?: ReadonlyArray<string>;
+  /** Locale codes for i18n output. Deferred. */
+  readonly locales?: ReadonlyArray<string>;
+  /** Rule IDs to suppress in the diagnostic stream. Deferred. */
+  readonly suppressRules?: ReadonlyArray<string>;
 }
 
 export interface ConvertSiteFromDiskOutput {
@@ -582,6 +616,8 @@ export async function convertSiteFromDisk(
     });
   }
 
+  const deferredDiagnostics = buildDeferredDiagnostics(input);
+
   const allDiagnostics = [
     ...siteResult.value.diagnostics,
     ...pluginDiagnostics,
@@ -596,6 +632,7 @@ export async function convertSiteFromDisk(
     ...themeLanguageDiagnostics,
     ...themeFontsDiagnostics,
     ...analyticsDiagnostics,
+    ...deferredDiagnostics,
   ];
 
   const i18nFromThemeLanguage =
@@ -977,6 +1014,94 @@ async function writeOne(target: string, content: string): Promise<Result<true, s
     const message = cause instanceof Error ? cause.message : String(cause);
     return err(`failed to write ${target}: ${message}`);
   }
+}
+
+function buildDeferredDiagnostics(
+  input: ConvertSiteFromDiskInput,
+): Array<{ sourcePath: string; diagnostic: ReturnType<typeof createDiagnostic> }> {
+  const diags: Array<{ sourcePath: string; diagnostic: ReturnType<typeof createDiagnostic> }> = [];
+  const add = (message: string) =>
+    diags.push({
+      sourcePath: 'mkdocs.yml',
+      diagnostic: createDiagnostic({
+        severity: 'info',
+        ruleId: 'wizard-decision-applied',
+        source: 'mkdocs-to-starlight',
+        message,
+      }),
+    });
+
+  if (input.cards !== undefined) {
+    add(
+      `Configured: --cards=${input.cards} requested. The MDX <Card>/<CardGrid> output path is not yet implemented in this build; falling back to HTML + shim. (Tracked for v2.)`,
+    );
+  }
+  if (input.mdxMode !== undefined) {
+    add(
+      `Configured: --mdx-mode=${input.mdxMode} requested. MDX mode selection is not yet implemented in this build; using auto-detection. (Tracked for v2.)`,
+    );
+  }
+  if (input.keepExplicitHeadingIds === true) {
+    add(
+      `Configured: --keep-explicit-heading-ids requested. Explicit heading ID preservation is not yet implemented in this build; IDs may be re-generated. (Tracked for v2.)`,
+    );
+  }
+  if (input.noSmartSymbols === true) {
+    add(
+      `Configured: --no-smart-symbols requested. Smart-symbol suppression is not yet implemented in this build. (Tracked for v2.)`,
+    );
+  }
+  if (input.noEmojiShortcodes === true) {
+    add(
+      `Configured: --no-emoji-shortcodes requested. Emoji shortcode suppression is not yet implemented in this build. (Tracked for v2.)`,
+    );
+  }
+  if (input.noInlineMarks === true) {
+    add(
+      `Configured: --no-inline-marks requested. Inline marks suppression is not yet implemented in this build. (Tracked for v2.)`,
+    );
+  }
+  if (input.noAutoAppend === true) {
+    add(
+      `Configured: --no-auto-append requested. Auto-append suppression is not yet implemented in this build. (Tracked for v2.)`,
+    );
+  }
+  if (input.snippetMaxDepth !== undefined) {
+    add(
+      `Configured: --snippet-max-depth=${String(input.snippetMaxDepth)} requested. Snippet depth limiting is not yet implemented in this build. (Tracked for v2.)`,
+    );
+  }
+  if (input.snippetDedentSubsections === true) {
+    add(
+      `Configured: --snippet-dedent-subsections requested. Snippet subsection dedenting is not yet implemented in this build. (Tracked for v2.)`,
+    );
+  }
+  if (input.expressiveCodeTheme !== undefined) {
+    add(
+      `Configured: --expressive-code-theme=${input.expressiveCodeTheme} requested. ExpressiveCode theme override is not yet implemented in this build; using auto-detected theme. (Tracked for v2.)`,
+    );
+  }
+  if (input.admonitionMapPath !== undefined) {
+    add(
+      `Configured: --admonition-map=${input.admonitionMapPath} requested. Custom admonition mapping is not yet implemented in this build; using built-in map. (Tracked for v2.)`,
+    );
+  }
+  if (input.extraAssets !== undefined && input.extraAssets.length > 0) {
+    add(
+      `Configured: --extra-asset paths requested (${String(input.extraAssets.length)} items). Extra asset inclusion is not yet implemented in this build. (Tracked for v2.)`,
+    );
+  }
+  if (input.locales !== undefined && input.locales.length > 0) {
+    add(
+      `Configured: --locale codes requested (${input.locales.join(', ')}). Locale override is not yet implemented in this build; using auto-detected i18n config. (Tracked for v2.)`,
+    );
+  }
+  if (input.suppressRules !== undefined && input.suppressRules.length > 0) {
+    add(
+      `Configured: --suppress rules requested (${input.suppressRules.join(', ')}). Rule suppression is not yet implemented in this build; all diagnostics are emitted. (Tracked for v2.)`,
+    );
+  }
+  return diags;
 }
 
 async function readAutoAppendContent(
