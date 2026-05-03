@@ -11,6 +11,11 @@
 
 import type { WizardAnswers } from '../../domain/wizard/answers.js';
 
+// DEFAULTS here ("what the parser treats as no-override") intentionally
+// duplicates the static fields of derive-defaults.ts. derive-defaults COMPUTES
+// `packageManager` from `npm_config_user_agent`; we need a hardcoded 'npm'
+// baseline so wizard answers like `pnpm` reliably emit `--package-manager=pnpm`
+// regardless of who's invoking the binary.
 const DEFAULTS: Omit<WizardAnswers, 'projectDir' | 'outputDir'> = {
   packageManager: 'npm',
   check: true,
