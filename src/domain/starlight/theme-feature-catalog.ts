@@ -113,7 +113,7 @@ const CATALOG: ReadonlyMap<string, ThemeFeatureClassification> = new Map(
     'navigation.top': {
       kind: 'unsupported',
       note:
-        'No built-in "back to top" button. Reimplement via a small floating `<a href="#_top">` in a custom component override.',
+        'No built-in "back to top" button. The community plugin `starlight-scroll-to-top` (frostybee/starlight-scroll-to-top) reproduces this UX with one line of config in `astro.config`. Otherwise, drop in a small floating `<a href="#_top">` via a custom component override.',
     },
     'toc.integrate': {
       kind: 'unsupported',

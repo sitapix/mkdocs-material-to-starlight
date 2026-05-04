@@ -7,46 +7,47 @@ import {
 } from '../../domain/wizard/answers.js';
 import { type Result, err, ok } from '../../domain/result.js';
 
+/**
+ * Tier 2: advanced settings the wizard exposes interactively. The remainder
+ * of the converter's surface is reachable via CLI flags (see `--help`); we
+ * tell the user that once, in one line, instead of dumping a wall of flags.
+ *
+ * Each prompt pre-selects the safe default and labels recommendations via
+ * the `hint` field so the option labels stay short.
+ */
 export async function runTier2(
   prompter: Prompter,
   defaults: DefaultAnswers,
 ): Promise<Result<Partial<WizardAnswers>, WizardCancelled>> {
-  prompter.note(
-    [
-      'Additional advanced flags (set via CLI only in this build):',
-      '  --expressive-code-theme <name>  --logo-replaces-title',
-      '  --admonition-map <path>         --keep-explicit-heading-ids',
-      '  --no-smart-symbols              --no-emoji-shortcodes',
-      '  --no-inline-marks               --no-auto-append',
-      '  --snippet-max-depth <N>         --snippet-dedent-subsections',
-      '  --suppress <ruleId>             --package-name <name>',
-    ].join('\n'),
-    'Tier 2 advanced',
+  prompter.log.info(
+    'Advanced options below. Anything not asked here is reachable via CLI flags — see --help.',
   );
 
   const linksValidator = await prompter.confirm({
-    message: 'Run `starlight-links-validator` on every build? (slow on first run)',
+    message: 'Run starlight-links-validator on every build?',
     initialValue: defaults.linksValidator,
+    active: 'Yes (catches broken links; slower)',
+    inactive: 'No (faster builds)',
   });
   if (linksValidator === null) return err(WIZARD_CANCELLED);
 
   const cards = await prompter.select<'mdx' | 'html' | 'skip'>({
-    message: 'Card / grid output',
+    message: 'Card and grid output',
     options: [
-      { value: 'html', label: 'HTML + shipped CSS shim (default)' },
+      { value: 'html', label: 'HTML + CSS shim', hint: 'default' },
       { value: 'mdx', label: 'Starlight <Card> / <CardGrid> MDX' },
-      { value: 'skip', label: 'Skip — no cards, no shim' },
+      { value: 'skip', label: 'Skip cards entirely' },
     ],
     initialValue: defaults.cards,
   });
   if (cards === null) return err(WIZARD_CANCELLED);
 
   const mdxMode = await prompter.select<'auto' | 'always' | 'never'>({
-    message: '.mdx promotion strategy',
+    message: 'When to promote pages to .mdx',
     options: [
-      { value: 'auto', label: 'Auto — promote when JSX/imports detected (default)' },
-      { value: 'always', label: 'Always — every page becomes .mdx' },
-      { value: 'never', label: 'Never — keep .md (may break embedded JSX)' },
+      { value: 'auto', label: 'Auto', hint: 'default; promote when JSX/imports detected' },
+      { value: 'always', label: 'Always', hint: 'every page becomes .mdx' },
+      { value: 'never', label: 'Never', hint: 'keep .md; may break embedded JSX' },
     ],
     initialValue: defaults.mdxMode,
   });
@@ -55,8 +56,8 @@ export async function runTier2(
   const configFormat = await prompter.select<'mjs' | 'ts'>({
     message: 'Astro config format',
     options: [
-      { value: 'mjs', label: 'astro.config.mjs (default)' },
-      { value: 'ts', label: 'astro.config.ts (typed)' },
+      { value: 'mjs', label: 'astro.config.mjs', hint: 'default' },
+      { value: 'ts', label: 'astro.config.ts', hint: 'typed' },
     ],
     initialValue: defaults.configFormat,
   });

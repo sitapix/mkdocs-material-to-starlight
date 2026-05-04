@@ -17,7 +17,9 @@ import { join } from 'node:path';
 import { createJsYamlDecoder } from '../../infrastructure/yaml/js-yaml-decoder.js';
 import { parseMkdocsConfig } from '../../use-cases/config/parse-mkdocs.js';
 import { explainConversion } from '../../use-cases/explain-conversion/explain.js';
+import { extractSnippetBasePaths } from '../../use-cases/config/snippet-base-paths.js';
 import type { ConversionPlan } from '../../domain/wizard/plan.js';
+import type { Prompter } from '../../domain/wizard/ports/prompter.js';
 import type { CliIo } from './main.js';
 
 export interface WizardRunResult {
@@ -31,6 +33,9 @@ export interface WizardRunCancelled {
 export interface WizardRunNonInteractive {
   readonly kind: 'non-interactive';
 }
+
+/** Max attempts to re-prompt for a project dir before giving up. */
+const PROJECT_DIR_MAX_ATTEMPTS = 3;
 
 export async function runWizardFlow(
   projectDirHint: string,
@@ -51,58 +56,46 @@ export async function runWizardFlow(
   );
   const prompter = createClackPrompter();
 
-  // Step 1: prompt for the project dir *before* loading mkdocs.yml. The
-  // ConversionPlan depends on the chosen dir, so this prompt cannot live
-  // inside runWizard (which takes the plan as input).
-  prompter.intro('mkdocs-to-starlight');
-  const projectDir = await prompter.text({
-    message: 'Project directory (containing mkdocs.yml)',
-    initialValue: projectDirHint,
-  });
-  if (projectDir === null) {
-    prompter.cancel('Aborted by user');
+  prompter.intro('mkdocs-material-to-starlight');
+  prompter.log.info('Convert a MkDocs Material site to Astro Starlight.');
+
+  // Step 1: project dir — re-prompt on missing/invalid mkdocs.yml so a typo
+  // doesn't drop the user back to the shell.
+  const loaded = await readProjectDirInteractively(prompter, projectDirHint);
+  if (loaded === 'cancelled') {
+    prompter.cancel('Cancelled. No files were written.');
     return { kind: 'cancelled' };
   }
+  const { projectDir, configValue } = loaded;
 
-  // Step 2: load + parse mkdocs.yml from the chosen dir.
-  const yaml = createJsYamlDecoder();
-  const configPath = join(projectDir, 'mkdocs.yml');
-  let configText: string;
-  try {
-    configText = await readFile(configPath, 'utf8');
-  } catch {
-    io.stderr(`error: could not read mkdocs.yml at ${configPath}`);
-    return { kind: 'non-interactive' };
-  }
-  const decoded = yaml.decode(configText);
-  if (!decoded.ok) {
-    io.stderr(`error: yaml-decode-failed: ${decoded.error.message}`);
-    return { kind: 'non-interactive' };
-  }
-  const config = parseMkdocsConfig(decoded.value);
-  if (!config.ok) {
-    io.stderr(`error: config-invalid: ${config.error.message}`);
-    return { kind: 'non-interactive' };
-  }
-
-  // Step 3: build the plan and defaults.
+  // Step 2: build the plan and defaults.
   const plan: ConversionPlan = {
-    config: config.value,
-    mappingRows: explainConversion(config.value),
+    config: configValue,
+    mappingRows: explainConversion(configValue),
     detectedExtraCss: [],
     detectedExtraJs: [],
     detectedLocales: [],
-    snippetCandidateDirs: [],
+    snippetCandidateDirs: extractSnippetBasePaths(configValue),
   };
-  const defaults = deriveDefaults(config.value, {
+  const defaults = deriveDefaults(configValue, {
     userAgent: env.npm_config_user_agent,
     env,
   });
 
-  // Step 4: run the rest of the wizard (outputDir, packageManager, Tier 1, Tier 2).
+  // Surface what we detected before asking anything else, so users see why
+  // the upcoming prompts exist. Levels use distinct shapes (◇/◆/▲), not just
+  // color, so this remains legible without color or for color-blind readers.
+  prompter.log.step(`Detected site: ${configValue.siteName}`);
+  if (plan.mappingRows.length > 0) {
+    prompter.log.step(
+      `${String(plan.mappingRows.length)} feature mapping${plan.mappingRows.length === 1 ? '' : 's'} will fire (run with --explain to list them).`,
+    );
+  }
+
+  // Step 3: run the rest of the wizard (outputDir, packageManager, Tier 1, Tier 2).
   const result = await runWizard({ projectDir, plan, defaults, prompter });
   if (!result.ok) {
-    prompter.cancel('Aborted by user');
+    prompter.cancel('Cancelled. No files were written.');
     return { kind: 'cancelled' };
   }
 
@@ -110,8 +103,79 @@ export async function runWizardFlow(
   const reparsed = parseArgs(flags);
   if (reparsed.kind !== 'convert') {
     io.stderr(`error: wizard produced an invalid command: ${JSON.stringify(reparsed)}`);
-    prompter.cancel('Aborted by user');
+    prompter.cancel('Cancelled. No files were written.');
     return { kind: 'cancelled' };
   }
   return { kind: 'success', command: reparsed, equivalentFlags: flags };
+}
+
+interface LoadedConfig {
+  readonly projectDir: string;
+  readonly configValue: ReturnType<typeof parseMkdocsConfig> extends infer R
+    ? R extends { ok: true; value: infer V }
+      ? V
+      : never
+    : never;
+}
+
+/**
+ * Prompt for the project dir, validate non-empty, then attempt to load
+ * mkdocs.yml. If loading fails, surface the reason via `log.warn` and re-prompt
+ * up to a small max so a typo is recoverable.
+ *
+ * The path picker (clack 1.3+) renders directory completion live, so users
+ * can tab through their filesystem instead of typing the full path. While
+ * the mkdocs.yml read+parse runs, a spinner shows progress so the prompt
+ * doesn't appear to hang on slow disks or large config files.
+ */
+async function readProjectDirInteractively(
+  prompter: Prompter,
+  initialHint: string,
+): Promise<LoadedConfig | 'cancelled'> {
+  const yaml = createJsYamlDecoder();
+  let hint = initialHint;
+  for (let attempt = 0; attempt < PROJECT_DIR_MAX_ATTEMPTS; attempt++) {
+    const projectDir = await prompter.path({
+      message: 'Project directory (containing mkdocs.yml)',
+      initialValue: hint,
+      directory: true,
+      validate: (value) => {
+        if (value.trim().length === 0) return 'Path is required.';
+        return undefined;
+      },
+    });
+    if (projectDir === null) return 'cancelled';
+
+    const configPath = join(projectDir, 'mkdocs.yml');
+    const spin = prompter.spinner({
+      initialMessage: `Reading ${configPath}`,
+    });
+    let configText: string;
+    try {
+      configText = await readFile(configPath, 'utf8');
+    } catch {
+      spin.error(`No mkdocs.yml at ${configPath}.`);
+      hint = projectDir;
+      continue;
+    }
+    spin.message('Parsing mkdocs.yml');
+    const decoded = yaml.decode(configText);
+    if (!decoded.ok) {
+      spin.error(`mkdocs.yml is not valid YAML: ${decoded.error.message}`);
+      hint = projectDir;
+      continue;
+    }
+    const config = parseMkdocsConfig(decoded.value);
+    if (!config.ok) {
+      spin.error(`mkdocs.yml is missing required fields: ${config.error.message}`);
+      hint = projectDir;
+      continue;
+    }
+    spin.stop(`Loaded ${configPath}`);
+    return { projectDir, configValue: config.value as LoadedConfig['configValue'] };
+  }
+  prompter.log.error(
+    `Gave up after ${String(PROJECT_DIR_MAX_ATTEMPTS)} attempts. Run with --help to see CLI flags.`,
+  );
+  return 'cancelled';
 }

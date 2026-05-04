@@ -135,10 +135,12 @@ describe('normalize (composed pre-parse pipeline)', () => {
     expect(out).not.toContain(':   A red fruit.');
   });
 
-  it('rewrites Material .md-button links into anchors with class', () => {
+  it('rewrites Material .md-button links into <LinkButton> JSX', () => {
     const src = 'Click [Subscribe](https://example.com){ .md-button .md-button--primary } now.\n';
     const out = normalize(src);
-    expect(out).toContain('<a href="https://example.com" class="md-button md-button--primary">Subscribe</a>');
+    expect(out).toContain(
+      '<LinkButton href="https://example.com" variant="primary">Subscribe</LinkButton>',
+    );
     expect(out).not.toContain('.md-button');
   });
 

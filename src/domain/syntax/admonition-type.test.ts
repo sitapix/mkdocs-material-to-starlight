@@ -46,4 +46,40 @@ describe('parseAdmonitionType', () => {
     expect(result.isFallback).toBe(true);
     expect(result.original).toBe('');
   });
+
+  describe('Material deprecated aliases resolve to canonical types', () => {
+    const cases: ReadonlyArray<readonly [string, AdmonitionType]> = [
+      ['summary', 'abstract'],
+      ['tldr', 'abstract'],
+      ['hint', 'tip'],
+      ['important', 'tip'],
+      ['check', 'success'],
+      ['done', 'success'],
+      ['help', 'question'],
+      ['faq', 'question'],
+      ['caution', 'warning'],
+      ['attention', 'warning'],
+      ['fail', 'failure'],
+      ['missing', 'failure'],
+      ['error', 'danger'],
+      ['cite', 'quote'],
+    ];
+    for (const [alias, canonical] of cases) {
+      it(`maps "${alias}" to "${canonical}"`, () => {
+        const result = parseAdmonitionType(alias);
+        expect(result.type).toBe(canonical);
+        expect(result.isFallback).toBe(false);
+        expect(result.isAlias).toBe(true);
+        expect(result.original).toBe(alias);
+      });
+    }
+  });
+
+  it('canonical types are not flagged as aliases', () => {
+    for (const t of ADMONITION_TYPES) {
+      const result = parseAdmonitionType(t);
+      expect(result.isAlias ?? false).toBe(false);
+      expect(result.isFallback).toBe(false);
+    }
+  });
 });

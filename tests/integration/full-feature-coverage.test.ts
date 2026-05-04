@@ -58,7 +58,7 @@ describe('full feature coverage end-to-end', () => {
     if (!result.ok) throw new Error(`${result.error.code}: ${result.error.message}`);
 
     const indexOut = readFileSync(
-      join(outputDir, 'src', 'content', 'docs', 'index.md'),
+      join(outputDir, 'src', 'content', 'docs', 'index.mdx'),
       'utf8',
     );
 
@@ -70,13 +70,14 @@ describe('full feature coverage end-to-end', () => {
     expect(indexOut).toMatch(/<details>/);
     expect(indexOut).toMatch(/<summary>Click to reveal<\/summary>/);
 
-    // pymdownx.blocks.* — /// tab grouping
-    expect(indexOut).toContain('data-label="Python"');
-    expect(indexOut).toContain('data-label="Ruby"');
+    // pymdownx.blocks.* — /// tab grouping → Starlight <TabItem>
+    expect(indexOut).toContain('<TabItem label="Python">');
+    expect(indexOut).toContain('<TabItem label="Ruby">');
 
-    // Material buttons → <a class="md-button">
-    expect(indexOut).toContain('class="md-button md-button--primary"');
-    expect(indexOut).toContain('class="md-button"');
+    // Material buttons → <LinkButton variant="primary|secondary"> (.mdx)
+    expect(indexOut).toContain('<LinkButton href="#subscribe" variant="primary">Subscribe</LinkButton>');
+    expect(indexOut).toContain('<LinkButton href="#learn" variant="secondary">Learn more</LinkButton>');
+    expect(indexOut).not.toContain('.md-button');
 
     // Definition lists → <dl>/<dt>/<dd>. The term `API` is wrapped by the
     // abbreviation normalizer (which runs first, by design), so the <dt>
@@ -171,7 +172,7 @@ describe('full feature coverage end-to-end', () => {
     // This test asserts that running the conversion twice with those same
     // explicit wizard defaults produces byte-equal output. This verifies that
     // the conversion is deterministic and idempotent when the wizard runs
-    // `mkdocs-to-starlight --yes` twice.
+    // `mkdocs-material-to-starlight --yes` twice.
     const wizardDefaults = {
       snippetBasePaths: ['docs'],
       linksValidator: true,

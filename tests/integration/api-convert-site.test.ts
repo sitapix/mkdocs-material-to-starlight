@@ -166,7 +166,7 @@ describe('interface/api/convertSiteFromDisk', () => {
     const result = await convertSiteFromDisk({ projectDir, outputDir });
     expect(result.ok).toBe(true);
     const notes = readFileSync(join(outputDir, 'MIGRATION_NOTES.md'), 'utf8');
-    expect(notes).toContain('plugin-social-no-equivalent');
+    expect(notes).toContain('plugin-social-mapped');
     expect(notes).toContain('plugin-typeset-deprecated');
     expect(notes).toContain('plugin-mkdocstrings-no-equivalent');
     // The search plugin emits an info-level acknowledgement that Pagefind
@@ -420,6 +420,55 @@ describe('interface/api/convertSiteFromDisk', () => {
     // Dependency added.
     const pkg = JSON.parse(readFileSync(join(outputDir, 'package.json'), 'utf8'));
     expect(pkg.dependencies['@astrojs/rss']).toBeDefined();
+  });
+
+  it('scaffolds an OG-card endpoint and installs astro-og-canvas when the social plugin is enabled', async () => {
+    writeFileSync(join(projectDir, 'docs', 'index.md'), '# Home\n');
+    writeFileSync(
+      join(projectDir, 'mkdocs.yml'),
+      [
+        'site_name: My Docs',
+        'docs_dir: docs',
+        'plugins:',
+        '  - social',
+        'nav:',
+        '  - Home: index.md',
+        '',
+      ].join('\n'),
+    );
+    const result = await convertSiteFromDisk({ projectDir, outputDir });
+    expect(result.ok).toBe(true);
+    // Endpoint stub scaffolded at the canonical Astro file route.
+    const ogPath = join(outputDir, 'src', 'pages', 'og', '[...slug].png.ts');
+    expect(existsSync(ogPath)).toBe(true);
+    const ogSource = readFileSync(ogPath, 'utf8');
+    expect(ogSource).toContain("import { OGImageRoute } from 'astro-og-canvas'");
+    expect(ogSource).toContain("await getCollection('docs')");
+    expect(ogSource).toContain("'My Docs'");
+    // Dependency added.
+    const pkg = JSON.parse(readFileSync(join(outputDir, 'package.json'), 'utf8'));
+    expect(pkg.dependencies['astro-og-canvas']).toBeDefined();
+  });
+
+  it('does not scaffold an OG-card endpoint when the social plugin is absent', async () => {
+    writeFileSync(join(projectDir, 'docs', 'index.md'), '# Home\n');
+    writeFileSync(
+      join(projectDir, 'mkdocs.yml'),
+      [
+        'site_name: My Docs',
+        'docs_dir: docs',
+        'nav:',
+        '  - Home: index.md',
+        '',
+      ].join('\n'),
+    );
+    const result = await convertSiteFromDisk({ projectDir, outputDir });
+    expect(result.ok).toBe(true);
+    expect(
+      existsSync(join(outputDir, 'src', 'pages', 'og', '[...slug].png.ts')),
+    ).toBe(false);
+    const pkg = JSON.parse(readFileSync(join(outputDir, 'package.json'), 'utf8'));
+    expect(pkg.dependencies['astro-og-canvas']).toBeUndefined();
   });
 
   it('does not scaffold an RSS endpoint when the rss plugin is absent', async () => {
@@ -929,7 +978,7 @@ describe('interface/api/convertSiteFromDisk', () => {
     expect(result.ok).toBe(true);
     const cfg = readFileSync(join(outputDir, 'astro.config.mjs'), 'utf8');
     expect(cfg).toContain('starlight-links-validator');
-    expect(cfg).toContain('starlightLinksValidator()');
+    expect(cfg).toContain('starlightLinksValidator({');
   });
 
   it('strips PyYAML !!python/... tags before YAML decode', async () => {
@@ -997,7 +1046,7 @@ describe('interface/api/convertSiteFromDisk', () => {
     expect(mdx).toMatch(/syncKey="bash-python"/);
   });
 
-  it('emits HTML divs for tabs when content.tabs.link is NOT enabled (default)', async () => {
+  it('emits Starlight <Tabs> MDX by default (no syncKey when content.tabs.link is absent)', async () => {
     writeFileSync(
       join(projectDir, 'docs', 'index.md'),
       ['# Tabs', '', '=== "Bash"', '    body', '=== "Python"', '    body', ''].join('\n'),
@@ -1009,15 +1058,18 @@ describe('interface/api/convertSiteFromDisk', () => {
     const result = await convertSiteFromDisk({ projectDir, outputDir });
     expect(result.ok).toBe(true);
     expect(
-      existsSync(join(outputDir, 'src', 'content', 'docs', 'index.md')),
+      existsSync(join(outputDir, 'src', 'content', 'docs', 'index.mdx')),
     ).toBe(true);
-    const md = readFileSync(
-      join(outputDir, 'src', 'content', 'docs', 'index.md'),
+    const mdx = readFileSync(
+      join(outputDir, 'src', 'content', 'docs', 'index.mdx'),
       'utf8',
     );
-    expect(md).toContain('class="sl-tabs"');
-    expect(md).toContain('data-label="Bash"');
-    expect(md).not.toContain('<Tabs');
+    expect(mdx).toMatch(/<Tabs[\s>]/);
+    expect(mdx).toContain('<TabItem label="Bash">');
+    expect(mdx).toContain('<TabItem label="Python">');
+    expect(mdx).not.toContain('class="sl-tabs"');
+    expect(mdx).not.toMatch(/syncKey=/);
+    expect(mdx).toContain("from '@astrojs/starlight/components'");
   });
 
   it('promotes a source file to .mdx when it contains JSX components and injects the Starlight import', async () => {

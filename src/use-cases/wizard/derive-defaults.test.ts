@@ -8,6 +8,8 @@ const baseConfig: MkdocsConfig = {
   siteUrl: null,
   docsDir: 'docs',
   useDirectoryUrls: true,
+  copyright: null,
+  repoName: null,
   repoUrl: null,
   editUri: null,
   nav: null,

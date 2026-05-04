@@ -32,10 +32,21 @@ export function normalizeFrontmatterHide(source: string): string {
   const fmBody = match[1] ?? '';
   const values = extractHideValues(fmBody);
   if (values === null) return source;
-  const cleaned = removeHideKey(fmBody);
+  let cleaned = removeHideKey(fmBody);
   const additions: string[] = [];
   if (values.includes('toc')) additions.push('tableOfContents: false');
-  if (values.includes('navigation')) additions.push('template: splash');
+  if (values.includes('navigation')) {
+    // Strip any pre-existing `template:` key (e.g. Material's
+    // `template: welcome.html`) before appending `template: splash` so the
+    // resulting frontmatter has exactly one `template:` line. Duplicate
+    // YAML keys at the same indent level are a fatal parse error in
+    // Astro's frontmatter loader.
+    cleaned = cleaned
+      .split('\n')
+      .filter((line) => !/^template\s*:/.test(line))
+      .join('\n');
+    additions.push('template: splash');
+  }
   const newFm = additions.length === 0 ? cleaned : `${cleaned.trimEnd()}\n${additions.join('\n')}`;
   return source.replace(FRONTMATTER_RE, `---\n${newFm}\n---`);
 }

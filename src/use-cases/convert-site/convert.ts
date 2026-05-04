@@ -30,12 +30,19 @@ import { expandSnippets } from '../expand-snippets/expand.js';
 import type { DetectedFeature } from '../serialize-config/package-json.js';
 import { validateFrontmatter } from '../validate-output/frontmatter.js';
 import { validateJsxComponents } from '../validate-output/jsx-components.js';
+import { validateOutput } from '../validate-output/validate.js';
 import { renameI18nPath } from '../detect-features/i18n-rename.js';
 import { expandIncludeMarkdown } from '../include-markdown/expand.js';
 import { scanMacroOccurrences } from '../detect-macros/scan.js';
 import { scanMacroExpressions } from '../detect-macros/scan-expressions.js';
 import { normalizeTyperSnippetDirectives } from '../normalize/typer-snippet-directives.js';
 import { scanHeadingAnchors } from '../normalize/scan-heading-anchors.js';
+import { scanGithubAlerts } from '../normalize/scan-github-alerts.js';
+import { scanHeadingBadges } from '../normalize/scan-heading-badges.js';
+import { scanTabAnchors } from '../normalize/scan-tab-anchors.js';
+import { scanButtonIcons } from '../normalize/scan-button-icons.js';
+import { scanMaterialMarkers } from '../normalize/scan-material-markers.js';
+import { scanFrontmatterFields } from '../normalize/scan-frontmatter-fields.js';
 import { normalizeMkdocstringsCrossRefs } from '../normalize/mkdocstrings-crossref.js';
 import { normalizeLinkAttrLists } from '../normalize/link-attr-list.js';
 import { normalizeContentTabs } from '../normalize/content-tabs.js';
@@ -77,16 +84,31 @@ export interface ConvertSiteInput {
    */
   readonly macrosScanEnabled?: boolean;
   /**
-   * When true (theme.features content.tabs.link), per-file conversion emits
-   * Starlight `<Tabs syncKey>` MDX components instead of plain HTML divs.
+   * When true (default), per-file conversion emits Starlight `<Tabs>+<TabItem>`
+   * MDX components and promotes affected files to `.mdx`. When false, the
+   * legacy `<div class="sl-tabs">` HTML path is used.
    */
   readonly emitMdxTabs?: boolean;
+  /**
+   * When true (theme.features `content.tabs.link`), the emitted `<Tabs>`
+   * components carry a `syncKey` so cross-page tab selection stays in sync.
+   * No effect when `emitMdxTabs` is false.
+   */
+  readonly tabsLinked?: boolean;
   /**
    * Mirrors PyMdown `pymdownx.snippets.dedent_subsections`. When true,
    * extracted line-ranges and named sections have common leading whitespace
    * stripped.
    */
   readonly snippetDedentSubsections?: boolean;
+  /**
+   * Optional injected validator that re-parses each converted file under
+   * the same parser Astro/Starlight uses (MDX or Markdown). When provided,
+   * parse errors are surfaced as `output-syntax-error` diagnostics; without
+   * it, post-conversion validation is skipped silently. The CLI shell wires
+   * the production `@mdx-js/mdx`-backed adapter by default.
+   */
+  readonly outputValidator?: import('../../domain/ports/output-validator.js').OutputValidator;
 }
 
 export interface TaggedDiagnostic {
@@ -149,6 +171,46 @@ export async function convertSite(
     // normalizeHeadingAttrList. Emits a per-occurrence info diagnostic so
     // users can locate every cross-page deep link that needs manual repair.
     for (const diagnostic of scanHeadingAnchors(read.value)) {
+      diagnostics.push({ sourcePath, diagnostic });
+    }
+    // Per-occurrence diagnostic for GitHub-style alert blockquotes
+    // (`> [!NOTE]`, `[!TIP]`, etc.). The starlight-github-alerts plugin
+    // installed by the package.json scaffolder transforms these at build time;
+    // the diagnostic is informational so users can audit their alert usage.
+    for (const diagnostic of scanGithubAlerts(read.value)) {
+      diagnostics.push({ sourcePath, diagnostic });
+    }
+    // Per-occurrence diagnostic for heading attr_list classes. The
+    // normalizer strips the `{ ... }` blob unconditionally; users with
+    // Material heading badges learn here that they need the
+    // `starlight-heading-badges` plugin to recover the styling.
+    for (const diagnostic of scanHeadingBadges(read.value)) {
+      diagnostics.push({ sourcePath, diagnostic });
+    }
+    // Single diagnostic per file when content tabs are present, flagging
+    // the per-tab anchor-link gap (Material auto-generates `#tab-label`
+    // anchors; Starlight's `<TabItem>` has no equivalent).
+    for (const diagnostic of scanTabAnchors(read.value)) {
+      diagnostics.push({ sourcePath, diagnostic });
+    }
+    // Single diagnostic per file when a Material `.md-button` label carried
+    // an icon shortcode that the curated map can't translate to a Starlight
+    // built-in. The button still renders correctly with a clean label; only
+    // the icon glyph is lost. Lists every unmapped shortcode for traceability.
+    for (const diagnostic of scanButtonIcons(read.value)) {
+      diagnostics.push({ sourcePath, diagnostic });
+    }
+    // Per-file scanner for Material-specific in-source markers that have
+    // no Starlight equivalent: `<!-- material/tags -->` index markers and
+    // `comments: true` frontmatter (the latter routes users to
+    // `starlight-giscus`).
+    for (const diagnostic of scanMaterialMarkers(read.value)) {
+      diagnostics.push({ sourcePath, diagnostic });
+    }
+    // Per-file scanner for Material-specific frontmatter fields with no
+    // direct Starlight equivalent: search controls (`search.boost`,
+    // `search.exclude`) and blog post fields (`categories`, `pin`, `links`).
+    for (const diagnostic of scanFrontmatterFields(read.value)) {
       diagnostics.push({ sourcePath, diagnostic });
     }
     // Reduce mkdocstrings [`X`][] and [`X`][module.Path] cross-references to
@@ -259,7 +321,8 @@ export async function convertSite(
       sourcePath,
       slugMap: slugResult.value,
       repoContext: input.repoContext ?? null,
-      emitMdxTabs: input.emitMdxTabs === true,
+      emitMdxTabs: input.emitMdxTabs !== false,
+      tabsLinked: input.tabsLinked === true,
     });
     const i18nRename =
       input.i18nLocales === undefined
@@ -283,7 +346,20 @@ export async function convertSite(
           severity: 'info',
           ruleId: 'grid-card-promoted-to-linkcard',
           source: 'convert-site/grids',
-          message: `${linkCardCount} single-link grid card${linkCardCount === 1 ? '' : 's'} promoted to <LinkCard> in ${sourcePath}.`,
+          message: `${linkCardCount} navigation grid card${linkCardCount === 1 ? '' : 's'} promoted to <LinkCard> in ${sourcePath}.`,
+        }),
+      });
+    }
+    // Emit one info diagnostic per LinkButton promotion in this file.
+    const linkButtonCount = (converted.text.match(/<LinkButton\b/g) ?? []).length;
+    if (linkButtonCount > 0) {
+      diagnostics.push({
+        sourcePath,
+        diagnostic: createDiagnostic({
+          severity: 'info',
+          ruleId: 'md-button-promoted-to-linkbutton',
+          source: 'convert-site/buttons',
+          message: `${linkButtonCount} \`.md-button\` link${linkButtonCount === 1 ? '' : 's'} promoted to <LinkButton> in ${sourcePath}.`,
         }),
       });
     }
@@ -292,6 +368,19 @@ export async function convertSite(
     }
     for (const diagnostic of validateJsxComponents(converted.text, sourcePath)) {
       diagnostics.push({ sourcePath, diagnostic });
+    }
+    // Re-parse the converted file under the same MDX/Markdown parser
+    // Astro/Starlight uses at build time. Catches syntax bugs (HTML
+    // comments in MDX, unclosed JSX, invalid expressions, etc.) before
+    // they reach the user's `astro build`.
+    if (input.outputValidator !== undefined) {
+      for (const diagnostic of await validateOutput(
+        converted.text,
+        converted.extension,
+        input.outputValidator,
+      )) {
+        diagnostics.push({ sourcePath: outputPath, diagnostic });
+      }
     }
     for (const feature of detectFeatures(source)) {
       featureUnion.add(feature);

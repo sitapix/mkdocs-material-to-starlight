@@ -79,9 +79,13 @@ describe('transformLinkNodes', () => {
     expect(out.text).toContain('![Diagram](/images/diagram.png)');
   });
 
-  it('emits a broken-link diagnostic and leaves the original href intact', () => {
+  it('emits a broken-link diagnostic and strips the link wrapper to plain text', () => {
     const out = process('[Missing](missing.md)\n', 'index.md', map);
-    expect(out.text).toContain('[Missing](missing.md)');
+    // The link wrapper is stripped so the build doesn't fail at runtime
+    // (starlight-links-validator would otherwise reject the page). The label
+    // text remains as inline content; the diagnostic captures the lost target.
+    expect(out.text).toContain('Missing');
+    expect(out.text).not.toContain('[Missing](missing.md)');
     expect(out.diagnostics).toHaveLength(1);
     const diag = out.diagnostics[0];
     expect(diag?.ruleId).toBe('broken-link');

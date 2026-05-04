@@ -39,6 +39,8 @@ import type { SlugMap } from '../../domain/starlight/slug-map.js';
 import { detectMdxNeeds } from '../mdx-detection/detect.js';
 import { unescapeDirectiveFences } from './unescape-directive-fences.js';
 import { injectStarlightImports } from '../mdx-detection/inject-imports.js';
+import { escapeJsxExpressionsForMdx } from '../mdx-detection/escape-jsx-expressions.js';
+import { sanitizeMdxSyntax } from '../mdx-detection/sanitize-mdx-syntax.js';
 import { createDiagnostic } from '../../domain/diagnostics/diagnostic.js';
 
 export interface ConvertFileInput {
@@ -51,11 +53,18 @@ export interface ConvertFileInput {
    */
   readonly repoContext?: RepoContext | null;
   /**
-   * When true (set when `theme.features: content.tabs.link` is enabled in
-   * mkdocs.yml), tab directives compile to Starlight MDX `<Tabs syncKey>`
-   * components instead of plain HTML divs. Forces .mdx output.
+   * When true (default), tab directives compile to Starlight MDX
+   * `<Tabs>+<TabItem>` components and the file is promoted to `.mdx`. When
+   * false, the legacy plain HTML `<div class="sl-tabs">` path is used.
    */
   readonly emitMdxTabs?: boolean;
+  /**
+   * When true (set when `theme.features: content.tabs.link` is enabled in
+   * mkdocs.yml), the emitted `<Tabs>` components carry a `syncKey` derived
+   * from the tab label set so cross-page tab synchronisation works the way
+   * Material's linked-tabs feature does. No effect when `emitMdxTabs` is false.
+   */
+  readonly tabsLinked?: boolean;
 }
 
 export interface ConvertFileOutput {
@@ -92,7 +101,10 @@ export function convertFile(input: ConvertFileInput): ConvertFileOutput {
     .use(ensureTitle, { sourcePath: input.sourcePath })
     .use(transformAdmonitionDirectives)
     .use(transformGridDirectives)
-    .use(transformTabDirectives, { emitMdxTabs: input.emitMdxTabs === true })
+    .use(transformTabDirectives, {
+      emitMdxTabs: input.emitMdxTabs !== false,
+      tabsLinked: input.tabsLinked === true,
+    })
     .use(transformIcons, { diagnostics })
     .use(transformLinkNodes, {
       fromSourcePath: input.sourcePath,
@@ -113,7 +125,13 @@ export function convertFile(input: ConvertFileInput): ConvertFileOutput {
         message: `Promoted to .mdx (${decision.reasons.join(', ')}). Used components: ${decision.usedComponents.join(', ') || '(none)'}.`,
       }),
     );
-    const withImports = injectStarlightImports(text, decision.usedComponents);
+    // MDX treats `{` as expression-opener, so leftover Jinja `{{ var }}`
+    // patterns must be wrapped in backticks before MDX parses the file —
+    // otherwise the build fails on every unconverted macro expression.
+    // Then sanitize the broader set of CommonMark idioms MDX rejects:
+    // HTML comments, autolinks, heading-anchor brace blocks, void elements.
+    const safeText = sanitizeMdxSyntax(escapeJsxExpressionsForMdx(text));
+    const withImports = injectStarlightImports(safeText, decision.usedComponents);
     return { text: withImports, diagnostics, extension: 'mdx' };
   }
   return { text, diagnostics, extension: 'md' };

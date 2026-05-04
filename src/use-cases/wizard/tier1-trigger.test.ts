@@ -10,6 +10,8 @@ function plan(over: Partial<MkdocsConfig> = {}): ConversionPlan {
     siteUrl: null,
     docsDir: 'docs',
     useDirectoryUrls: true,
+    copyright: null,
+    repoName: null,
     repoUrl: null,
     editUri: null,
     nav: null,

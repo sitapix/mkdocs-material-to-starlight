@@ -75,4 +75,125 @@ describe('normalizeAdmonitions', () => {
     const twice = normalizeAdmonitions(once);
     expect(twice).toBe(once);
   });
+
+  it('recursively converts an admonition nested inside another admonition body', () => {
+    const src = [
+      '??? info "Smart Mode Algorithm"',
+      '',
+      '    Some prose.',
+      '',
+      '    !!! note',
+      '        Inner body.',
+      '',
+      '    Trailing prose.',
+      '',
+    ].join('\n');
+    // Outer must use one MORE colon than inner — remark-directive closes any
+    // open container when it meets a fence with ≥ as many colons. Inner stays
+    // at the canonical ADMONITION_FENCE_DEPTH; outer grows to depth+1.
+    const OUTER = ':'.repeat(ADMONITION_FENCE_DEPTH + 1);
+    const INNER = ':'.repeat(ADMONITION_FENCE_DEPTH);
+    const expected = [
+      `${OUTER}info[Smart Mode Algorithm]{collapsible="closed"}`,
+      '',
+      'Some prose.',
+      '',
+      `${INNER}note`,
+      'Inner body.',
+      INNER,
+      '',
+      'Trailing prose.',
+      OUTER,
+      '',
+    ].join('\n');
+    expect(normalizeAdmonitions(src)).toBe(expected);
+  });
+
+  it('grows fence depth for each level of admonition nesting', () => {
+    const src = [
+      '!!! warning "outer"',
+      '    !!! info "middle"',
+      '        !!! note',
+      '            innermost',
+      '',
+    ].join('\n');
+    const D6 = ':'.repeat(ADMONITION_FENCE_DEPTH);
+    const D7 = ':'.repeat(ADMONITION_FENCE_DEPTH + 1);
+    const D8 = ':'.repeat(ADMONITION_FENCE_DEPTH + 2);
+    const expected = [
+      `${D8}warning[outer]`,
+      `${D7}info[middle]`,
+      `${D6}note`,
+      'innermost',
+      D6,
+      D7,
+      D8,
+      '',
+    ].join('\n');
+    expect(normalizeAdmonitions(src)).toBe(expected);
+  });
+
+  it('is idempotent across nesting — running twice equals running once', () => {
+    const src = [
+      '??? info "Outer"',
+      '    !!! note',
+      '        Inner.',
+      '',
+    ].join('\n');
+    const once = normalizeAdmonitions(src);
+    const twice = normalizeAdmonitions(once);
+    expect(twice).toBe(once);
+  });
+
+  it('grows fence depth when body contains a /// pymdownx block marker', () => {
+    // Real-world pydantic pattern: !!! note wrapping /// version-added.
+    // The blocks normalizer (which runs after admonitions) emits the inner
+    // /// directive at base depth, so the outer admonition's closer must
+    // exceed it — otherwise the inner closer terminates both at parse time.
+    const src = [
+      '!!! note "Heads up"',
+      '    body line',
+      '',
+      '    /// version-added | v2.10',
+      '    ///',
+      '',
+    ].join('\n');
+    const OUTER = ':'.repeat(ADMONITION_FENCE_DEPTH + 1);
+    const expected = [
+      `${OUTER}note[Heads up]`,
+      'body line',
+      '',
+      '/// version-added | v2.10',
+      '///',
+      OUTER,
+      '',
+    ].join('\n');
+    expect(normalizeAdmonitions(src)).toBe(expected);
+  });
+
+  it('grows fence depth above the deepest /// block nesting in the body', () => {
+    // Doubly-nested pymdownx blocks inside an admonition: the outer block
+    // will eventually emit at depth (BASE+1), so the admonition needs (BASE+2).
+    const src = [
+      '!!! warning "Heads up"',
+      '    //// admonition | Outer',
+      '    /// note',
+      '    inner',
+      '    ///',
+      '    ////',
+      '',
+    ].join('\n');
+    const D8 = ':'.repeat(ADMONITION_FENCE_DEPTH + 2);
+    const expected = [
+      `${D8}warning[Heads up]`,
+      '//// admonition | Outer',
+      '/// note',
+      'inner',
+      '///',
+      '////',
+      D8,
+      '',
+    ].join('\n');
+    expect(normalizeAdmonitions(src)).toBe(expected);
+  });
 });

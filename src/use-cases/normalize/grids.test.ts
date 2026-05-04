@@ -187,6 +187,303 @@ describe('normalizeCardGrids', () => {
     });
   });
 
+  describe('link + description card → <LinkCard description=…> promotion', () => {
+    it('promotes a card with a bare link followed by a single plain paragraph', () => {
+      const src = [
+        '<div class="grid cards" markdown>',
+        '',
+        '-   [Customizing Starlight](/guides/customization/)',
+        '',
+        '    Learn how to make your Starlight site your own.',
+        '',
+        '</div>',
+        '',
+      ].join('\n');
+      const out = normalizeCardGrids(src);
+      expect(out).toContain('<LinkCard');
+      expect(out).toContain('title="Customizing Starlight"');
+      expect(out).toContain('href="/guides/customization/"');
+      expect(out).toContain(
+        'description="Learn how to make your Starlight site your own."',
+      );
+      expect(out).not.toMatch(/^:::card$/m);
+    });
+
+    it('joins a multi-line plain paragraph into a single description', () => {
+      const src = [
+        '<div class="grid cards" markdown>',
+        '',
+        '-   [Title](href.md)',
+        '',
+        '    First line of description.',
+        '    Second line of description.',
+        '',
+        '</div>',
+        '',
+      ].join('\n');
+      const out = normalizeCardGrids(src);
+      expect(out).toContain(
+        'description="First line of description. Second line of description."',
+      );
+    });
+
+    it('escapes quote characters in the description', () => {
+      const src = [
+        '<div class="grid cards" markdown>',
+        '',
+        '-   [Title](href.md)',
+        '',
+        '    Reads "config.yml" on startup.',
+        '',
+        '</div>',
+        '',
+      ].join('\n');
+      const out = normalizeCardGrids(src);
+      expect(out).toContain(
+        'description="Reads &quot;config.yml&quot; on startup."',
+      );
+    });
+
+    it('does NOT promote when the description paragraph contains a markdown link', () => {
+      const src = [
+        '<div class="grid cards" markdown>',
+        '',
+        '-   [Title](href.md)',
+        '',
+        '    See also [other page](other.md) for context.',
+        '',
+        '</div>',
+        '',
+      ].join('\n');
+      const out = normalizeCardGrids(src);
+      expect(out).not.toContain('<LinkCard');
+      expect(out).toContain(':::card');
+    });
+
+    it('does NOT promote when the description contains inline code', () => {
+      const src = [
+        '<div class="grid cards" markdown>',
+        '',
+        '-   [Title](href.md)',
+        '',
+        '    Configures the `database.url` setting.',
+        '',
+        '</div>',
+        '',
+      ].join('\n');
+      const out = normalizeCardGrids(src);
+      expect(out).not.toContain('<LinkCard');
+    });
+
+    it('does NOT promote when there are two paragraphs after the link', () => {
+      const src = [
+        '<div class="grid cards" markdown>',
+        '',
+        '-   [Title](href.md)',
+        '',
+        '    First paragraph.',
+        '',
+        '    Second paragraph.',
+        '',
+        '</div>',
+        '',
+      ].join('\n');
+      const out = normalizeCardGrids(src);
+      expect(out).not.toContain('<LinkCard');
+      expect(out).toContain(':::card');
+    });
+
+    it('does NOT promote when description contains block-level markdown', () => {
+      const src = [
+        '<div class="grid cards" markdown>',
+        '',
+        '-   [Title](href.md)',
+        '',
+        '    - bullet inside description',
+        '',
+        '</div>',
+        '',
+      ].join('\n');
+      const out = normalizeCardGrids(src);
+      expect(out).not.toContain('<LinkCard');
+    });
+
+    it('still promotes the bare-link-only shape (no regression)', () => {
+      const src = [
+        '<div class="grid cards" markdown>',
+        '',
+        '- [Quick Start](getting-started.md)',
+        '',
+        '</div>',
+        '',
+      ].join('\n');
+      const out = normalizeCardGrids(src);
+      expect(out).toContain('<LinkCard title="Quick Start" href="getting-started.md" />');
+      expect(out).not.toContain('description=');
+    });
+
+    it('is idempotent across both shapes in the same grid', () => {
+      const src = [
+        '<div class="grid cards" markdown>',
+        '',
+        '- [Plain Link](a.md)',
+        '',
+        '-   [Linked Title](b.md)',
+        '',
+        '    Description text.',
+        '',
+        '</div>',
+        '',
+      ].join('\n');
+      const once = normalizeCardGrids(src);
+      expect(normalizeCardGrids(once)).toBe(once);
+    });
+  });
+
+  describe('icon and emphasis wrappers around the link', () => {
+    it('strips a Material icon prefix before matching the link', () => {
+      const src = [
+        '<div class="grid cards" markdown>',
+        '',
+        '-   :material-clock: [Quick Start](getting-started.md)',
+        '',
+        '</div>',
+        '',
+      ].join('\n');
+      const out = normalizeCardGrids(src);
+      expect(out).toContain('<LinkCard title="Quick Start" href="getting-started.md" />');
+    });
+
+    it('strips a trailing Material icon (arrow-right idiom)', () => {
+      const src = [
+        '<div class="grid cards" markdown>',
+        '',
+        '-   [Quick Start](getting-started.md) :material-arrow-right:',
+        '',
+        '</div>',
+        '',
+      ].join('\n');
+      const out = normalizeCardGrids(src);
+      expect(out).toContain('<LinkCard title="Quick Start" href="getting-started.md" />');
+    });
+
+    it('strips a surrounding **bold** wrapper before matching the link', () => {
+      const src = [
+        '<div class="grid cards" markdown>',
+        '',
+        '- **[Quick Start](getting-started.md)**',
+        '',
+        '</div>',
+        '',
+      ].join('\n');
+      const out = normalizeCardGrids(src);
+      expect(out).toContain('<LinkCard title="Quick Start" href="getting-started.md" />');
+    });
+
+    it('strips a surrounding __bold__ wrapper before matching the link', () => {
+      const src = [
+        '<div class="grid cards" markdown>',
+        '',
+        '- __[Quick Start](getting-started.md)__',
+        '',
+        '</div>',
+        '',
+      ].join('\n');
+      const out = normalizeCardGrids(src);
+      expect(out).toContain('<LinkCard title="Quick Start" href="getting-started.md" />');
+    });
+
+    it('strips a surrounding *italic* wrapper before matching the link', () => {
+      const src = [
+        '<div class="grid cards" markdown>',
+        '',
+        '- *[Quick Start](getting-started.md)*',
+        '',
+        '</div>',
+        '',
+      ].join('\n');
+      const out = normalizeCardGrids(src);
+      expect(out).toContain('<LinkCard title="Quick Start" href="getting-started.md" />');
+    });
+
+    it('strips combined icon prefix + bold wrapper (canonical Material idiom)', () => {
+      const src = [
+        '<div class="grid cards" markdown>',
+        '',
+        '-   :material-clock: __[Customizing Starlight](/guides/customization/)__',
+        '',
+        '    Learn how to make your Starlight site your own.',
+        '',
+        '</div>',
+        '',
+      ].join('\n');
+      const out = normalizeCardGrids(src);
+      expect(out).toContain('<LinkCard');
+      expect(out).toContain('title="Customizing Starlight"');
+      expect(out).toContain('href="/guides/customization/"');
+      expect(out).toContain('description="Learn how to make your Starlight site your own."');
+    });
+
+    it('handles fontawesome and octicons icon namespaces', () => {
+      const src = [
+        '<div class="grid cards" markdown>',
+        '',
+        '- :fontawesome-solid-rocket: **[Launch](launch.md)**',
+        '- :octicons-mark-github-16: [Repo](https://github.com/x/y)',
+        '',
+        '</div>',
+        '',
+      ].join('\n');
+      const out = normalizeCardGrids(src);
+      expect(out).toContain('<LinkCard title="Launch"');
+      expect(out).toContain('<LinkCard title="Repo"');
+    });
+
+    it('does NOT promote when there is extra text after the link on the same line', () => {
+      const src = [
+        '<div class="grid cards" markdown>',
+        '',
+        '-   :material-clock: [Title](href.md) — with extra trailing prose',
+        '',
+        '</div>',
+        '',
+      ].join('\n');
+      const out = normalizeCardGrids(src);
+      expect(out).not.toContain('<LinkCard');
+      expect(out).toContain(':::card');
+    });
+
+    it('does NOT promote when an icon-only line precedes the link (no link on first non-blank line)', () => {
+      const src = [
+        '<div class="grid cards" markdown>',
+        '',
+        '-   :material-rocket: **Fast**',
+        '',
+        '    [Learn more](docs.md)',
+        '',
+        '</div>',
+        '',
+      ].join('\n');
+      const out = normalizeCardGrids(src);
+      expect(out).not.toContain('<LinkCard');
+    });
+
+    it('is idempotent for icon-prefixed link cards with description', () => {
+      const src = [
+        '<div class="grid cards" markdown>',
+        '',
+        '-   :material-clock: __[Customizing Starlight](/guides/customization/)__',
+        '',
+        '    Learn how to make your Starlight site your own.',
+        '',
+        '</div>',
+        '',
+      ].join('\n');
+      const once = normalizeCardGrids(src);
+      expect(normalizeCardGrids(once)).toBe(once);
+    });
+  });
+
   it('is idempotent', () => {
     const src = [
       '<div class="grid cards" markdown>',

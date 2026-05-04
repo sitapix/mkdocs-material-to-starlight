@@ -21,6 +21,7 @@
 import { visit } from 'unist-util-visit';
 import type { Plugin } from 'unified';
 import type { Root } from 'mdast';
+import { extractLabelIcon } from '../extract-label-icon.js';
 
 interface ContainerDirectiveLike {
   type: 'containerDirective';
@@ -32,19 +33,32 @@ interface ContainerDirectiveLike {
 
 export interface TabTransformOptions {
   /**
-   * When true, emit Starlight `<Tabs syncKey="…">` MDX components instead
-   * of the default plain HTML `<div class="sl-tabs">` blocks. The syncKey
-   * is derived from the tab label set so identically-labelled tab groups
-   * stay synchronised across pages. Set when `theme.features` includes
-   * `content.tabs.link` in mkdocs.yml.
+   * When true (default), emit Starlight `<Tabs>+<TabItem>` MDX components.
+   * When false, emit the legacy plain HTML `<div class="sl-tabs">` blocks
+   * (kept as an explicit opt-out only — the MDX path is the supported one).
    */
   readonly emitMdxTabs?: boolean;
+  /**
+   * When true, the emitted `<Tabs>` carries a `syncKey="…"` derived from
+   * the tab label set so identically-labelled groups stay synchronised
+   * across pages. Set when `theme.features` includes `content.tabs.link`
+   * in mkdocs.yml. No effect when `emitMdxTabs` is false.
+   */
+  readonly tabsLinked?: boolean;
+  /**
+   * Optional shortcode → Starlight icon name override map, threaded through
+   * to the icon-extraction helper used on tab labels. Mirrors the override
+   * map passed to the icon transform.
+   */
+  readonly iconOverrides?: Readonly<Record<string, string>>;
 }
 
 export const transformTabDirectives: Plugin<[TabTransformOptions?], Root> = (
   options = {},
 ) => {
-  const emitMdx = options.emitMdxTabs === true;
+  const emitMdx = options.emitMdxTabs !== false;
+  const tabsLinked = options.tabsLinked === true;
+  const iconOverrides = options.iconOverrides;
   return (tree) => {
     visit(tree, 'containerDirective', (node, index, parent) => {
       const directive = node as unknown as ContainerDirectiveLike;
@@ -57,11 +71,11 @@ export const transformTabDirectives: Plugin<[TabTransformOptions?], Root> = (
       const replacement =
         directive.name === 'tabs'
           ? emitMdx
-            ? renderTabsContainerMdx(directive)
+            ? renderTabsContainerMdx(directive, iconOverrides, tabsLinked)
             : renderTabsContainer(directive)
           : emitMdx
-            ? renderTabMdx(directive)
-            : renderTab(directive);
+            ? renderTabMdx(directive, iconOverrides)
+            : renderTab(directive, iconOverrides);
       (parent.children as unknown[]).splice(index, 1, ...replacement);
       return index;
     });
@@ -70,13 +84,17 @@ export const transformTabDirectives: Plugin<[TabTransformOptions?], Root> = (
 
 function renderTabsContainerMdx(
   directive: ContainerDirectiveLike,
+  iconOverrides: Readonly<Record<string, string>> | undefined,
+  tabsLinked: boolean,
 ): ReadonlyArray<unknown> {
-  const labels = collectChildLabels(directive);
-  const syncKey = deriveSyncKey(labels);
-  const openTag =
-    syncKey === null
-      ? '<Tabs>'
-      : `<Tabs syncKey="${escapeAttr(syncKey)}">`;
+  // syncKey is only emitted when the source `mkdocs.yml` opted into Material's
+  // `content.tabs.link` cross-page sync feature; emitting it unconditionally
+  // would impose synchronization the author didn't ask for. When set, it is
+  // derived from the cleaned (icon-stripped) labels so two tab groups that
+  // differ only in icon shortcodes still synchronise correctly.
+  const openTag = tabsLinked
+    ? buildLinkedTabsOpenTag(directive, iconOverrides)
+    : '<Tabs>';
   const out: unknown[] = [{ type: 'html', value: openTag }];
   for (const child of directive.children) {
     if (isDirectiveLabel(child)) continue;
@@ -86,12 +104,25 @@ function renderTabsContainerMdx(
   return out;
 }
 
-function renderTabMdx(directive: ContainerDirectiveLike): ReadonlyArray<unknown> {
-  const label = readDirectiveLabel(directive);
-  const openTag =
-    label === null
-      ? '<TabItem label="Tab">'
-      : `<TabItem label="${escapeAttr(label)}">`;
+function buildLinkedTabsOpenTag(
+  directive: ContainerDirectiveLike,
+  iconOverrides: Readonly<Record<string, string>> | undefined,
+): string {
+  const labels = collectChildLabels(directive, iconOverrides);
+  const syncKey = deriveSyncKey(labels);
+  return syncKey === null
+    ? '<Tabs>'
+    : `<Tabs syncKey="${escapeAttr(syncKey)}">`;
+}
+
+function renderTabMdx(
+  directive: ContainerDirectiveLike,
+  iconOverrides: Readonly<Record<string, string>> | undefined,
+): ReadonlyArray<unknown> {
+  const rawLabel = readDirectiveLabel(directive);
+  const openTag = rawLabel === null
+    ? '<TabItem label="Tab">'
+    : buildTabItemOpenTag(rawLabel, iconOverrides);
   const out: unknown[] = [{ type: 'html', value: openTag }];
   for (const child of directive.children) {
     if (isDirectiveLabel(child)) continue;
@@ -101,8 +132,25 @@ function renderTabMdx(directive: ContainerDirectiveLike): ReadonlyArray<unknown>
   return out;
 }
 
+function buildTabItemOpenTag(
+  rawLabel: string,
+  iconOverrides: Readonly<Record<string, string>> | undefined,
+): string {
+  const { iconName, label } = extractLabelIcon(
+    iconOverrides === undefined
+      ? { rawLabel }
+      : { rawLabel, overrides: iconOverrides },
+  );
+  const safeLabel = label.length > 0 ? label : 'Tab';
+  if (iconName === null) {
+    return `<TabItem label="${escapeAttr(safeLabel)}">`;
+  }
+  return `<TabItem icon="${escapeAttr(iconName)}" label="${escapeAttr(safeLabel)}">`;
+}
+
 function collectChildLabels(
   directive: ContainerDirectiveLike,
+  iconOverrides: Readonly<Record<string, string>> | undefined,
 ): ReadonlyArray<string> {
   const labels: string[] = [];
   for (const child of directive.children) {
@@ -113,8 +161,15 @@ function collectChildLabels(
     ) {
       const childDir = child as unknown as ContainerDirectiveLike;
       if (childDir.name === 'tab') {
-        const label = readDirectiveLabel(childDir);
-        if (label !== null) labels.push(label);
+        const raw = readDirectiveLabel(childDir);
+        if (raw !== null) {
+          const cleaned = extractLabelIcon(
+            iconOverrides === undefined
+              ? { rawLabel: raw }
+              : { rawLabel: raw, overrides: iconOverrides },
+          ).label;
+          if (cleaned.length > 0) labels.push(cleaned);
+        }
       }
     }
   }
@@ -137,12 +192,22 @@ function renderTabsContainer(directive: ContainerDirectiveLike): ReadonlyArray<u
   return wrapWithDiv(directive, openTag);
 }
 
-function renderTab(directive: ContainerDirectiveLike): ReadonlyArray<unknown> {
-  const label = readDirectiveLabel(directive);
+function renderTab(
+  directive: ContainerDirectiveLike,
+  iconOverrides: Readonly<Record<string, string>> | undefined,
+): ReadonlyArray<unknown> {
+  const rawLabel = readDirectiveLabel(directive);
+  // Plain HTML tabs have no `icon` attribute slot, but we still strip the
+  // shortcode so the visible data-label doesn't carry literal `:foo:` text.
+  const cleaned = rawLabel === null ? null : extractLabelIcon(
+    iconOverrides === undefined
+      ? { rawLabel }
+      : { rawLabel, overrides: iconOverrides },
+  ).label;
   const openTag =
-    label === null
+    cleaned === null || cleaned.length === 0
       ? '<div class="sl-tab">'
-      : `<div class="sl-tab" data-label="${escapeAttr(label)}">`;
+      : `<div class="sl-tab" data-label="${escapeAttr(cleaned)}">`;
   return wrapWithDiv(directive, openTag);
 }
 

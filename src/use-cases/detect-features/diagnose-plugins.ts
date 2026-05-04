@@ -24,7 +24,7 @@
 import type { MkdocsPlugin } from '../../domain/config/mkdocs-config.js';
 import { createDiagnostic, type Diagnostic } from '../../domain/diagnostics/diagnostic.js';
 
-const SOURCE = 'mkdocs-to-starlight';
+const SOURCE = 'mkdocs-material-to-starlight';
 
 interface PluginDiagnosticSpec {
   readonly ruleId: string;
@@ -45,10 +45,10 @@ const PLUGIN_DIAGNOSTICS: ReadonlyMap<string, PluginDiagnosticSpec> = new Map([
   [
     'social',
     {
-      ruleId: 'plugin-social-no-equivalent',
-      severity: 'warning',
+      ruleId: 'plugin-social-mapped',
+      severity: 'info',
       message:
-        'Material `social` plugin generates per-page OG/PNG cards; Starlight has no first-party equivalent. Recreate via `astro-og-canvas` or a custom Satori/Resvg pipeline if needed.',
+        'Material `social` plugin (per-page OG card PNGs) detected — auto-wired to `astro-og-canvas`. The converter installs the package and emits a stub endpoint at `src/pages/og/[...slug].png.ts` that you must customize (logo, fonts, colors). Note: distinct from Starlight\'s `social: []` config (header social-media icon links), which is wired separately from `extra.social[]` in mkdocs.yml.',
     },
   ],
   [
@@ -249,6 +249,154 @@ const PLUGIN_DIAGNOSTICS: ReadonlyMap<string, PluginDiagnosticSpec> = new Map([
         'mkdocs-swagger-ui-tag plugin detected. Install `starlight-openapi` and add it to your Astro Starlight integration. See https://starlight-openapi.vercel.app for setup. Each `<swagger-ui>` tag in source must be manually replaced with the appropriate Starlight Openapi component or page route.',
     },
   ],
+  [
+    'pdf-export',
+    {
+      ruleId: 'plugin-pdf-export-mapped',
+      severity: 'info',
+      message:
+        'mkdocs-pdf-export-plugin detected. Closest Starlight equivalent: `starlight-to-pdf` (CLI tool — runs after `astro build` against the built site). Install with `npm i -D starlight-to-pdf` and run `npx starlight-to-pdf <url>` after each build, or wire it into your CI release step. The converter does not auto-install it because CLI tools are not Astro integrations.',
+    },
+  ],
+  [
+    'with-pdf',
+    {
+      ruleId: 'plugin-pdf-export-mapped',
+      severity: 'info',
+      message:
+        'mkdocs-with-pdf (PDF export variant) detected. Closest Starlight equivalent: `starlight-to-pdf` (CLI tool — runs after `astro build`). Install with `npm i -D starlight-to-pdf` and run `npx starlight-to-pdf <url>` after each build. The converter does not auto-install it because CLI tools are not Astro integrations.',
+    },
+  ],
+  [
+    'exclude',
+    {
+      ruleId: 'plugin-exclude-mapped',
+      severity: 'warning',
+      message:
+        'mkdocs-exclude plugin detected. Astro/Starlight has no in-config path-exclusion mechanism: any file under `src/content/docs/` becomes a published page. Either (a) move excluded paths out of `src/content/docs/` so Astro never sees them, (b) add `draft: true` frontmatter to each excluded page (Astro skips drafts in production builds), or (c) write a custom Astro content-collection filter via `defineCollection({ filter })`.',
+    },
+  ],
+  [
+    'mkdocs-redoc-tag',
+    {
+      ruleId: 'plugin-swagger-ui-mapped',
+      severity: 'info',
+      message:
+        'mkdocs-redoc-tag plugin detected (alternative OpenAPI renderer). Install `starlight-openapi` and add it to your Starlight integration. Each `<redoc>` tag in source must be manually replaced with the appropriate `starlight-openapi` schema route — see https://starlight-openapi.vercel.app for setup.',
+    },
+  ],
+  [
+    'render-swagger',
+    {
+      ruleId: 'plugin-swagger-ui-mapped',
+      severity: 'info',
+      message:
+        'mkdocs-render-swagger-plugin detected (alternative OpenAPI renderer). Install `starlight-openapi` and add it to your Starlight integration. Each `!!swagger schema.yml!!` macro in source must be manually replaced with the appropriate `starlight-openapi` schema route — see https://starlight-openapi.vercel.app for setup.',
+    },
+  ],
+  [
+    'git-authors',
+    {
+      ruleId: 'plugin-git-authors-mapped',
+      severity: 'info',
+      message:
+        'mkdocs-git-authors-plugin detected (per-page git contributors). Starlight has no per-page contributor block. Recreate via the `starlight-contributor-list` community plugin (project-wide contributors footer), or write a small Astro component that reads `git log --format` at build time for true per-page authors.',
+    },
+  ],
+  [
+    'git-committers',
+    {
+      ruleId: 'plugin-git-authors-mapped',
+      severity: 'info',
+      message:
+        'mkdocs-git-committers-2 plugin detected (per-page git committers). Starlight has no per-page contributor block. Recreate via the `starlight-contributor-list` community plugin (project-wide contributors footer), or write a small Astro component that reads `git log --format` at build time for true per-page committers.',
+    },
+  ],
+  [
+    'mkdocs-bibtex',
+    {
+      ruleId: 'plugin-mkdocs-bibtex-no-equivalent',
+      severity: 'warning',
+      message:
+        'mkdocs-bibtex plugin detected (BibTeX-driven citations). No Starlight equivalent. Pre-render citations to inline footnotes ahead of conversion, or write a custom remark plugin that reads your `.bib` file and inlines references.',
+    },
+  ],
+  // PyMdown extensions (Tier 3 long-tail) — extensions that the converter does
+  // not transform. Each emits a single info/warning diagnostic so the user sees
+  // a structured note in MIGRATION_NOTES.md and can audit which features need
+  // manual handling.
+  [
+    'pymdownx.arithmatex',
+    {
+      ruleId: 'extension-arithmatex-detected',
+      severity: 'warning',
+      message:
+        '`pymdownx.arithmatex` (math rendering) detected. The converter passes `$inline$` and `$$block$$` math through `remark-math`, but Astro needs a rehype renderer to display formulas. Install `rehype-katex` (preferred) or `rehype-mathjax` and wire it into `astro.config.mjs` `markdown.rehypePlugins`. Add `import "katex/dist/katex.min.css"` to your global CSS.',
+    },
+  ],
+  [
+    'pymdownx.progressbar',
+    {
+      ruleId: 'extension-progressbar-no-equivalent',
+      severity: 'warning',
+      message:
+        '`pymdownx.progressbar` (`[=85% "label"]` progress bars) detected — no Starlight or Astro equivalent. Existing markers will pass through as literal text. Replace them with a custom component, an inline `<progress>` element, or static text.',
+    },
+  ],
+  [
+    'pymdownx.striphtml',
+    {
+      ruleId: 'extension-striphtml-subsumed',
+      severity: 'info',
+      message:
+        '`pymdownx.striphtml` (build-time HTML stripper) detected — subsumed by the Astro/MDX pipeline, which handles HTML inclusion via its own component model. No action required.',
+    },
+  ],
+  [
+    'pymdownx.blocks.dialog',
+    {
+      ruleId: 'extension-blocks-dialog-no-equivalent',
+      severity: 'warning',
+      message:
+        '`pymdownx.blocks.dialog` (`/// dialog | …` blocks) detected — no Starlight equivalent. Replace dialog blocks with a custom MDX component (e.g., `<Dialog>`) under `src/components/`, or convert them to admonitions/asides.',
+    },
+  ],
+  [
+    'pymdownx.blocks.grid',
+    {
+      ruleId: 'extension-blocks-grid-no-equivalent',
+      severity: 'warning',
+      message:
+        '`pymdownx.blocks.grid` (generic CSS-grid block, distinct from `grid cards`) detected — no Starlight equivalent. The `<div class="grid cards">` shape is still mapped; only the bare `pymdownx.blocks.grid` form is unmapped. Replace with hand-written `<div class="sl-grid">` markup or a custom Astro component.',
+    },
+  ],
+  [
+    'pymdownx.escapeall',
+    {
+      ruleId: 'extension-escapeall-detected',
+      severity: 'info',
+      message:
+        '`pymdownx.escapeall` detected. MDX and remark handle backslash escapes natively; some unusual character escapes that Python-Markdown allowed may behave differently in MDX (e.g., `\\!`, `\\(`). Common cases (`\\*`, `\\_`, `\\\\`) still work. Spot-check passages that rely on escaping unusual characters.',
+    },
+  ],
+  [
+    'pymdownx.pathconverter',
+    {
+      ruleId: 'extension-pathconverter-subsumed',
+      severity: 'info',
+      message:
+        '`pymdownx.pathconverter` (relative-path rewriting) detected — subsumed by the converter\'s built-in link normalizer, which rewrites `.md` paths to Starlight slugs. No action required.',
+    },
+  ],
+  [
+    'pymdownx.saneheaders',
+    {
+      ruleId: 'extension-saneheaders-detected',
+      severity: 'info',
+      message:
+        '`pymdownx.saneheaders` detected. Remark/MDX heading parsing follows CommonMark defaults, which approximate but do not exactly match saneheaders\' stricter parsing of `#` in inline contexts. Headings that worked under saneheaders should continue to work; spot-check edge cases.',
+    },
+  ],
 ]);
 
 export function diagnosePlugins(
@@ -271,5 +419,43 @@ export function diagnosePlugins(
       }),
     );
   }
+
+  // Per-plugin custom-config detection. The auto-wired plugin substitutions
+  // (blog → starlight-blog, glightbox → starlight-image-zoom, etc.) cover the
+  // happy path with default options. When the user has customized the
+  // upstream plugin, surface a single diagnostic listing the bespoke option
+  // keys so they know which settings need hand-porting to the Starlight
+  // plugin's own (different) configuration shape.
+  const blog = plugins.find((p) => p.name === 'blog');
+  if (blog !== undefined) {
+    const customKeys = Object.keys(blog.options).filter(
+      (k) => !DEFAULT_BLOG_KEYS.has(k),
+    );
+    if (customKeys.length > 0) {
+      out.push(
+        createDiagnostic({
+          severity: 'info',
+          ruleId: 'plugin-blog-custom-config',
+          source: SOURCE,
+          message:
+            `Material \`blog\` plugin has bespoke options that \`starlight-blog\` does not honor as-is: ${customKeys.map((k) => '`' + k + '`').join(', ')}. ` +
+            `Hand-port each one: URL formats (\`post_url_format\`, \`archive_url_format\`, \`categories_url_format\`) become Astro page route patterns under \`src/content/docs/\`; pagination settings (\`pagination_per_page\`) map to \`starlight-blog\`'s \`postsPerPage\`; ` +
+            `\`authors_file\` becomes the plugin's \`authors\` config object; \`draft_if_future_date\` requires a content-collection filter; \`categories_allowed\` requires the same plus a Zod schema enum.`,
+        }),
+      );
+    }
+  }
+
   return out;
 }
+
+/**
+ * The default `blog` plugin keys we already know how to translate (or that
+ * are no-ops because Astro/Starlight-blog handle them differently). Anything
+ * outside this set fires the `plugin-blog-custom-config` diagnostic.
+ */
+const DEFAULT_BLOG_KEYS: ReadonlySet<string> = new Set([
+  'enabled',
+  'blog_dir',
+  'post_dir',
+]);

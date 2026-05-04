@@ -33,6 +33,7 @@ import { preprocessMkdocsPythonTags } from '../../use-cases/config/preprocess-mk
 import { resolveInherits } from '../../use-cases/config/inherit-config.js';
 import { parseNavTree } from '../../use-cases/config/nav-tree.js';
 import { compileNavigation } from '../../use-cases/compile-navigation/compile.js';
+import { scanNavTopics } from '../../use-cases/detect-features/nav-topics.js';
 import { applyPagesOverrides } from '../../use-cases/compile-navigation/apply-pages.js';
 import { applySectionIndex } from '../../use-cases/compile-navigation/section-index.js';
 import { parseLiterateNav } from '../../use-cases/config/parse-literate-nav.js';
@@ -40,13 +41,16 @@ import { createDiagnostic } from '../../domain/diagnostics/diagnostic.js';
 import type { MkdocsNavEntry } from '../../domain/config/mkdocs-config.js';
 import { loadAwesomePagesFiles } from '../../use-cases/config/load-awesome-pages.js';
 import { convertSite, type TaggedDiagnostic } from '../../use-cases/convert-site/convert.js';
+import { createMdxOutputValidator } from '../../infrastructure/mdx/at-mdx-js-validator.js';
 import { detectFeaturesFromPlugins } from '../../use-cases/detect-features/from-plugins.js';
+import { detectFeaturesFromThemeFeatures } from '../../use-cases/detect-features/from-theme-features.js';
 import { diagnosePlugins } from '../../use-cases/detect-features/diagnose-plugins.js';
 import { extractRedirects } from '../../use-cases/detect-features/redirects.js';
 import { extractAutoAppend } from '../../use-cases/detect-features/auto-append.js';
 import { extractSocial } from '../../use-cases/detect-features/social.js';
 import { extractAlternateLocales } from '../../use-cases/detect-features/extra-alternate.js';
 import { extractExtraAssets } from '../../use-cases/detect-features/extra-assets.js';
+import { detectExtraWarnings } from '../../use-cases/detect-features/extra-warnings.js';
 import { classifyHook } from '../../use-cases/detect-features/hook-archetypes.js';
 import { deriveEditLinkBaseUrl } from '../../use-cases/detect-features/edit-link.js';
 import { extractTocConfig } from '../../use-cases/detect-features/toc-config.js';
@@ -65,15 +69,21 @@ import { serializeContentConfig } from '../../use-cases/serialize-config/content
 import { serializePackageJson } from '../../use-cases/serialize-config/package-json.js';
 import { serializeMigrationNotes } from '../../use-cases/serialize-config/migration-notes.js';
 import { serializeRssEndpoint } from '../../use-cases/serialize-config/rss-endpoint.js';
+import { serializeOgEndpoint } from '../../use-cases/serialize-config/og-endpoint.js';
 import { serializeStyleSheet } from '../../use-cases/serialize-config/styles.js';
 import { mapMaterialPaletteToStarlight } from '../../domain/starlight/palette-mapping.js';
 import { classifyThemeFeature } from '../../domain/starlight/theme-feature-catalog.js';
 import { detectLongtailFeatures } from '../../use-cases/detect-features/theme-features-longtail.js';
+import { detectInsidersFeatures } from '../../use-cases/detect-features/insiders-features.js';
 import {
   scanTabsLinkOccurrences,
   scanCodehiliteLinenumsOccurrences,
   scanMetaYmlFiles,
+  scanCodeBlockOptOuts,
+  scanLatexDelimiters,
+  scanMathScripts,
 } from '../../use-cases/detect-features/scan-bulk-diagnostics.js';
+import { scanMaterialCodeCssVars } from '../../use-cases/detect-features/scan-code-css-vars.js';
 import type { SidebarEntry } from '../../domain/starlight/sidebar.js';
 
 export interface ConvertSiteFromDiskInput {
@@ -82,8 +92,12 @@ export interface ConvertSiteFromDiskInput {
   readonly snippetBasePaths?: ReadonlyArray<string>;
   /** When false, omits starlight-links-validator from generated config. Defaults to true. */
   readonly linksValidator?: boolean;
-  /** Override for tab output mode. 'mdx' forces Starlight <Tabs>, 'html' forces HTML divs,
-   *  undefined falls back to auto-detection from content.tabs.link. */
+  /** Override for tab output mode. Defaults to `'mdx'` — emit Starlight
+   *  `<Tabs>+<TabItem>` JSX (file promoted to `.mdx`); `syncKey` is added
+   *  when `content.tabs.link` is set in `theme.features`. `'html'` is a
+   *  legacy opt-out that emits `<div class="sl-tabs">` plus a CSS shim;
+   *  retained for users who must keep `.md` extensions and do not need
+   *  Starlight's native tab styling. */
   readonly tabs?: 'mdx' | 'html';
   /** When false, suppresses rss.xml.ts output even if the rss plugin is detected. */
   readonly rss?: boolean;
@@ -136,6 +150,12 @@ export interface ConvertSiteFromDiskInput {
   readonly suppressRules?: ReadonlyArray<string>;
   /** When false, user opted out of starlight-sidebar-topics auto-install. Deferred. */
   readonly sidebarTopics?: boolean;
+  /**
+   * Optional injected output validator (test seam). When omitted, the API
+   * default-wires the production `@mdx-js/mdx`-backed adapter. Pass `null`
+   * to explicitly skip post-conversion syntax validation.
+   */
+  readonly outputValidator?: import('../../domain/ports/output-validator.js').OutputValidator | null;
 }
 
 export interface ConvertSiteFromDiskOutput {
@@ -282,10 +302,18 @@ export async function convertSiteFromDisk(
   })();
   const hasTabsLink = themeFeatures.includes('content.tabs.link');
   const hasNavigationTabs = themeFeatures.includes('navigation.tabs');
-  const emitMdxTabs =
-    input.tabs === 'mdx' ? true :
-    input.tabs === 'html' ? false :
-    hasTabsLink;
+  // Default to MDX so tabs render via Starlight's native <Tabs>+<TabItem>
+  // components (theme-aware styling, accessibility, syncKey support). The
+  // legacy `html` mode emits `<div class="sl-tabs">` + a CSS shim and is
+  // retained only for callers who explicitly opt in via `tabs: 'html'`.
+  const emitMdxTabs = input.tabs !== 'html';
+
+  // Default-wire the production validator. Callers can pass an explicit
+  // validator (test seam) or `null` to skip validation entirely.
+  const outputValidator =
+    input.outputValidator === undefined
+      ? createMdxOutputValidator()
+      : input.outputValidator;
 
   const siteResult = await convertSite({
     docsDir,
@@ -297,12 +325,14 @@ export async function convertSiteFromDisk(
     includeMarkdownEnabled,
     macrosScanEnabled,
     emitMdxTabs,
+    tabsLinked: hasTabsLink,
     snippetDedentSubsections: snippetExtensionOptions(
       config.value.markdownExtensions,
     )['dedent_subsections'] === true,
     ...(resolvedSnippetBasePaths === undefined
       ? {}
       : { snippetBasePaths: resolvedSnippetBasePaths }),
+    ...(outputValidator === null ? {} : { outputValidator }),
   });
   if (!siteResult.ok) {
     return err({
@@ -341,9 +371,17 @@ export async function convertSiteFromDisk(
 
   const sidebarWithPages = applyPagesOverrides(sidebarResult.value.entries, pagesResult.value);
 
-  const featuresFromPlugins = detectFeaturesFromPlugins(config.value.plugins);
+  const featuresFromPlugins = detectFeaturesFromPlugins(
+    config.value.plugins,
+    config.value.markdownExtensions,
+  );
+  const featuresFromThemeFlags = detectFeaturesFromThemeFeatures(themeFeatures);
   const allFeatures = [
-    ...new Set([...siteResult.value.detectedFeatures, ...featuresFromPlugins]),
+    ...new Set([
+      ...siteResult.value.detectedFeatures,
+      ...featuresFromPlugins,
+      ...featuresFromThemeFlags,
+    ]),
   ].sort();
 
   // Plugin-level diagnostics (for plugins that have no Starlight equivalent
@@ -372,7 +410,7 @@ export async function convertSiteFromDisk(
           diagnostic: createDiagnostic({
             severity: 'info' as const,
             ruleId: 'plugin-include-markdown-applied',
-            source: 'mkdocs-to-starlight',
+            source: 'mkdocs-material-to-starlight',
             message:
               'mkdocs-include-markdown-plugin: `{% include %}` and `{% include-markdown %}` directives have been resolved inline before per-file conversion.',
           }),
@@ -395,7 +433,7 @@ export async function convertSiteFromDisk(
       diagnostic: createDiagnostic({
         severity: 'info',
         ruleId: 'palette-translated',
-        source: 'mkdocs-to-starlight',
+        source: 'mkdocs-material-to-starlight',
         message: `Material palette primary "${palette.sourceName}" translated to Starlight accent CSS variables (hue=${String(palette.accentHue)}).`,
       }),
     });
@@ -405,7 +443,7 @@ export async function convertSiteFromDisk(
       diagnostic: createDiagnostic({
         severity: 'warning',
         ruleId: 'palette-custom-needs-manual',
-        source: 'mkdocs-to-starlight',
+        source: 'mkdocs-material-to-starlight',
         message:
           'theme.palette.primary: custom — translate your --md-primary-fg-color overrides to --sl-color-accent-* manually.',
       }),
@@ -416,7 +454,7 @@ export async function convertSiteFromDisk(
       diagnostic: createDiagnostic({
         severity: 'warning',
         ruleId: 'palette-unknown-color',
-        source: 'mkdocs-to-starlight',
+        source: 'mkdocs-material-to-starlight',
         message:
           'theme.palette.primary names a color the converter does not recognize; using Starlight default accent.',
       }),
@@ -441,7 +479,7 @@ export async function convertSiteFromDisk(
         diagnostic: createDiagnostic({
           severity: 'warning',
           ruleId: 'hook-file-not-found',
-          source: 'mkdocs-to-starlight',
+          source: 'mkdocs-material-to-starlight',
           message: `mkdocs.yml hooks: references "${hookRel}" but the file could not be read at ${hookFull}.`,
         }),
       });
@@ -453,7 +491,7 @@ export async function convertSiteFromDisk(
       diagnostic: createDiagnostic({
         severity: 'warning',
         ruleId: 'hook-archetype-detected',
-        source: 'mkdocs-to-starlight',
+        source: 'mkdocs-material-to-starlight',
         message: `Python hook archetypes: ${archetypes.join(', ')}. The converter cannot evaluate Python; reproduce the behaviour as remark/rehype plugin, Starlight component override, or Astro endpoint.`,
       }),
     });
@@ -469,9 +507,70 @@ export async function convertSiteFromDisk(
       diagnostic: createDiagnostic({
         severity: 'info',
         ruleId: 'feature-tabs-link-detected',
-        source: 'mkdocs-to-starlight',
+        source: 'mkdocs-material-to-starlight',
         message:
-          'theme.features `content.tabs.link` detected. Generated tab blocks are plain HTML; for true cross-page sync, replace with Starlight `<Tabs syncKey="…">` MDX components.',
+          'theme.features `content.tabs.link` detected. Generated `<Tabs>` components include a derived `syncKey` so identically-labelled tab groups stay synchronised across pages, matching Material\'s behaviour.',
+      }),
+    });
+  }
+  if (config.value.copyright !== null) {
+    themeFeatureDiagnostics.push({
+      sourcePath: 'mkdocs.yml',
+      diagnostic: createDiagnostic({
+        severity: 'info',
+        ruleId: 'copyright-text-detected',
+        source: 'mkdocs-material-to-starlight',
+        message: `mkdocs.yml \`copyright:\` text detected: "${config.value.copyright}". Starlight has no first-class \`copyright\` config option. Recreate by overriding Footer.astro under \`src/components/overrides/\` with the supplied text rendered inside a \`<footer class="sl-flex">\` block, then register the override via Starlight \`components: { Footer: "./src/components/overrides/Footer.astro" }\`.`,
+      }),
+    });
+  }
+  if (config.value.repoUrl !== null) {
+    const repoName = config.value.repoName ?? '(host inferred from URL)';
+    themeFeatureDiagnostics.push({
+      sourcePath: 'mkdocs.yml',
+      diagnostic: createDiagnostic({
+        severity: 'info',
+        ruleId: 'repo-button-recommendation',
+        source: 'mkdocs-material-to-starlight',
+        message: `mkdocs.yml \`repo_url\` is set${config.value.repoName !== null ? ` (repo_name: "${repoName}")` : ''}. The converter wires the URL into starlight \`editLink.baseUrl\`, but does not auto-synthesise a header repo-button — Starlight surfaces repo links via the \`social: [...]\` config. To match Material's repo button, add an entry like \`{ icon: "github", label: "${config.value.repoName ?? 'GitHub'}", href: "${config.value.repoUrl}" }\` to your starlight \`social\` array in astro.config (skip if you already added the same entry to mkdocs.yml's \`extra.social[]\`).`,
+      }),
+    });
+  }
+  // theme.icon.* overrides — Material lets users swap UI chrome icons
+  // (menu/search/repo/edit/etc.) and per-admonition / per-tag icons.
+  // Starlight uses its own icon catalog and slot mechanism; most overrides
+  // must be reproduced via component overrides or per-occurrence props.
+  const themeIcons = (() => {
+    const ti = config.value.theme?.options['icon'];
+    return typeof ti === 'object' && ti !== null && !Array.isArray(ti)
+      ? (ti as Record<string, unknown>)
+      : null;
+  })();
+  if (themeIcons !== null && Object.keys(themeIcons).length > 0) {
+    const keys = Object.keys(themeIcons).sort().join(', ');
+    themeFeatureDiagnostics.push({
+      sourcePath: 'mkdocs.yml',
+      diagnostic: createDiagnostic({
+        severity: 'info',
+        ruleId: 'theme-icon-overrides-detected',
+        source: 'mkdocs-material-to-starlight',
+        message: `mkdocs.yml \`theme.icon\` overrides detected (${keys}). Starlight has its own icon catalog and slot system; UI-chrome icons (menu/search/repo/edit/view/previous/next/top/close) cannot be remapped via config. \`theme.icon.admonition.<type>\` overrides should be reproduced per-aside via \`<Aside icon="…">\`. \`theme.icon.tag.<id>\` overrides require a custom Tag.astro component (see \`extra-tags-alias-map\` diagnostic). \`theme.icon.logo\` is honoured if you set \`logo: { src }\` in starlight() — pass an SVG asset.`,
+      }),
+    });
+  }
+  const themeDirection = (() => {
+    const d = config.value.theme?.options['direction'];
+    return typeof d === 'string' ? d.toLowerCase() : null;
+  })();
+  if (themeDirection === 'rtl') {
+    themeFeatureDiagnostics.push({
+      sourcePath: 'mkdocs.yml',
+      diagnostic: createDiagnostic({
+        severity: 'info',
+        ruleId: 'theme-direction-rtl',
+        source: 'mkdocs-material-to-starlight',
+        message:
+          'theme.direction `rtl` detected. Add `dir: \'rtl\'` to the relevant Starlight `locales: { <code>: { label, lang, dir: \'rtl\' } }` entry so the layout flips for right-to-left languages. Starlight has no top-level direction switch — the setting is per-locale.',
       }),
     });
   }
@@ -481,7 +580,7 @@ export async function convertSiteFromDisk(
       diagnostic: createDiagnostic({
         severity: 'info',
         ruleId: 'feature-navigation-tabs-recommend-topics',
-        source: 'mkdocs-to-starlight',
+        source: 'mkdocs-material-to-starlight',
         message:
           'theme.features `navigation.tabs` detected. Install `starlight-sidebar-topics` and split the generated sidebar into one topic per top-level group for the equivalent UX.',
       }),
@@ -495,7 +594,7 @@ export async function convertSiteFromDisk(
         diagnostic: createDiagnostic({
           severity: 'warning',
           ruleId: 'theme-feature-unknown',
-          source: 'mkdocs-to-starlight',
+          source: 'mkdocs-material-to-starlight',
           message: `theme.features \`${feature}\` was not recognized as a Material feature flag — typo or post-catalog addition.`,
         }),
       });
@@ -510,7 +609,7 @@ export async function convertSiteFromDisk(
           classification.kind === 'unsupported'
             ? 'theme-feature-unsupported'
             : 'theme-feature-replaced',
-        source: 'mkdocs-to-starlight',
+        source: 'mkdocs-material-to-starlight',
         message: `theme.features \`${feature}\`: ${classification.note}`,
       }),
     });
@@ -529,8 +628,32 @@ export async function convertSiteFromDisk(
     diagnostic: createDiagnostic({
       severity: 'info',
       ruleId: 'theme-feature-longtail-detected',
-      source: 'mkdocs-to-starlight',
+      source: 'mkdocs-material-to-starlight',
       message: `theme.features \`${entry.flag}\`: ${entry.recommendation}`,
+    }),
+  }));
+
+  // Per-flag/plugin info diagnostics for Material Insiders features. These
+  // run alongside (not instead of) the longtail/diagnose-plugins detectors —
+  // the Insiders rule provides the explicit "this requires a paid Material
+  // subscription" labeling so users can grep MIGRATION_NOTES.md for `insiders`.
+  const insidersEntries = detectInsidersFeatures({
+    themeFeatures,
+    pluginNames: config.value.plugins.map((p) => p.name),
+  });
+  const insidersDiagnostics: Array<{
+    sourcePath: string;
+    diagnostic: ReturnType<typeof createDiagnostic>;
+  }> = insidersEntries.map((entry) => ({
+    sourcePath: 'mkdocs.yml',
+    diagnostic: createDiagnostic({
+      severity: 'info',
+      ruleId: 'material-insiders-feature-detected',
+      source: 'mkdocs-material-to-starlight',
+      message:
+        entry.kind === 'theme-feature'
+          ? `theme.features \`${entry.feature}\`: ${entry.rationale}`
+          : `plugins \`${entry.feature}\`: ${entry.rationale}`,
     }),
   }));
 
@@ -539,7 +662,7 @@ export async function convertSiteFromDisk(
     diagnostic: createDiagnostic({
       severity: 'info' as const,
       ruleId: 'yaml-python-tag-stripped',
-      source: 'mkdocs-to-starlight',
+      source: 'mkdocs-material-to-starlight',
       message: `Python tag stripped from mkdocs.yml: ${tag}`,
     }),
   }));
@@ -559,7 +682,7 @@ export async function convertSiteFromDisk(
         diagnostic: createDiagnostic({
           severity: 'warning',
           ruleId: 'expressive-code-theme-fallback',
-          source: 'mkdocs-to-starlight',
+          source: 'mkdocs-material-to-starlight',
           message: `pygments_style "${expressiveCodeConfig.sourceStyle}" has no curated Shiki equivalent — defaulted to ['${light}', '${dark}']. Replace expressiveCode.themes in astro.config.mjs with a closer match from https://shiki.style/themes.`,
         }),
       });
@@ -569,7 +692,7 @@ export async function convertSiteFromDisk(
         diagnostic: createDiagnostic({
           severity: 'info',
           ruleId: 'expressive-code-theme-applied',
-          source: 'mkdocs-to-starlight',
+          source: 'mkdocs-material-to-starlight',
           message: `pygments_style "${expressiveCodeConfig.sourceStyle}" mapped to expressiveCode.themes ['${light}', '${dark}'].`,
         }),
       });
@@ -580,7 +703,7 @@ export async function convertSiteFromDisk(
         diagnostic: createDiagnostic({
           severity: 'warning',
           ruleId: 'expressive-code-options-dropped',
-          source: 'mkdocs-to-starlight',
+          source: 'mkdocs-material-to-starlight',
           message: `pymdownx.highlight option(s) dropped (no ExpressiveCode equivalent): ${expressiveCodeConfig.unsupportedOptions.join(', ')}.`,
         }),
       });
@@ -606,7 +729,7 @@ export async function convertSiteFromDisk(
       diagnostic: createDiagnostic({
         severity: 'info',
         ruleId: 'theme-language-applied',
-        source: 'mkdocs-to-starlight',
+        source: 'mkdocs-material-to-starlight',
         message: `theme.language "${themeLanguage.code}" mapped to starlight locales.root.lang ("${themeLanguage.label}").`,
       }),
     });
@@ -623,7 +746,7 @@ export async function convertSiteFromDisk(
       diagnostic: createDiagnostic({
         severity: 'info',
         ruleId: 'extra-analytics-applied',
-        source: 'mkdocs-to-starlight',
+        source: 'mkdocs-material-to-starlight',
         message: `extra.analytics provider "${analytics.provider}" property "${analytics.property}" injected into starlight head[].`,
       }),
     });
@@ -633,7 +756,7 @@ export async function convertSiteFromDisk(
         diagnostic: createDiagnostic({
           severity: 'warning',
           ruleId: 'extra-analytics-feedback-dropped',
-          source: 'mkdocs-to-starlight',
+          source: 'mkdocs-material-to-starlight',
           message:
             'extra.analytics.feedback widget has no Starlight equivalent — reimplement via a custom component or install a community plugin.',
         }),
@@ -655,13 +778,16 @@ export async function convertSiteFromDisk(
       diagnostic: createDiagnostic({
         severity: 'info',
         ruleId: 'theme-fonts-applied',
-        source: 'mkdocs-to-starlight',
+        source: 'mkdocs-material-to-starlight',
         message: `theme.font mapped to Fontsource: ${parts.join(', ')}. Run \`npm install\` to fetch.`,
       }),
     });
   }
 
   const deferredDiagnostics = buildDeferredDiagnostics(input);
+
+  // Hoisted: needed both by the CSS scanner below and by config serialization.
+  const extraAssets = extractExtraAssets(config.value.extras);
 
   // Per-occurrence scans for the three previously bulk-emitted diagnostics.
   // Reads source files to find per-file occurrences of the affected patterns.
@@ -670,45 +796,95 @@ export async function convertSiteFromDisk(
     (ext) => (typeof ext === 'string' ? ext : Object.keys(ext)[0] ?? '') === 'codehilite',
   );
   const hasMetaPlugin = config.value.plugins.some((p) => p.name === 'meta');
-  if (hasTabsLink || hasCodehilite || hasMetaPlugin) {
-    // Read all source files once for the scans.
-    const sourceEntries: Array<readonly [string, string]> = [];
+  // Read all source files once. The opt-out / no-copy scan always runs (it
+  // doesn't depend on a plugin flag), so the read is unconditional now.
+  const sourceEntries: Array<readonly [string, string]> = [];
+  for (const relPath of sourceListing.value) {
+    const absPath = join(docsDir, relPath);
+    const readResult = await fs.readText(absPath);
+    if (!readResult.ok) continue;
+    sourceEntries.push([relPath, readResult.value]);
+  }
+  if (hasTabsLink) {
+    for (const d of scanTabsLinkOccurrences(sourceEntries)) {
+      bulkOccurrenceDiagnostics.push(d);
+    }
+  }
+  if (hasCodehilite) {
+    for (const d of scanCodehiliteLinenumsOccurrences(sourceEntries)) {
+      bulkOccurrenceDiagnostics.push(d);
+    }
+  }
+  // Scan for .meta.yml files separately (they're not in sourceListing which only lists .md/.mdx)
+  if (hasMetaPlugin) {
     const metaEntries: Array<readonly [string, string]> = [];
-    for (const relPath of sourceListing.value) {
-      const absPath = join(docsDir, relPath);
-      const readResult = await fs.readText(absPath);
-      if (!readResult.ok) continue;
-      sourceEntries.push([relPath, readResult.value]);
-    }
-    // Scan for .meta.yml files separately (they're not in sourceListing which only lists .md/.mdx)
-    if (hasMetaPlugin) {
-      const allDocFiles = await dirReader.list(docsDir, ['.yml', '.yaml']);
-      if (allDocFiles.ok) {
-        for (const relPath of allDocFiles.value) {
-          if (!relPath.endsWith('.meta.yml')) continue;
-          const absPath = join(docsDir, relPath);
-          const readResult = await fs.readText(absPath);
-          if (!readResult.ok) continue;
-          metaEntries.push([relPath, readResult.value]);
-        }
+    const allDocFiles = await dirReader.list(docsDir, ['.yml', '.yaml']);
+    if (allDocFiles.ok) {
+      for (const relPath of allDocFiles.value) {
+        if (!relPath.endsWith('.meta.yml')) continue;
+        const absPath = join(docsDir, relPath);
+        const readResult = await fs.readText(absPath);
+        if (!readResult.ok) continue;
+        metaEntries.push([relPath, readResult.value]);
       }
     }
-    if (hasTabsLink) {
-      for (const d of scanTabsLinkOccurrences(sourceEntries)) {
-        bulkOccurrenceDiagnostics.push(d);
-      }
-    }
-    if (hasCodehilite) {
-      for (const d of scanCodehiliteLinenumsOccurrences(sourceEntries)) {
-        bulkOccurrenceDiagnostics.push(d);
-      }
-    }
-    if (hasMetaPlugin && metaEntries.length > 0) {
+    if (metaEntries.length > 0) {
       for (const d of scanMetaYmlFiles(metaEntries)) {
         bulkOccurrenceDiagnostics.push(d);
       }
     }
   }
+  // Always scan for `.no-copy` / `.no-select` markers — they're a per-block
+  // opt-out from Material's content.code.copy / content.code.select, but
+  // ExpressiveCode has no per-block toggle. The scanner emits a warning per
+  // file so the silent drop is visible.
+  for (const d of scanCodeBlockOptOuts(sourceEntries)) {
+    bulkOccurrenceDiagnostics.push(d);
+  }
+  // Scan for Material's alternate LaTeX delimiters `\(...\)` / `\[...\]`.
+  // remark-math (the auto-wired math pipeline) only recognizes $/$$, so
+  // these would silently render as literal backslashes. The scanner runs
+  // unconditionally; the diagnostic is informational when math isn't
+  // configured at all and actionable when it is.
+  for (const d of scanLatexDelimiters(sourceEntries)) {
+    bulkOccurrenceDiagnostics.push(d);
+  }
+  // Scan extra_javascript paths for MathJax/KaTeX runtime config scripts.
+  // Astro renders math at build time via rehype-katex; these runtime scripts
+  // are obsolete and may conflict with the rehype output.
+  for (const d of scanMathScripts(extraAssets.js.map((j) => j.src))) {
+    bulkOccurrenceDiagnostics.push(d);
+  }
+  // Scan extra_css files for Material code-block customization that does
+  // not survive the move to ExpressiveCode (Pygments token classes,
+  // --md-code-* CSS variables). The CSS files live in docs_dir / project
+  // root; we resolve relative to docs_dir first, then projectDir.
+  {
+    const cssEntries: Array<readonly [string, string]> = [];
+    for (const cssPath of extraAssets.css) {
+      // Skip absolute URLs (CDN-hosted styles).
+      if (/^[a-z][a-z0-9+\-.]*:\/\//i.test(cssPath)) continue;
+      const trimmed = cssPath.replace(/^\/+/, '');
+      const docsRel = join(docsDir, trimmed);
+      const docsRead = await fs.readText(docsRel);
+      if (docsRead.ok) {
+        cssEntries.push([trimmed, docsRead.value]);
+        continue;
+      }
+      const projectRead = await fs.readText(join(input.projectDir, trimmed));
+      if (projectRead.ok) cssEntries.push([trimmed, projectRead.value]);
+    }
+    for (const d of scanMaterialCodeCssVars(cssEntries)) {
+      bulkOccurrenceDiagnostics.push(d);
+    }
+  }
+
+  // Surface diagnostics for `extra:` keys with no Starlight equivalent
+  // (consent dialog, lifecycle status dictionary, non-Google analytics
+  // providers). Pure detection — does not affect other branches.
+  const extraWarningDiagnostics = detectExtraWarnings(config.value.extras).map(
+    (d) => ({ sourcePath: 'mkdocs.yml', diagnostic: d }),
+  );
 
   const allDiagnostics = [
     ...siteResult.value.diagnostics,
@@ -719,7 +895,9 @@ export async function convertSiteFromDisk(
     ...paletteDiagnostics,
     ...pythonTagDiagnostics,
     ...themeFeatureDiagnostics,
+    ...extraWarningDiagnostics,
     ...longtailDiagnostics,
+    ...insidersDiagnostics,
     ...hookDiagnostics,
     ...expressiveCodeDiagnostics,
     ...themeLanguageDiagnostics,
@@ -749,13 +927,24 @@ export async function convertSiteFromDisk(
     config.value.editUri,
   );
   const tableOfContents = extractTocConfig(config.value.markdownExtensions);
-  const extraAssets = extractExtraAssets(config.value.extras);
-  // Make extra CSS entries Starlight-resolvable: external URLs pass through;
-  // local paths are relocated to public/ by the asset planner so we point
-  // Starlight at them via /<path> served from the public directory.
-  const extraCssEntries = extraAssets.css.map((p) =>
-    /^[a-z][a-z0-9+\-.]*:\/\//i.test(p) ? p : `/${p.replace(/^\/+/, '')}`,
-  );
+  // Split extra CSS into two buckets:
+  //   - external URLs (e.g. https://fonts.…/foo.css) pass through to
+  //     Starlight `customCss` — Vite leaves the URL alone.
+  //   - local CSS files (`docs/css/extra.css`) get copied to `public/`
+  //     by the asset planner. Starlight's `customCss` cannot resolve
+  //     public-folder paths (Rollup tries to bundle them and fails). We
+  //     instead emit a `<link rel="stylesheet" href="/<path>">` entry in
+  //     `head[]` so the file loads as a static asset at runtime.
+  const extraCssExternal: string[] = [];
+  const extraCssPublicHrefs: string[] = [];
+  for (const p of extraAssets.css) {
+    if (/^[a-z][a-z0-9+\-.]*:\/\//i.test(p)) {
+      extraCssExternal.push(p);
+    } else {
+      extraCssPublicHrefs.push(`/${p.replace(/^\/+/, '')}`);
+    }
+  }
+  const extraCssEntries = extraCssExternal;
   // Fontsource packages are imported as bare specifiers — Vite resolves
   // them as the package's CSS export, so they slot into customCss verbatim.
   const fontCssImports: string[] = [];
@@ -786,6 +975,7 @@ export async function convertSiteFromDisk(
     siteName: config.value.siteName,
     siteDescription: config.value.siteDescription,
     siteUrl: config.value.siteUrl,
+    useDirectoryUrls: config.value.useDirectoryUrls,
     sidebar: sidebarWithPages,
     detectedFeatures: allFeatures,
     redirects,
@@ -801,9 +991,17 @@ export async function convertSiteFromDisk(
     ...(expressiveCodeConfig === undefined
       ? {}
       : { expressiveCode: { themes: expressiveCodeConfig.themes } }),
-    ...(analytics === null
-      ? {}
-      : { extraHeadEntries: analytics.headEntries }),
+    ...((analytics !== null || extraCssPublicHrefs.length > 0)
+      ? {
+          extraHeadEntries: [
+            ...(analytics?.headEntries ?? []),
+            ...extraCssPublicHrefs.map((href) => ({
+              tag: 'link' as const,
+              attrs: { rel: 'stylesheet', href },
+            })),
+          ],
+        }
+      : {}),
     ...(input.mikeVersions !== undefined ? { mikeVersions: input.mikeVersions } : {}),
   });
   const packageJsonSource = serializePackageJson({
@@ -835,6 +1033,16 @@ export async function convertSiteFromDisk(
         siteUrl: config.value.siteUrl,
       })
     : null;
+  const ogEndpointSource = allFeatures.includes('og-cards')
+    ? serializeOgEndpoint({ siteName: config.value.siteName })
+    : null;
+  // starlight-tags 1.0+ requires a `tags.yml` at the project root listing
+  // every tag the site uses. Material's tags plugin doesn't carry this
+  // structure, so emit a minimal stub the user can extend. Without the file,
+  // the build fails at static-paths generation time.
+  const tagsYmlSource = allFeatures.includes('tags')
+    ? '# starlight-tags configuration. Each tag must declare a `label` (display\n# name); other fields (description, color, icon, permalink, etc.) are\n# optional. Tag IDs must be lowercase letters/digits/hyphens/underscores.\n# See https://frostybee.github.io/starlight-tags/ for the full schema.\ntags:\n  example:\n    label: Example\n    description: An example tag — replace with your own definitions.\n'
+    : null;
   const writeResult = await writeOutputs({
     outputDir: input.outputDir,
     files: siteResult.value.files,
@@ -843,6 +1051,8 @@ export async function convertSiteFromDisk(
     migrationNotesSource,
     stylesheetSource,
     rssEndpointSource,
+    ogEndpointSource,
+    tagsYmlSource,
     configFormat: input.configFormat ?? 'mjs',
   });
   if (!writeResult.ok) {
@@ -872,7 +1082,7 @@ export async function convertSiteFromDisk(
         diagnostic: createDiagnostic({
           severity: 'warning',
           ruleId: 'logo-source-missing',
-          source: 'mkdocs-to-starlight',
+          source: 'mkdocs-material-to-starlight',
           message: `theme.logo: ${logoSrc} could not be located. ${logoCopy.error}`,
         }),
       });
@@ -889,7 +1099,7 @@ export async function convertSiteFromDisk(
         diagnostic: createDiagnostic({
           severity: 'warning',
           ruleId: 'favicon-source-missing',
-          source: 'mkdocs-to-starlight',
+          source: 'mkdocs-material-to-starlight',
           message: `theme.favicon: ${faviconRaw} could not be located. ${faviconCopy.error}`,
         }),
       });
@@ -1010,9 +1220,14 @@ async function compileSidebarEntries(
     ? applySectionIndex(tree)
     : { nav: tree, diagnostics: [] };
   const sidebar = compileNavigation(transformed.nav, slugMap);
+  const topicDiagnostics = scanNavTopics(transformed.nav);
   return ok({
     entries: sidebar.entries,
-    diagnostics: [...transformed.diagnostics, ...sidebar.diagnostics],
+    diagnostics: [
+      ...transformed.diagnostics,
+      ...sidebar.diagnostics,
+      ...topicDiagnostics,
+    ],
   });
 }
 
@@ -1068,6 +1283,8 @@ interface WriteOutputsInput {
   readonly migrationNotesSource: string;
   readonly stylesheetSource: string;
   readonly rssEndpointSource: string | null;
+  readonly ogEndpointSource: string | null;
+  readonly tagsYmlSource: string | null;
   readonly configFormat: 'mjs' | 'ts';
 }
 
@@ -1089,6 +1306,12 @@ async function writeOutputs(input: WriteOutputsInput): Promise<Result<true, stri
   ];
   if (input.rssEndpointSource !== null) {
     scaffold.push([['src', 'pages', 'rss.xml.ts'], input.rssEndpointSource]);
+  }
+  if (input.ogEndpointSource !== null) {
+    scaffold.push([['src', 'pages', 'og', '[...slug].png.ts'], input.ogEndpointSource]);
+  }
+  if (input.tagsYmlSource !== null) {
+    scaffold.push([['tags.yml'], input.tagsYmlSource]);
   }
   for (const [parts, content] of scaffold) {
     const writeRes = await writeOne(join(input.outputDir, ...parts), content);
@@ -1120,7 +1343,7 @@ function buildDeferredDiagnostics(
       diagnostic: createDiagnostic({
         severity: 'info',
         ruleId: 'wizard-decision-applied',
-        source: 'mkdocs-to-starlight',
+        source: 'mkdocs-material-to-starlight',
         message,
       }),
     });

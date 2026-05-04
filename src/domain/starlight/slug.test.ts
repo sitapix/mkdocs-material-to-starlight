@@ -41,4 +41,25 @@ describe('deriveSlug', () => {
     expect(deriveSlug('api/auth.mdx')).toBe('api/auth');
     expect(deriveSlug('index.mdx')).toBe('');
   });
+
+  it('treats a top-level README.md the same as index.md (empty slug)', () => {
+    expect(deriveSlug('README.md')).toBe('');
+    expect(deriveSlug('README.mdx')).toBe('');
+  });
+
+  it('treats directory/README.md the same as directory/index.md', () => {
+    expect(deriveSlug('api/README.md')).toBe('api');
+    expect(deriveSlug('guides/intro/README.md')).toBe('guides/intro');
+    expect(deriveSlug('api/README.mdx')).toBe('api');
+  });
+
+  it('README matching is case-sensitive on the basename — "Readme.md" is a regular page (slug then lowercased)', () => {
+    // Both MkDocs section-index plugin and most repos treat README.md as
+    // the canonical spelling. Mixed-case spellings are intentional file
+    // names, not folder indexes — they survive the index-stripping step
+    // but the final slug is then lowercased to match Astro's default
+    // content-collection slug derivation.
+    expect(deriveSlug('api/Readme.md')).toBe('api/readme');
+    expect(deriveSlug('api/readme.md')).toBe('api/readme');
+  });
 });

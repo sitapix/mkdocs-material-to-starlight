@@ -7,6 +7,12 @@
  *
  * `projectDir` is an INPUT (the caller chose it before loading mkdocs.yml to
  * build the ConversionPlan). The wizard does not re-prompt for it.
+ *
+ * UX note: the "advanced options?" gate is asked exactly once, after Tier 1.
+ * If the user picks "Show advanced options" we run Tier 2 and then convert
+ * directly — we don't re-ask "Convert now?", because by then opting in to
+ * Tier 2 already was an opt-in to converting once finished. Cancellation is
+ * always available via Ctrl+C or Esc, which clack maps to a null answer.
  */
 
 import type { Prompter } from '../../domain/wizard/ports/prompter.js';
@@ -40,33 +46,27 @@ export async function runWizard(
   const tier1 = await runTier1(prompter, plan, defaults);
   if (!tier1.ok) return tier1;
 
-  // Decide whether to enter Tier 2 or skip straight to convert.
-  const advanced = await prompter.select<'apply' | 'advanced' | 'cancel'>({
-    message: 'Ready?',
+  // Single gate: convert with current answers, or open advanced options.
+  // Cancel is always Ctrl+C / Esc — we don't surface it as a third option to
+  // keep the menu binary and the "happy path" obvious.
+  //
+  // selectKey lets the user hit `c` or `a` without pressing Enter — one
+  // keystroke for the most common decision point in the whole flow.
+  const next = await prompter.selectKey<'c' | 'a'>({
+    message: 'Convert now, or review advanced options first?',
     options: [
-      { value: 'apply', label: 'Convert now' },
-      { value: 'advanced', label: 'Show advanced options first' },
-      { value: 'cancel', label: 'Cancel' },
+      { value: 'c', label: 'Convert now (press c)' },
+      { value: 'a', label: 'Review advanced options first (press a)' },
     ],
-    initialValue: 'apply',
+    initialValue: 'c',
   });
-  if (advanced === null || advanced === 'cancel') return err(WIZARD_CANCELLED);
+  if (next === null) return err(WIZARD_CANCELLED);
 
   let tier2: Partial<WizardAnswers> = {};
-  if (advanced === 'advanced') {
+  if (next === 'a') {
     const t2 = await runTier2(prompter, defaults);
     if (!t2.ok) return t2;
     tier2 = t2.value;
-
-    const finalAction = await prompter.select<'apply' | 'cancel'>({
-      message: 'Convert now?',
-      options: [
-        { value: 'apply', label: 'Convert' },
-        { value: 'cancel', label: 'Cancel' },
-      ],
-      initialValue: 'apply',
-    });
-    if (finalAction === null || finalAction === 'cancel') return err(WIZARD_CANCELLED);
   }
 
   return ok({

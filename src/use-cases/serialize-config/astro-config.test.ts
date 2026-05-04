@@ -189,6 +189,72 @@ describe('serializeAstroConfig', () => {
     expect(out).toContain('starlightVersions(');
   });
 
+  it('imports and wires starlight-announcement when announcement feature is detected', () => {
+    const out = serializeAstroConfig({
+      siteName: 'X',
+      siteDescription: null,
+      siteUrl: null,
+      sidebar: [],
+      detectedFeatures: ['announcement'],
+    });
+    expect(out).toContain(`import starlightAnnouncement from 'starlight-announcement';`);
+    expect(out).toContain('starlightAnnouncement(');
+  });
+
+  it('imports and wires starlight-page-actions when page-actions feature is detected', () => {
+    const out = serializeAstroConfig({
+      siteName: 'X',
+      siteDescription: null,
+      siteUrl: null,
+      sidebar: [],
+      detectedFeatures: ['page-actions'],
+    });
+    expect(out).toContain(`import starlightPageActions from 'starlight-page-actions';`);
+    expect(out).toContain('starlightPageActions()');
+  });
+
+  it('imports and wires starlight-github-alerts when github-alerts feature is detected', () => {
+    const out = serializeAstroConfig({
+      siteName: 'X',
+      siteDescription: null,
+      siteUrl: null,
+      sidebar: [],
+      detectedFeatures: ['github-alerts'],
+    });
+    expect(out).toContain(`import starlightGithubAlerts from 'starlight-github-alerts';`);
+    expect(out).toContain('starlightGithubAlerts()');
+  });
+
+  it('imports and wires starlight-kbd when kbd feature is detected', () => {
+    const out = serializeAstroConfig({
+      siteName: 'X',
+      siteDescription: null,
+      siteUrl: null,
+      sidebar: [],
+      detectedFeatures: ['kbd'],
+    });
+    expect(out).toContain(`import starlightKbd from 'starlight-kbd';`);
+    // starlight-kbd 0.4.0+ requires a `types` array; the converter emits a
+    // single default type the user can extend.
+    expect(out).toContain('starlightKbd({');
+    expect(out).toContain('types:');
+    expect(out).toContain("id: 'default'");
+  });
+
+  it('imports and wires starlight-llms-txt by default for every site', () => {
+    // Tier-3 closure: starlight-llms-txt is a zero-config, zero-cost AI-assistant
+    // accessibility plugin. It runs for every Starlight site so the converter
+    // wires it into every emitted astro.config.mjs.
+    const out = serializeAstroConfig({
+      siteName: 'X',
+      siteDescription: null,
+      siteUrl: null,
+      sidebar: [],
+    });
+    expect(out).toContain(`import starlightLlmsTxt from 'starlight-llms-txt';`);
+    expect(out).toContain('starlightLlmsTxt()');
+  });
+
   it('imports starlight-blog when the blog feature is detected', () => {
     const out = serializeAstroConfig({
       siteName: 'X',
@@ -333,7 +399,7 @@ describe('serializeAstroConfig enableLinksValidator', () => {
       enableLinksValidator: true,
     });
     expect(out).toContain(`import starlightLinksValidator from 'starlight-links-validator';`);
-    expect(out).toContain('starlightLinksValidator()');
+    expect(out).toContain('starlightLinksValidator({');
   });
 });
 
@@ -398,5 +464,39 @@ describe('serializeAstroConfig mikeVersions', () => {
       detectedFeatures: ['versions'],
     });
     expect(out).toContain("{ slug: '2.0' }");
+  });
+});
+
+describe('serializeAstroConfig useDirectoryUrls', () => {
+  it('emits build: { format: "file" } when useDirectoryUrls is false', () => {
+    const out = serializeAstroConfig({
+      siteName: 'X',
+      siteDescription: null,
+      siteUrl: null,
+      useDirectoryUrls: false,
+      sidebar: [],
+    });
+    expect(out).toContain("build: { format: 'file' }");
+  });
+
+  it('does NOT emit a build entry when useDirectoryUrls is true (matches Astro default)', () => {
+    const out = serializeAstroConfig({
+      siteName: 'X',
+      siteDescription: null,
+      siteUrl: null,
+      useDirectoryUrls: true,
+      sidebar: [],
+    });
+    expect(out).not.toContain("build:");
+  });
+
+  it('does NOT emit a build entry when useDirectoryUrls is omitted (defaults to MkDocs default)', () => {
+    const out = serializeAstroConfig({
+      siteName: 'X',
+      siteDescription: null,
+      siteUrl: null,
+      sidebar: [],
+    });
+    expect(out).not.toContain("build:");
   });
 });

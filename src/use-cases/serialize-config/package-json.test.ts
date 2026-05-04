@@ -108,6 +108,105 @@ describe('serializePackageJson', () => {
     expect(JSON.parse(out).name).toBe('my-pkg');
   });
 
+  it('adds starlight-changelogs alongside starlight-versions when versions is detected (mike companion)', () => {
+    // When the user runs `mike` for versioning, the natural companion is
+    // `starlight-changelogs` so users can publish changelog entries between
+    // versions. The gap-analysis report (2026-05-03) recommends bundling them.
+    const out = serializePackageJson({
+      siteName: 'X',
+      siteDescription: null,
+      detectedFeatures: ['versions'],
+    });
+    const parsed = JSON.parse(out);
+    expect(parsed.dependencies).toHaveProperty('starlight-versions');
+    expect(parsed.dependencies).toHaveProperty('starlight-changelogs');
+  });
+
+  it('adds starlight-kbd when kbd feature is detected (pymdownx.keys companion)', () => {
+    // Tier-4 closure: pymdownx.keys (`++ctrl+alt+del++`) renders as inline
+    // <kbd> HTML; starlight-kbd installs CSS that styles those tags with the
+    // keyboard-key chrome users expect from Material.
+    const out = serializePackageJson({
+      siteName: 'X',
+      siteDescription: null,
+      detectedFeatures: ['kbd'],
+    });
+    expect(JSON.parse(out).dependencies).toHaveProperty('starlight-kbd');
+  });
+
+  it('does not add starlight-kbd when kbd is not detected', () => {
+    const out = serializePackageJson({
+      siteName: 'X',
+      siteDescription: null,
+      detectedFeatures: [],
+    });
+    expect(JSON.parse(out).dependencies).not.toHaveProperty('starlight-kbd');
+  });
+
+  it('adds starlight-announcement when announcement feature is detected (announce.dismiss companion)', () => {
+    const out = serializePackageJson({
+      siteName: 'X',
+      siteDescription: null,
+      detectedFeatures: ['announcement'],
+    });
+    expect(JSON.parse(out).dependencies).toHaveProperty('starlight-announcement');
+  });
+
+  it('adds starlight-page-actions when page-actions feature is detected (content.action.view companion)', () => {
+    const out = serializePackageJson({
+      siteName: 'X',
+      siteDescription: null,
+      detectedFeatures: ['page-actions'],
+    });
+    expect(JSON.parse(out).dependencies).toHaveProperty('starlight-page-actions');
+  });
+
+  it('adds starlight-github-alerts when github-alerts feature is detected', () => {
+    const out = serializePackageJson({
+      siteName: 'X',
+      siteDescription: null,
+      detectedFeatures: ['github-alerts'],
+    });
+    expect(JSON.parse(out).dependencies).toHaveProperty('starlight-github-alerts');
+  });
+
+  it('does not add starlight-github-alerts when github-alerts is not detected', () => {
+    const out = serializePackageJson({
+      siteName: 'X',
+      siteDescription: null,
+      detectedFeatures: [],
+    });
+    expect(JSON.parse(out).dependencies).not.toHaveProperty('starlight-github-alerts');
+  });
+
+  it('always includes starlight-llms-txt as a default dependency (AI-assistant accessibility)', () => {
+    // Tier-3 closure: starlight-llms-txt generates llms.txt / llms-full.txt
+    // automatically from Starlight content. It needs no per-site configuration
+    // and improves AI-assistant accessibility for every Starlight site, so the
+    // converter installs it by default.
+    const outNoFeatures = serializePackageJson({
+      siteName: 'X',
+      siteDescription: null,
+    });
+    expect(JSON.parse(outNoFeatures).dependencies).toHaveProperty('starlight-llms-txt');
+
+    const outWithFeatures = serializePackageJson({
+      siteName: 'Y',
+      siteDescription: null,
+      detectedFeatures: ['math', 'versions'],
+    });
+    expect(JSON.parse(outWithFeatures).dependencies).toHaveProperty('starlight-llms-txt');
+  });
+
+  it('does not add starlight-changelogs when versions is not detected', () => {
+    const out = serializePackageJson({
+      siteName: 'X',
+      siteDescription: null,
+      detectedFeatures: [],
+    });
+    expect(JSON.parse(out).dependencies).not.toHaveProperty('starlight-changelogs');
+  });
+
   it('pins @astrojs/starlight to ^0.34.0 or newer (sidebar slug resolver fix)', () => {
     // Starlight 0.30 has a sidebar slug-resolution bug: `astro build` rejects
     // every entry with "The slug X does not exist" even though the entry's

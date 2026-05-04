@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Add a tiered, conditional `@clack/prompts` wizard launched by `npx mkdocs-to-starlight` (zero args), backed by a POSIX-compliant flag surface that reproduces every wizard answer for unattended/CI use.
+**Goal:** Add a tiered, conditional `@clack/prompts` wizard launched by `npx mkdocs-material-to-starlight` (zero args), backed by a POSIX-compliant flag surface that reproduces every wizard answer for unattended/CI use.
 
 **Architecture:** Pure orchestrator in `use-cases/wizard/` driven by a `Prompter` port (`domain/wizard/ports/prompter.ts`); clack adapter is the only side-effecting module and is lazy-imported. Hand-rolled `parse-args.ts` is replaced with Node 20's `node:util` `parseArgs` (zero deps, free short aliases). Every wizard answer maps 1:1 to a flag, so `--yes` runs unattended produce the same output as wizard defaults.
 
@@ -1384,7 +1384,7 @@ export async function runWizard(
 ): Promise<Result<WizardAnswers, WizardCancelled>> {
   const { projectDir, plan, defaults, prompter } = input;
 
-  prompter.intro('mkdocs-to-starlight');
+  prompter.intro('mkdocs-material-to-starlight');
 
   const outputDir = await prompter.text({
     message: 'Output directory',
@@ -2797,7 +2797,7 @@ export async function runWizardFlow(
   // Step 1: prompt for the project dir *before* loading mkdocs.yml. The
   // ConversionPlan depends on the chosen dir, so this prompt cannot live
   // inside runWizard (which takes the plan as input).
-  prompter.intro('mkdocs-to-starlight');
+  prompter.intro('mkdocs-material-to-starlight');
   const projectDir = await prompter.text({
     message: 'Project directory (containing mkdocs.yml)',
     initialValue: projectDirHint,
@@ -2877,7 +2877,7 @@ Add at the top of `runCli`, before the existing `parseArgs(argv)` call:
     if (wizard.kind === 'cancelled') return 130;
     if (wizard.kind === 'non-interactive') return 2;
     io.stdout(
-      `Equivalent command: mkdocs-to-starlight ${wizard.equivalentFlags.join(' ')}`,
+      `Equivalent command: mkdocs-material-to-starlight ${wizard.equivalentFlags.join(' ')}`,
     );
     return runConvert(wizard.command, io, overrides);
   }
@@ -3016,13 +3016,13 @@ git commit -m "feat(convert): refuse to overwrite non-empty output dir without -
 Replace `HELP_TEXT` in `main.ts` with the full grouped help (Convert / Wizard / Output / Advanced sections). Keep within ~80 cols. Concrete content:
 
 ```typescript
-const HELP_TEXT = `mkdocs-to-starlight — convert a MkDocs Material site to Astro Starlight
+const HELP_TEXT = `mkdocs-material-to-starlight — convert a MkDocs Material site to Astro Starlight
 
 Usage:
-  mkdocs-to-starlight                                  (interactive wizard)
-  mkdocs-to-starlight <project-dir> <output-dir> [options]
-  mkdocs-to-starlight <project-dir> --explain
-  mkdocs-to-starlight compare <baseline-url> <converted-url> [options]
+  mkdocs-material-to-starlight                                  (interactive wizard)
+  mkdocs-material-to-starlight <project-dir> <output-dir> [options]
+  mkdocs-material-to-starlight <project-dir> --explain
+  mkdocs-material-to-starlight compare <baseline-url> <converted-url> [options]
 
 General:
   -y, --yes                Accept defaults non-interactively (CI-safe)
@@ -3129,13 +3129,13 @@ Add this section near the top, after the existing one-liner installation:
 
 ```sh
 # Interactive wizard (recommended for first-time conversions)
-npx mkdocs-to-starlight
+npx mkdocs-material-to-starlight
 
 # Unattended (CI / scripted)
-npx mkdocs-to-starlight ./mkdocs-project ./starlight-out --yes
+npx mkdocs-material-to-starlight ./mkdocs-project ./starlight-out --yes
 
 # See what will happen, without writing anything
-npx mkdocs-to-starlight ./mkdocs-project --explain
+npx mkdocs-material-to-starlight ./mkdocs-project --explain
 ```
 
 The wizard auto-detects features in your `mkdocs.yml` (tabs, snippets, RSS,

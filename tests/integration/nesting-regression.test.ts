@@ -76,10 +76,10 @@ describe('nesting structural regression', () => {
       sourcePath: 'index.md',
       slugMap: map(['index.md']),
     });
-    structuralCheck(out.text, '<div class="sl-tabs">', '</div>', [
-      'data-label="macOS"',
-      'data-label="Linux"',
-      'data-label="Windows"',
+    structuralCheck(out.text, '<Tabs>', '</Tabs>', [
+      'label="macOS"',
+      'label="Linux"',
+      'label="Windows"',
     ]);
   });
 

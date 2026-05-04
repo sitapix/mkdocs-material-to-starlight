@@ -47,7 +47,10 @@ export function injectStarlightImports(
     const fmEnd = (fmMatch[1] ?? '').length;
     const head = source.slice(0, fmEnd);
     const tail = source.slice(fmEnd);
-    return `${head}\n${importLine}\n${tail.replace(/^\n+/, '')}`;
+    // Two newlines AFTER the import so a blank line sits between it and the
+    // body. MDX accepts adjacency, but Astro's parser and downstream tooling
+    // are happier with the canonical paragraph separation.
+    return `${head}\n${importLine}\n\n${tail.replace(/^\n+/, '')}`;
   }
   return `${importLine}\n\n${source}`;
 }

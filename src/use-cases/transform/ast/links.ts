@@ -19,7 +19,7 @@
  *   diagnostics     — output sink; the plugin appends Diagnostics, never throws
  */
 
-import { visit } from 'unist-util-visit';
+import { visit, SKIP } from 'unist-util-visit';
 import type { Plugin } from 'unified';
 import type { Image, Link, Root } from 'mdast';
 import { rewriteInternalLink } from '../rewrite-links.js';
@@ -32,14 +32,14 @@ export interface LinkTransformOptions {
   readonly diagnostics: Diagnostic[];
 }
 
-const SOURCE = 'mkdocs-to-starlight';
+const SOURCE = 'mkdocs-material-to-starlight';
 
 export const transformLinkNodes: Plugin<[LinkTransformOptions], Root> = (options) => {
   return (tree) => {
-    visit(tree, ['link', 'image'], (node) => {
+    visit(tree, ['link', 'image'], (node, index, parent) => {
       const linkLike = node as Link | Image;
       if (typeof linkLike.url !== 'string') {
-        return;
+        return undefined;
       }
       const result = rewriteInternalLink({
         href: linkLike.url,
@@ -48,11 +48,39 @@ export const transformLinkNodes: Plugin<[LinkTransformOptions], Root> = (options
       });
       if (!result.ok) {
         options.diagnostics.push(toDiagnostic(linkLike, result.error.target));
-        return;
+        // Strip the broken link wrapper. The label text (children of a
+        // `link` node) becomes plain inline content; an unresolvable image
+        // is replaced by its alt text. This prevents starlight-links-
+        // validator from rejecting the build at runtime while keeping
+        // the human-readable text visible. The diagnostic above already
+        // surfaced the lost target in MIGRATION_NOTES.md.
+        if (parent !== undefined && index !== undefined) {
+          if (linkLike.type === 'link') {
+            (parent.children as unknown[]).splice(
+              index,
+              1,
+              ...(linkLike.children ?? []),
+            );
+            return [SKIP, index];
+          }
+          // Image node: replace with its alt text (or drop entirely if empty).
+          const alt = (linkLike as Image).alt ?? '';
+          if (alt.length > 0) {
+            (parent.children as unknown[]).splice(index, 1, {
+              type: 'text',
+              value: alt,
+            });
+          } else {
+            (parent.children as unknown[]).splice(index, 1);
+          }
+          return [SKIP, index];
+        }
+        return undefined;
       }
       if (result.value.kind === 'internal' || result.value.kind === 'asset') {
         linkLike.url = result.value.href;
       }
+      return undefined;
     });
   };
 };

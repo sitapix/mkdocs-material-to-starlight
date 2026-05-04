@@ -50,13 +50,24 @@ describe('extractSocial', () => {
     expect(icons).toContain('youtube');
   });
 
-  it('falls back to the trailing icon path segment for unknown icons', () => {
+  it('falls back to `external` for unknown icons (Starlight\'s social-icon enum is finite)', () => {
     const result = extractSocial({
       social: [
         { icon: 'fontawesome/brands/funky-network', link: 'https://example.com' },
       ],
     });
-    expect(result[0]?.icon).toBe('funky-network');
+    expect(result[0]?.icon).toBe('external');
+  });
+
+  it('substitutes `external` for known-bad mappings (medium, dev, python, docker, whatsapp, globe)', () => {
+    const result = extractSocial({
+      social: [
+        { icon: 'fontawesome/brands/medium', link: 'https://medium.com/x' },
+        { icon: 'fontawesome/solid/globe', link: 'https://example.com' },
+        { icon: 'fontawesome/brands/whatsapp', link: 'https://wa.me/x' },
+      ],
+    });
+    expect(result.map((r) => r.icon)).toEqual(['external', 'external', 'external']);
   });
 
   it('skips entries without a link', () => {

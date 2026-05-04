@@ -50,10 +50,11 @@ describe('convertFile', () => {
       '',
     ].join('\n');
     const out = convertFile({ source, sourcePath: 'index.md', slugMap: map });
-    expect(out.text).toContain('<div class="sl-tabs">');
-    expect(out.text).toContain('data-label="macOS"');
-    expect(out.text).toContain('data-label="Linux"');
+    expect(out.text).toContain('<Tabs>');
+    expect(out.text).toContain('<TabItem label="macOS">');
+    expect(out.text).toContain('<TabItem label="Linux">');
     expect(out.text).toContain('[auth](/api/auth)');
+    expect(out.extension).toBe('mdx');
   });
 
   it('reports a broken-link diagnostic without aborting the conversion', () => {
@@ -63,7 +64,10 @@ describe('convertFile', () => {
       sourcePath: 'index.md',
       slugMap: map,
     });
-    expect(out.text).toContain('[missing](missing.md)');
+    // The broken link wrapper is stripped to plain text so the build
+    // doesn't fail at runtime; the diagnostic captures the lost target.
+    expect(out.text).toContain('See missing');
+    expect(out.text).not.toContain('[missing](missing.md)');
     expect(out.diagnostics.some((d) => d.ruleId === 'broken-link')).toBe(true);
   });
 

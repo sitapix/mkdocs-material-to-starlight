@@ -90,7 +90,11 @@ function splitFragment(href: string): SplitHref {
   if (hash === -1) {
     return { path: href, fragment: null };
   }
-  return { path: href.slice(0, hash), fragment: href.slice(hash) };
+  // Strip a trailing `/` from the path part (Material sources sometimes
+  // write `path.md/#anchor` — directory-style — instead of the canonical
+  // `path.md#anchor`. Both refer to the same target).
+  const path = href.slice(0, hash).replace(/\/$/, '');
+  return { path, fragment: href.slice(hash) };
 }
 
 function isMarkdownPath(path: string): boolean {

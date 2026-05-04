@@ -45,6 +45,7 @@ import { normalizeFastapiIncludes } from './fastapi-includes.js';
 import { normalizeHeadingAttrList } from './heading-attr-list.js';
 import { normalizeImages } from './images.js';
 import { normalizeInlineMarks } from './inline-marks.js';
+import { normalizeLegacySyntax } from './legacy-syntax.js';
 import { normalizeMkautodocBlocks } from './mkautodoc.js';
 import { normalizeSmartSymbols } from './smartsymbols.js';
 
@@ -72,5 +73,6 @@ export function normalize(source: string): string {
   current = normalizeOnlyMkdocs(current);
   current = normalizeFrontmatterHide(current);
   current = normalizeStandardEmoji(current);
+  current = normalizeLegacySyntax(current);
   return current;
 }

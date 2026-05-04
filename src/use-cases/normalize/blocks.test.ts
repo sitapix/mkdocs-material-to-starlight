@@ -51,10 +51,12 @@ describe('normalizeBlocks', () => {
   });
 
   it('matches closer to opener by fence length, allowing nested 3-slash inside 4-slash', () => {
-    // Both outer (4-slash) and inner (3-slash) admonition blocks become
-    // ADMONITION_FENCE_DEPTH directives. The fence-length matching in the
-    // normalizer's OWN tokenizer is the load-bearing behavior under test —
-    // the inner 3-slash close must NOT be mistaken for the outer 4-slash close.
+    // The fence-length matching in the normalizer's OWN tokenizer is the
+    // load-bearing behavior under test — the inner 3-slash close must NOT be
+    // mistaken for the outer 4-slash close. The outer block grows ONE COLON
+    // above the inner so remark-directive's closing rule (a closer of M
+    // colons terminates any open container with depth ≤ M) doesn't let the
+    // inner closer prematurely terminate the outer.
     const src = [
       '//// admonition | Outer',
       '/// note',
@@ -63,12 +65,73 @@ describe('normalizeBlocks', () => {
       '////',
       '',
     ].join('\n');
+    const OUTER = ':'.repeat(ADMONITION_FENCE_DEPTH + 1);
     const expected = [
-      `${F}note[Outer]`,
+      `${OUTER}note[Outer]`,
       `${F}note`,
       'inner body',
       F,
-      F,
+      OUTER,
+      '',
+    ].join('\n');
+    expect(normalizeBlocks(src)).toBe(expected);
+  });
+
+  it('grows fence depth for each level of block nesting', () => {
+    // Triple-nested admonition blocks: leaf at base depth, each enclosing
+    // block adds one colon so the closing sequence unwinds inside-out.
+    const src = [
+      '///// admonition | Outermost',
+      '//// admonition | Middle',
+      '/// admonition | Inner',
+      'innermost body',
+      '///',
+      '////',
+      '/////',
+      '',
+    ].join('\n');
+    const D6 = ':'.repeat(ADMONITION_FENCE_DEPTH);
+    const D7 = ':'.repeat(ADMONITION_FENCE_DEPTH + 1);
+    const D8 = ':'.repeat(ADMONITION_FENCE_DEPTH + 2);
+    const expected = [
+      `${D8}note[Outermost]`,
+      `${D7}note[Middle]`,
+      `${D6}note[Inner]`,
+      'innermost body',
+      D6,
+      D7,
+      D8,
+      '',
+    ].join('\n');
+    expect(normalizeBlocks(src)).toBe(expected);
+  });
+
+  it('grows tab and tabs fence depth when a tab body contains a nested block', () => {
+    // Real-world fastapi pattern: a `//// tab` wrapping a `/// details`.
+    // The tab fence must exceed the details fence; the tabs wrapper must
+    // exceed the tab fence; otherwise an inner closer terminates the outer.
+    const src = [
+      '//// tab | venv',
+      'text',
+      '/// details | What that command means',
+      'inner items',
+      '///',
+      '////',
+      '',
+    ].join('\n');
+    const D6 = ':'.repeat(ADMONITION_FENCE_DEPTH);
+    const D7 = ':'.repeat(ADMONITION_FENCE_DEPTH + 1);
+    const D8 = ':'.repeat(ADMONITION_FENCE_DEPTH + 2);
+    const expected = [
+      `${D8}tabs`,
+      `${D7}tab[venv]`,
+      'text',
+      `${D6}note[What that command means]{collapsible="closed"}`,
+      'inner items',
+      D6,
+      D7,
+      D8,
+      '',
       '',
     ].join('\n');
     expect(normalizeBlocks(src)).toBe(expected);

@@ -48,7 +48,7 @@ export interface ExpandOutput {
 }
 
 const DEFAULT_MAX_DEPTH = 8;
-const SOURCE = 'mkdocs-to-starlight';
+const SOURCE = 'mkdocs-material-to-starlight';
 
 export async function expandSnippets(input: ExpandInput): Promise<ExpandOutput> {
   const diagnostics: Diagnostic[] = [];

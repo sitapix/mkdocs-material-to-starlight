@@ -53,6 +53,25 @@ function mapOne(
   // outside that alphabet means the family is not on Fontsource (CJK
   // glyphs, ligatures, decorative names with punctuation).
   if (!/^[A-Za-z0-9 ]+$/.test(family)) return null;
-  const slug = family.toLowerCase().replace(/ /g, '-');
-  return { family, package: `@fontsource/${slug}` };
+  // Strip common weight/style suffixes that Material users sometimes write
+  // into the font family name (`Inter Regular`, `Roboto Mono Bold`). The
+  // matching Fontsource package always sits at the bare family name; weights
+  // are exposed as CSS variants under the same package, not separate packages.
+  // Without this, families like `Inter Regular` resolve to a 404 package name.
+  const WEIGHT_STYLE_TOKENS = new Set([
+    'regular', 'bold', 'italic', 'medium', 'semibold', 'extrabold',
+    'black', 'thin', 'extralight', 'light',
+  ]);
+  const tokens = family.split(' ');
+  const trimmed = (() => {
+    const out = [...tokens];
+    while (out.length > 1) {
+      const last = out[out.length - 1]?.toLowerCase() ?? '';
+      if (!WEIGHT_STYLE_TOKENS.has(last)) break;
+      out.pop();
+    }
+    return out;
+  })();
+  const slug = trimmed.join(' ').toLowerCase().replace(/ /g, '-');
+  return { family: trimmed.join(' '), package: `@fontsource/${slug}` };
 }

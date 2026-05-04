@@ -109,10 +109,18 @@ describe('end-to-end smoke conversion', () => {
       const result = convertFile({ source, sourcePath, slugMap: slugMap.value });
       converted[sourcePath] = result.text;
       for (const d of result.diagnostics) {
+        // `mdx-promotion` is informational (file uses a Starlight JSX
+        // component, so it was promoted to .mdx). Not a problem; filter it
+        // out to keep the smoke test focused on actual conversion issues.
+        if (d.ruleId === 'mdx-promotion') continue;
         allDiagnostics.push(`${sourcePath}: ${d.ruleId}: ${d.message}`);
       }
     }
 
+    if (allDiagnostics.length > 0) {
+      // eslint-disable-next-line no-console
+      console.error('UNEXPECTED smoke diagnostics:', allDiagnostics);
+    }
     expect(allDiagnostics).toEqual([]);
 
     const indexOut = converted['index.md'] ?? '';
@@ -121,8 +129,8 @@ describe('end-to-end smoke conversion', () => {
     expect(indexOut).toContain(':::caution');
     expect(indexOut).toContain('Heads up');
     expect(indexOut).toContain('[this](/api/auth)');
-    expect(indexOut).toContain('<div class="sl-tabs">');
-    expect(indexOut).toContain('data-label="macOS"');
+    expect(indexOut).toContain('<Tabs>');
+    expect(indexOut).toContain('<TabItem label="macOS">');
 
     const guideOut = converted['guide/intro.md'] ?? '';
     expect(guideOut).toContain(':::note');

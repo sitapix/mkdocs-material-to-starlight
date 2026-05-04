@@ -28,7 +28,7 @@ describe('serializeStyleSheet', () => {
   it('starts with a comment identifying the source', () => {
     const out = serializeStyleSheet();
     expect(out.trimStart().startsWith('/*')).toBe(true);
-    expect(out).toContain('mkdocs-to-starlight');
+    expect(out).toContain('mkdocs-material-to-starlight');
   });
 
   it('emits no palette block when palette is undefined', () => {

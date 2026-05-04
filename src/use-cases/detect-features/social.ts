@@ -46,21 +46,49 @@ const ICON_MAP: ReadonlyMap<string, string> = new Map(
     'fontawesome/brands/threads': 'threads',
     'fontawesome/brands/reddit': 'reddit',
     'fontawesome/brands/stack-overflow': 'stackOverflow',
-    'fontawesome/brands/medium': 'medium',
-    'fontawesome/brands/dev': 'devTo',
     'fontawesome/brands/patreon': 'patreon',
     'fontawesome/brands/npm': 'npm',
-    'fontawesome/brands/python': 'python',
-    'fontawesome/brands/docker': 'docker',
     'fontawesome/brands/slack': 'slack',
     'fontawesome/brands/telegram': 'telegram',
-    'fontawesome/brands/whatsapp': 'whatsapp',
+    'fontawesome/brands/pinterest': 'pinterest',
+    'fontawesome/brands/tiktok': 'tiktok',
     'fontawesome/regular/envelope': 'email',
     'fontawesome/solid/envelope': 'email',
     'fontawesome/solid/rss': 'rss',
     'fontawesome/brands/rss': 'rss',
+    'fontawesome/solid/phone': 'phone',
+    // Icons Material exposes that have NO Starlight equivalent: fall back
+    // to the generic `external` icon so the build does not crash. Starlight's
+    // social-icon enum is finite; unmapped FontAwesome glyphs (`globe`,
+    // `home`, `link`, `medium`, `dev`, `python`, `docker`, `whatsapp`,
+    // `youtube-play` variants, etc.) all render as `external` instead of
+    // breaking the site config validation.
+    'fontawesome/brands/medium': 'external',
+    'fontawesome/brands/dev': 'external',
+    'fontawesome/brands/python': 'external',
+    'fontawesome/brands/docker': 'external',
+    'fontawesome/brands/whatsapp': 'external',
+    'fontawesome/solid/globe': 'external',
+    'fontawesome/solid/house': 'external',
+    'fontawesome/solid/home': 'external',
+    'fontawesome/solid/link': 'external',
+    'fontawesome/solid/external-link': 'external',
   }),
 );
+
+/**
+ * Subset of Starlight's `social[].icon` enum that the converter is allowed
+ * to emit. Anything outside this set crashes Starlight's config validator
+ * at build time, so the extractor falls back to `external` for unknowns.
+ */
+const VALID_SOCIAL_ICONS: ReadonlySet<string> = new Set([
+  'github', 'gitlab', 'bitbucket', 'codePen', 'farcaster', 'discord', 'gitter',
+  'twitter', 'x.com', 'mastodon', 'codeberg', 'youtube', 'threads', 'linkedin',
+  'twitch', 'azureDevOps', 'microsoftTeams', 'instagram', 'stackOverflow',
+  'telegram', 'rss', 'facebook', 'email', 'phone', 'reddit', 'patreon',
+  'signal', 'slack', 'matrix', 'hackerOne', 'openCollective', 'blueSky',
+  'discourse', 'zulip', 'pinterest', 'tiktok', 'external', 'npm',
+]);
 
 export function extractSocial(
   extras: Readonly<Record<string, unknown>>,
@@ -81,7 +109,11 @@ export function extractSocial(
     const link = typeof obj.link === 'string' ? obj.link : null;
     if (link === null) continue;
     const iconRaw = typeof obj.icon === 'string' ? obj.icon : '';
-    const icon = ICON_MAP.get(iconRaw) ?? trailingSegment(iconRaw);
+    const mapped = ICON_MAP.get(iconRaw) ?? trailingSegment(iconRaw);
+    // Starlight's `social[].icon` is a finite enum; falling back to whatever
+    // the user wrote in mkdocs.yml will fail config validation. Substitute
+    // `external` for any unmapped value so the build stays alive.
+    const icon = VALID_SOCIAL_ICONS.has(mapped) ? mapped : 'external';
     const label = typeof obj.name === 'string' && obj.name.length > 0 ? obj.name : icon;
     out.push({ icon, label, href: link });
   }

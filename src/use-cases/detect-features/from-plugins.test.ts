@@ -21,6 +21,10 @@ describe('detectFeaturesFromPlugins', () => {
     expect(detectFeaturesFromPlugins(plugins('tags')).has('tags')).toBe(true);
   });
 
+  it('maps the Material social plugin to the og-cards feature (astro-og-canvas)', () => {
+    expect(detectFeaturesFromPlugins(plugins('social')).has('og-cards')).toBe(true);
+  });
+
   it('maps git-revision-date-localized to the last-updated feature', () => {
     expect(
       detectFeaturesFromPlugins(plugins('git-revision-date-localized')).has(
@@ -49,5 +53,30 @@ describe('detectFeaturesFromPlugins', () => {
     expect(detectFeaturesFromPlugins(plugins('some-unknown-plugin'))).toEqual(
       new Set(),
     );
+  });
+
+  describe('extension-driven features (Tier 4 #14)', () => {
+    function exts(...names: string[]): ReadonlyArray<{ readonly name: string }> {
+      return names.map((name) => ({ name }));
+    }
+
+    it('maps pymdownx.keys to the kbd feature (drives starlight-kbd dep)', () => {
+      const features = detectFeaturesFromPlugins([], exts('pymdownx.keys'));
+      expect(features.has('kbd')).toBe(true);
+    });
+
+    it('does not emit kbd feature when pymdownx.keys is not configured', () => {
+      const features = detectFeaturesFromPlugins([], exts('pymdownx.highlight'));
+      expect(features.has('kbd')).toBe(false);
+    });
+
+    it('combines plugin-driven and extension-driven features in one pass', () => {
+      const features = detectFeaturesFromPlugins(
+        plugins('mike'),
+        exts('pymdownx.keys'),
+      );
+      expect(features.has('versions')).toBe(true);
+      expect(features.has('kbd')).toBe(true);
+    });
   });
 });

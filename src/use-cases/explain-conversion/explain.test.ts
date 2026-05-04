@@ -11,6 +11,8 @@ function makeConfig(
     siteUrl: null,
     docsDir: 'docs',
     useDirectoryUrls: true,
+    copyright: null,
+    repoName: null,
     repoUrl: null,
     editUri: null,
     theme: null,

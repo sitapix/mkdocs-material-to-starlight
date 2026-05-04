@@ -82,7 +82,7 @@ const LONGTAIL: ReadonlyMap<string, string> = new Map([
   ],
   [
     'announce.dismiss',
-    'No first-class Starlight equivalent. Override `Banner.astro` to add a dismiss button that writes to localStorage and conditionally hides the banner.',
+    '`starlight-announcement` covers this — dismissible announcement banners with optional scheduling. Auto-installed; configure title/message in `astro.config.mjs`.',
   ],
   [
     'content.action.edit',
@@ -90,7 +90,7 @@ const LONGTAIL: ReadonlyMap<string, string> = new Map([
   ],
   [
     'content.action.view',
-    'No first-class Starlight equivalent. Override `PageActions.astro` to add a "View source" link pointing at your repository.',
+    '`starlight-page-actions` covers this — adds a "View source" page-action button. Auto-installed; configure the source link in `astro.config.mjs`.',
   ],
   [
     'content.tooltips',

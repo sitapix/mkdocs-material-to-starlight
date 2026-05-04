@@ -33,6 +33,8 @@ const BOX_DRAWING_RE = /[├└│]/;
 /** Opening fence: optional language must be absent, "text", or "tree". */
 const FENCE_OPEN_RE = /^( {0,3})(```|~~~)(text|tree)?\s*$/i;
 const FENCE_CLOSE_RE = /^( {0,3})(```|~~~)\s*$/;
+/** ANY fence open (with or without language) — used to skip over non-tree fences. */
+const ANY_FENCE_OPEN_RE = /^( {0,3})(```+|~~~+)([^\n`]*)$/;
 
 interface FenceBlock {
   readonly indentStr: string;
@@ -67,15 +69,25 @@ function readFenceBlock(
   return null;
 }
 
+/**
+ * Filename/dirname character set: ASCII letters, digits, and a small set of
+ * filesystem-safe punctuation. Crucially excludes markdown formatting (`*`,
+ * `_`, `` ` ``), prose punctuation (`:`, `,`, `;`, `?`, `!`), and HTML
+ * (`<`, `>`, `=`, `"`). A real directory listing's first line is overwhelmingly
+ * just `name/` or `name.ext`; anything else is more likely to be prose.
+ */
+const TREE_ROOT_RE = /^[A-Za-z0-9_.\-/]+\/?$/;
+
 function isAsciiTreeBlock(contentLines: ReadonlyArray<string>): boolean {
   if (contentLines.length < 3) return false;
   const boxLines = contentLines.filter((l) => BOX_DRAWING_RE.test(l));
   if (boxLines.length < 2) return false;
   const firstNonBlank = contentLines.find((l) => l.trim().length > 0);
   if (firstNonBlank === undefined) return false;
-  // First line should look like a directory (ends with /) or a plain name.
-  const trimmed = firstNonBlank.trim();
-  return trimmed.endsWith('/') || (!trimmed.includes('/') && !trimmed.includes(' '));
+  // First line must look like a real filesystem entry — letters/digits/
+  // ./_-/ only, optional trailing slash. Rejects `**Note**:`, `$ command`,
+  // headings, and other prose tokens that happen to lack spaces or slashes.
+  return TREE_ROOT_RE.test(firstNonBlank.trim());
 }
 
 /**
@@ -135,6 +147,40 @@ export function normalizeFileTrees(source: string): FileTreeResult {
 
   let i = 0;
   while (i < lines.length) {
+    const line = lines[i] ?? '';
+
+    // If this line opens a fence whose language is NOT promotion-eligible
+    // (anything except empty, "text", or "tree"), skip the entire block. The
+    // alternative — letting the loop fall through — would let
+    // `readFenceBlock` mistake the block's CLOSING fence for an opening of a
+    // no-language fence and swallow everything up to the next fence. (Real
+    // fastapi/index.md regression: the close of a Python block was taken as
+    // the open of a tree fence and absorbed an entire console block.)
+    const anyOpen = ANY_FENCE_OPEN_RE.exec(line);
+    if (anyOpen !== null) {
+      const marker = anyOpen[2] ?? '';
+      const lang = (anyOpen[3] ?? '').trim();
+      const isPromotionCandidate = lang.length === 0 || /^(text|tree)$/i.test(lang);
+      if (!isPromotionCandidate) {
+        const markerChar = marker[0];
+        const minLen = marker.length;
+        let j = i + 1;
+        while (j < lines.length) {
+          const closeMatch = (lines[j] ?? '').match(/^( {0,3})(`+|~+)\s*$/);
+          if (
+            closeMatch !== null &&
+            (closeMatch[2] ?? '')[0] === markerChar &&
+            (closeMatch[2] ?? '').length >= minLen
+          ) {
+            break;
+          }
+          j += 1;
+        }
+        i = j + 1;
+        continue;
+      }
+    }
+
     const fence = readFenceBlock(lines, i);
     if (fence === null) {
       i += 1;

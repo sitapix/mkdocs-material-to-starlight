@@ -19,6 +19,16 @@ const LINENUMS_RE = /\blinenums="(\d+)"/;
 const HL_LINES_RE = /\bhl_lines="([^"]+)"/;
 const ATTR_LIST_RE = /\{\s*([^}]*)\s*\}/;
 
+// Match a `title="..."` or `title='...'` attribute anywhere in a brace block.
+// Captures the quoted value in groups 1 (double) or 2 (single).
+const BRACE_TITLE_RE = /\btitle=(?:"([^"]*)"|'([^']*)')/;
+
+// A brace block is a "valid Expressive Code line-range" when its contents are
+// numeric ranges only (e.g. `1,3-5`). Anything else (`upgrade="skip"`,
+// `title="…"`, `linenums="2"`) is Material syntax that Expressive Code cannot
+// parse and we must rewrite.
+const NUMERIC_RANGE_RE = /^[\s,0-9-]+$/;
+
 export function normalizeCodeBlockMeta(source: string): string {
   return source.replace(FENCE_RE, (full, fence: string, rest: string) => {
     const translated = translateRest(rest);
@@ -33,6 +43,15 @@ export function normalizeCodeBlockMeta(source: string): string {
 const OPTION_PREFIX_RE = /^(hl_lines|linenums|title|highlight)=/i;
 
 function translateRest(rest: string): string {
+  // Pre-process: if the meta contains a Material-form brace block (anything
+  // that isn't a pure numeric line-range), extract `title="..."` if present
+  // and strip the rest of the brace block. Expressive Code cannot parse
+  // arbitrary key="value" pairs inside braces — it expects line ranges only.
+  const rewritten = rewriteMaterialBraceBlock(rest);
+  if (rewritten !== null) {
+    rest = rewritten;
+  }
+
   if (rest.includes('showLineNumbers') || rest.includes('{')) {
     // Already translated or already an EC marker — preserve.
     if (!LINENUMS_RE.test(rest) && !HL_LINES_RE.test(rest)) return rest;
@@ -91,4 +110,34 @@ function translateRest(rest: string): string {
   // ```python style); add a space when there's no language but there is meta.
   if (lang.length > 0) return parts.join(' ');
   return ` ${parts.join(' ')}`.trimEnd();
+}
+
+/**
+ * If `rest` contains a Material-form brace block (one whose contents are NOT
+ * a pure numeric line-range), extract any `title="..."` attribute and strip
+ * the entire brace block. Returns the rewritten string, or null when no
+ * rewrite is needed.
+ *
+ * Examples:
+ *   `python {upgrade="skip" title="X"}` → `python title="X"`
+ *   `python {test="skip" lint="skip"}`  → `python` (everything stripped)
+ *   `python {1,3-5}`                    → null (legitimate EC line-range)
+ *   `python {3,5-7} title="x"`          → null (numeric brace; no rewrite)
+ */
+function rewriteMaterialBraceBlock(rest: string): string | null {
+  const braceMatch = rest.match(ATTR_LIST_RE);
+  if (braceMatch === null) return null;
+  const inner = braceMatch[1] ?? '';
+  if (NUMERIC_RANGE_RE.test(inner)) return null;
+  const titleMatch = inner.match(BRACE_TITLE_RE);
+  const titleValue = titleMatch === null ? null : (titleMatch[1] ?? titleMatch[2] ?? '');
+  // Strip the entire brace block — its non-title contents are Material-only
+  // attributes (test=, lint=, upgrade=, etc.) that Expressive Code does not
+  // recognize. The title, if any, is reattached outside the braces.
+  let out = rest.replace(ATTR_LIST_RE, '').replace(/\s+/g, ' ').trim();
+  if (titleValue !== null && titleValue.length > 0 && !out.includes('title=')) {
+    out = out.length > 0 ? `${out} title="${titleValue}"` : `title="${titleValue}"`;
+  }
+  // Reattach a leading space so the fence-line shape (`​```python …`) is preserved.
+  return out.length > 0 ? ` ${out}` : '';
 }

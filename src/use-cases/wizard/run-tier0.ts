@@ -15,19 +15,29 @@ export interface Tier0Answers {
   readonly check: boolean;
 }
 
+/**
+ * Tier 0: the unconditional questions. Output directory uses the `path`
+ * prompt (clack 1.3+) so the user gets directory completion and live
+ * validation as they type.
+ */
 export async function runTier0(
   prompter: Prompter,
   plan: ConversionPlan,
   defaults: DefaultAnswers,
 ): Promise<Result<Tier0Answers, WizardCancelled>> {
-  const outputDir = await prompter.text({
+  const outputDir = await prompter.path({
     message: 'Output directory',
     initialValue: deriveOutputDirName(plan.config.siteName),
+    directory: true,
+    validate: (value) => {
+      if (value.trim().length === 0) return 'Path is required.';
+      return undefined;
+    },
   });
   if (outputDir === null) return err(WIZARD_CANCELLED);
 
   const packageManager = await prompter.select<PackageManager>({
-    message: 'Package manager (used in the final "next steps" hint)',
+    message: 'Package manager',
     options: [
       { value: 'npm', label: 'npm' },
       { value: 'pnpm', label: 'pnpm' },
@@ -39,8 +49,10 @@ export async function runTier0(
   if (packageManager === null) return err(WIZARD_CANCELLED);
 
   const check = await prompter.confirm({
-    message: 'Run `astro check` against the converted site?',
+    message: 'Run astro check after conversion?',
     initialValue: defaults.check,
+    active: 'Yes (slower, catches schema errors)',
+    inactive: 'No (faster)',
   });
   if (check === null) return err(WIZARD_CANCELLED);
 

@@ -1,5 +1,6 @@
 /**
- * Detect features from a parsed `mkdocs.yml` plugin list.
+ * Detect features from a parsed `mkdocs.yml` plugin list AND markdown
+ * extension list.
  *
  * Some Starlight integrations are driven by plugin presence in the source
  * `mkdocs.yml`, not by syntax in Markdown source files. Examples:
@@ -7,12 +8,16 @@
  *   mkdocs-glightbox  → starlight-image-zoom (click-to-zoom for images)
  *   mike              → starlight-versions   (versioned doc trees)
  *
+ * Some are driven by Markdown extension presence:
+ *
+ *   pymdownx.keys     → starlight-kbd        (prettier `<kbd>` styling)
+ *
  * This use-case is the parallel of `detect-features/detect.ts` (which scans
  * source) — they produce the same `DetectedFeature` union and the site-level
- * orchestrator takes the union of both. Pure: takes a plugin list, returns a
- * `Set<DetectedFeature>`.
+ * orchestrator takes the union of both. Pure: takes plugins/extensions,
+ * returns a `Set<DetectedFeature>`.
  *
- * Adding a new plugin → feature mapping is one line in PLUGIN_TO_FEATURE.
+ * Adding a new mapping is one line in PLUGIN_TO_FEATURE.
  */
 
 import type { MkdocsPlugin } from '../../domain/config/mkdocs-config.js';
@@ -36,14 +41,25 @@ const PLUGIN_TO_FEATURE: ReadonlyMap<string, DetectedFeature> = new Map([
   // mkdocs-swagger-ui-tag → starlight-openapi.
   ['mkdocs-swagger-ui-tag', 'swagger-ui'] as const,
   ['swagger-ui-tag', 'swagger-ui'] as const,
+  // pymdownx.keys → starlight-kbd. Same map, since it's a name → feature
+  // lookup and extensions are passed through the same iteration as plugins.
+  ['pymdownx.keys', 'kbd'] as const,
+  // Material `social` plugin (per-page OG card PNGs) → astro-og-canvas.
+  // No `starlight-*` plugin exists for this; the canonical Starlight pattern
+  // (HiDeoo guides, 2026) installs astro-og-canvas and mounts an Astro
+  // endpoint via `OGImageRoute`. Note: this is NOT Starlight's `social: []`
+  // header config (icon links to social-media accounts) — that one is wired
+  // separately from `extra.social[]` in mkdocs.yml.
+  ['social', 'og-cards'] as const,
 ]);
 
 export function detectFeaturesFromPlugins(
   plugins: ReadonlyArray<MkdocsPlugin>,
+  extensions: ReadonlyArray<{ readonly name: string }> = [],
 ): ReadonlySet<DetectedFeature> {
   const out = new Set<DetectedFeature>();
-  for (const plugin of plugins) {
-    const feature = PLUGIN_TO_FEATURE.get(plugin.name);
+  for (const item of [...plugins, ...extensions]) {
+    const feature = PLUGIN_TO_FEATURE.get(item.name);
     if (feature !== undefined) {
       out.add(feature);
     }

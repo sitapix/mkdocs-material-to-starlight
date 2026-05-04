@@ -60,9 +60,38 @@ interface CollectedBlock {
 
 export function normalizeBlocks(source: string): string {
   const lines = source.split('\n');
+  return normalizeBlocksRec(lines).output.join('\n');
+}
+
+interface NormalizedBlocks {
+  readonly output: ReadonlyArray<string>;
+  /** Maximum colon-fence depth emitted by directives in this block. */
+  readonly maxFenceDepth: number;
+}
+
+/**
+ * Recursive worker. Returns the normalized lines plus the deepest colon
+ * fence emitted, so an enclosing container can choose a strictly greater
+ * fence depth for its own opener and closer (otherwise the inner closer
+ * would terminate the outer per remark-directive's closing rule).
+ */
+function normalizeBlocksRec(lines: ReadonlyArray<string>): NormalizedBlocks {
   const output: string[] = [];
   let i = 0;
   let inFence = false;
+  let maxFenceDepth = 0;
+
+  function track(depth: number): void {
+    if (depth > maxFenceDepth) maxFenceDepth = depth;
+  }
+
+  function pushPassthrough(line: string): void {
+    output.push(line);
+    // A line might be a passthrough `:::+name…` directive emitted by an
+    // earlier normalizer (e.g. the admonition pass). Track its depth so an
+    // enclosing block's fence can clear it.
+    track(measureDirectiveFenceDepth(line));
+  }
 
   while (i < lines.length) {
     const line = lines[i] ?? '';
@@ -82,7 +111,7 @@ export function normalizeBlocks(source: string): string {
 
     const parsed = parseBlocksLine(line);
     if (parsed === null || parsed.kind !== 'open') {
-      output.push(line);
+      pushPassthrough(line);
       i += 1;
       continue;
     }
@@ -91,14 +120,16 @@ export function normalizeBlocks(source: string): string {
     if (closeIndex === -1) {
       // Unterminated fence — leave the source unchanged so a downstream
       // diagnostic stage can surface the mismatch without losing content.
-      output.push(line);
+      pushPassthrough(line);
       i += 1;
       continue;
     }
 
     if (parsed.name === TAB_NAME) {
       const group = collectTabGroup(lines, parsed, i, closeIndex);
-      output.push(...renderTabGroup(lines, group));
+      const rendered = renderTabGroup(lines, group);
+      output.push(...rendered.output);
+      track(rendered.maxFenceDepth);
       i = group[group.length - 1]!.closeIndex + 1;
       continue;
     }
@@ -143,17 +174,30 @@ export function normalizeBlocks(source: string): string {
     }
 
     const { typeOverride, bodyStart } = parseOptions(lines, i + 1, closeIndex);
-    const bodySlice = lines.slice(bodyStart, closeIndex).join('\n');
+    const bodyLines = lines.slice(bodyStart, closeIndex);
     const effectiveName = resolveBlockName(parsed.name, typeOverride);
-    output.push(renderOpening(parsed, effectiveName));
-    if (bodySlice.length > 0) {
-      output.push(normalizeBlocks(bodySlice));
+    const inner = normalizeBlocksRec(bodyLines);
+    const fenceDepth = Math.max(ADMONITION_FENCE_DEPTH, inner.maxFenceDepth + 1);
+    output.push(renderOpening(parsed, effectiveName, fenceDepth));
+    if (inner.output.length > 0) {
+      output.push(inner.output.join('\n'));
     }
-    output.push(`${' '.repeat(parsed.indent)}${':'.repeat(ADMONITION_FENCE_DEPTH)}`);
+    output.push(`${' '.repeat(parsed.indent)}${':'.repeat(fenceDepth)}`);
+    track(fenceDepth);
     i = closeIndex + 1;
   }
 
-  return output.join('\n');
+  return { output, maxFenceDepth };
+}
+
+/**
+ * Return the depth of a leading directive fence on a line (open or close),
+ * or 0 if the line is not a directive fence. Used by the recursive worker
+ * to detect passthrough fences emitted by upstream normalizers.
+ */
+function measureDirectiveFenceDepth(line: string): number {
+  const match = line.match(/^[ \t]*(:{3,})/);
+  return match === null ? 0 : (match[1] ?? '').length;
 }
 
 interface ParsedOptions {
@@ -255,26 +299,56 @@ function skipBlankLines(lines: readonly string[], index: number): number {
   return i;
 }
 
+interface RenderedTabGroup {
+  readonly output: ReadonlyArray<string>;
+  /** Deepest colon fence emitted by this tab group (including its own wrappers). */
+  readonly maxFenceDepth: number;
+}
+
 function renderTabGroup(
   lines: readonly string[],
   tabs: ReadonlyArray<CollectedBlock>,
-): ReadonlyArray<string> {
+): RenderedTabGroup {
   const indent = ' '.repeat(tabs[0]!.opening.indent);
-  const out: string[] = [`${indent}::::tabs`];
+  const out: string[] = [];
 
+  // Compute each tab's body-derived fence depth first so we can size the
+  // tab and tabs wrappers strictly above any inner directive fence.
+  interface RenderedTab {
+    readonly title: string;
+    readonly innerOutput: ReadonlyArray<string>;
+    readonly innerMax: number;
+  }
+  const rendered: RenderedTab[] = [];
+  let groupInnerMax = 0;
   for (const tab of tabs) {
     const title = tab.opening.title ?? '';
-    out.push(`${indent}:::tab[${title}]`);
-    const bodySlice = lines.slice(tab.openIndex + 1, tab.closeIndex).join('\n');
-    if (bodySlice.length > 0) {
-      out.push(normalizeBlocks(bodySlice));
-    }
-    out.push(`${indent}:::`);
+    const bodyLines = lines.slice(tab.openIndex + 1, tab.closeIndex);
+    const inner = normalizeBlocksRec(bodyLines);
+    rendered.push({ title, innerOutput: inner.output, innerMax: inner.maxFenceDepth });
+    if (inner.maxFenceDepth > groupInnerMax) groupInnerMax = inner.maxFenceDepth;
   }
 
-  out.push(`${indent}::::`);
+  // Tab fence must exceed the deepest directive fence in any tab body so its
+  // closer doesn't accidentally terminate them. Default 3 is fine when no
+  // inner directives exist (the historical baseline).
+  const TAB_BASE_DEPTH = 3;
+  const TABS_BASE_DEPTH = 4;
+  const tabDepth = Math.max(TAB_BASE_DEPTH, groupInnerMax + 1);
+  // tabs wrapper must exceed every tab fence too.
+  const tabsDepth = Math.max(TABS_BASE_DEPTH, tabDepth + 1);
+
+  out.push(`${indent}${':'.repeat(tabsDepth)}tabs`);
+  for (const r of rendered) {
+    out.push(`${indent}${':'.repeat(tabDepth)}tab[${r.title}]`);
+    if (r.innerOutput.length > 0) {
+      out.push(r.innerOutput.join('\n'));
+    }
+    out.push(`${indent}${':'.repeat(tabDepth)}`);
+  }
+  out.push(`${indent}${':'.repeat(tabsDepth)}`);
   out.push('');
-  return out;
+  return { output: out, maxFenceDepth: tabsDepth };
 }
 
 function renderHtmlBlock(title: string | null, body: string): ReadonlyArray<string> {
@@ -292,10 +366,14 @@ function renderHtmlBlock(title: string | null, body: string): ReadonlyArray<stri
   return [openTag, body, `</${tag}>`];
 }
 
-function renderOpening(opening: BlocksOpening, effectiveName: string): string {
+function renderOpening(
+  opening: BlocksOpening,
+  effectiveName: string,
+  fenceDepth: number,
+): string {
   const indent = ' '.repeat(opening.indent);
   const label = opening.title === null ? '' : `[${opening.title}]`;
-  const fence = ':'.repeat(ADMONITION_FENCE_DEPTH);
+  const fence = ':'.repeat(fenceDepth);
   // pymdownx.blocks.details has no Starlight equivalent of its own, but the
   // existing admonition pipeline already maps `:::note[Title]{collapsible}`
   // through to a `<details><summary>` HTML pair. Rewriting `/// details` into

@@ -174,6 +174,25 @@ function buildSplashPage(
     const srcM = /\bsrc=["']([^"']+)["']/.exec(heroImgHtml[0]);
     heroImagePath = srcM?.[1] ?? null;
   }
+  // Normalise the hero image path for Starlight's `hero.image.file` schema.
+  // Material's source frequently uses `../path/to/img.png` or
+  // `assets/img.png` (resolved relative to the docs root). After conversion
+  // the page lives at `src/content/docs/index.mdx`, so any `../` prefix
+  // resolves outside `src/content/docs/` and Astro's image bundler errors
+  // with "Could not find requested image". For HTTP(S) URLs and absolute
+  // public-folder paths, leave the path alone — they are valid as-is. For
+  // relative paths, drop to `/<basename>` so the image is served from
+  // public/ (asset planner already copies docs/* to public/* by default).
+  if (heroImagePath !== null) {
+    const isUrl = /^[a-z][a-z0-9+\-.]*:\/\//i.test(heroImagePath);
+    const isPublic = heroImagePath.startsWith('/');
+    if (!isUrl && !isPublic) {
+      const stripped = heroImagePath.replace(/[?#].*$/, '');
+      const slashIdx = stripped.lastIndexOf('/');
+      const basename = slashIdx === -1 ? stripped : stripped.slice(slashIdx + 1);
+      heroImagePath = `/${basename}`;
+    }
+  }
 
   // Extract CTA buttons (only explicit .md-button ones).
   const actions: Array<{ text: string; link: string; variant: 'primary' | 'secondary' }> = [];
@@ -191,11 +210,24 @@ function buildSplashPage(
     });
   }
 
+  // Decide which hero image schema fits: `image.file` (Astro-bundled,
+  // src-relative path) vs `image.html` (raw markup, used for public-served
+  // images). Public paths (`/<…>`) and external URLs both go through
+  // `image.html`; only src-relative paths survive into `image.file`.
+  const heroImageHtml =
+    heroImagePath !== null &&
+    (heroImagePath.startsWith('/') ||
+      /^[a-z][a-z0-9+\-.]*:\/\//i.test(heroImagePath))
+      ? `<img src="${heroImagePath}" alt="" />`
+      : null;
+
   // Build structured hero frontmatter object.
   const hero: HeroFrontmatter = {
     ...(heroTitle !== null ? { title: heroTitle } : {}),
     ...(heroTagline !== null ? { tagline: heroTagline } : {}),
-    ...(heroImagePath !== null ? { image: { file: heroImagePath } } : {}),
+    ...(heroImagePath !== null && heroImageHtml === null
+      ? { image: { file: heroImagePath } }
+      : {}),
     ...(actions.length > 0 ? { actions } : {}),
   };
 
@@ -205,7 +237,11 @@ function buildSplashPage(
   if (heroTagline !== null) heroLines.push(`  tagline: ${heroTagline}`);
   if (heroImagePath !== null) {
     heroLines.push('  image:');
-    heroLines.push(`    file: ${heroImagePath}`);
+    if (heroImageHtml !== null) {
+      heroLines.push(`    html: '${heroImageHtml.replace(/'/g, "''")}'`);
+    } else {
+      heroLines.push(`    file: ${heroImagePath}`);
+    }
   }
   if (actions.length > 0) {
     heroLines.push('  actions:');
@@ -218,8 +254,15 @@ function buildSplashPage(
   }
   const heroBlock = heroLines.join('\n');
 
-  // Build the new frontmatter.
-  const existingFm = fmMatch !== null ? (fmMatch[1] ?? '') : '';
+  // Build the new frontmatter. Strip any pre-existing `template:` key from
+  // the source frontmatter (e.g. Material's `template: welcome.html`)
+  // before re-adding `template: splash` — duplicate YAML keys at the same
+  // indent level are a fatal parse error in Astro's frontmatter loader.
+  const rawFm = fmMatch !== null ? (fmMatch[1] ?? '') : '';
+  const existingFm = rawFm
+    .split('\n')
+    .filter((line) => !/^template\s*:/.test(line))
+    .join('\n');
   const newFm = existingFm.trimEnd().length > 0
     ? `${existingFm.trimEnd()}\ntemplate: splash\n${heroBlock}`
     : `template: splash\n${heroBlock}`;

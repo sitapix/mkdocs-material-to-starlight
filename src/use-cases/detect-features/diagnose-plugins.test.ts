@@ -18,11 +18,13 @@ describe('diagnosePlugins', () => {
     expect(diagnosePlugins(plugins('glightbox', 'mike'))).toEqual([]);
   });
 
-  it('emits a diagnostic for the Material social plugin (no Starlight equivalent)', () => {
+  it('emits an info diagnostic for the Material social plugin mapped to astro-og-canvas', () => {
     const out = diagnosePlugins(plugins('social'));
     expect(out).toHaveLength(1);
-    expect(out[0]?.ruleId).toBe('plugin-social-no-equivalent');
-    expect(out[0]?.severity).toBe('warning');
+    expect(out[0]?.ruleId).toBe('plugin-social-mapped');
+    expect(out[0]?.severity).toBe('info');
+    expect(out[0]?.message).toContain('astro-og-canvas');
+    expect(out[0]?.message).toContain('og/[...slug].png.ts');
   });
 
   it('emits a diagnostic for the meta plugin (folder-scoped frontmatter cascade)', () => {
@@ -69,10 +71,10 @@ describe('diagnosePlugins', () => {
     expect(out[0]?.message).toContain('locales');
   });
 
-  it('handles multiple unmappable plugins in one pass, preserving order', () => {
+  it('handles multiple plugins in one pass, preserving order', () => {
     const out = diagnosePlugins(plugins('social', 'typeset'));
     expect(out).toHaveLength(2);
-    expect(out[0]?.ruleId).toBe('plugin-social-no-equivalent');
+    expect(out[0]?.ruleId).toBe('plugin-social-mapped');
     expect(out[1]?.ruleId).toBe('plugin-typeset-deprecated');
   });
 
@@ -102,5 +104,92 @@ describe('diagnosePlugins', () => {
     const out = diagnosePlugins(plugins('mkdocs-swagger-ui-tag', 'swagger-ui-tag'));
     const swaggerDiags = out.filter((d) => d.ruleId === 'plugin-swagger-ui-mapped');
     expect(swaggerDiags).toHaveLength(1);
+  });
+
+  it('emits an info diagnostic for mkdocs-pdf-export-plugin pointing at starlight-to-pdf CLI', () => {
+    const out = diagnosePlugins(plugins('pdf-export'));
+    expect(out).toHaveLength(1);
+    expect(out[0]?.ruleId).toBe('plugin-pdf-export-mapped');
+    expect(out[0]?.severity).toBe('info');
+    expect(out[0]?.message).toContain('starlight-to-pdf');
+    expect(out[0]?.message).toContain('CLI');
+  });
+
+  it('emits the same diagnostic for the mkdocs-with-pdf plugin variant', () => {
+    const out = diagnosePlugins(plugins('with-pdf'));
+    expect(out[0]?.ruleId).toBe('plugin-pdf-export-mapped');
+  });
+
+  describe('PyMdown extension diagnostics (Tier 3)', () => {
+    function exts(...names: string[]): ReadonlyArray<{ readonly name: string }> {
+      return names.map((name) => ({ name }));
+    }
+
+    it('emits a warning for pymdownx.arithmatex recommending rehype-katex', () => {
+      const out = diagnosePlugins([], exts('pymdownx.arithmatex'));
+      expect(out).toHaveLength(1);
+      expect(out[0]?.ruleId).toBe('extension-arithmatex-detected');
+      expect(out[0]?.severity).toBe('warning');
+      expect(out[0]?.message).toMatch(/rehype-katex|rehype-mathjax/);
+    });
+
+    it('emits a warning for pymdownx.progressbar (no Starlight equivalent)', () => {
+      const out = diagnosePlugins([], exts('pymdownx.progressbar'));
+      expect(out[0]?.ruleId).toBe('extension-progressbar-no-equivalent');
+      expect(out[0]?.severity).toBe('warning');
+    });
+
+    it('emits an info for pymdownx.striphtml (subsumed by Astro pipeline)', () => {
+      const out = diagnosePlugins([], exts('pymdownx.striphtml'));
+      expect(out[0]?.ruleId).toBe('extension-striphtml-subsumed');
+      expect(out[0]?.severity).toBe('info');
+    });
+
+    it('emits a warning for pymdownx.blocks.dialog (no first-class mapping)', () => {
+      const out = diagnosePlugins([], exts('pymdownx.blocks.dialog'));
+      expect(out[0]?.ruleId).toBe('extension-blocks-dialog-no-equivalent');
+      expect(out[0]?.severity).toBe('warning');
+    });
+
+    it('emits a warning for pymdownx.blocks.grid (no Starlight equivalent)', () => {
+      const out = diagnosePlugins([], exts('pymdownx.blocks.grid'));
+      expect(out[0]?.ruleId).toBe('extension-blocks-grid-no-equivalent');
+      expect(out[0]?.severity).toBe('warning');
+    });
+
+    it('emits an info for pymdownx.escapeall (handled differently in MDX)', () => {
+      const out = diagnosePlugins([], exts('pymdownx.escapeall'));
+      expect(out[0]?.ruleId).toBe('extension-escapeall-detected');
+      expect(out[0]?.severity).toBe('info');
+    });
+
+    it('emits an info for pymdownx.pathconverter (subsumed by link normalizer)', () => {
+      const out = diagnosePlugins([], exts('pymdownx.pathconverter'));
+      expect(out[0]?.ruleId).toBe('extension-pathconverter-subsumed');
+      expect(out[0]?.severity).toBe('info');
+    });
+
+    it('emits an info for pymdownx.saneheaders (behavioral edge case)', () => {
+      const out = diagnosePlugins([], exts('pymdownx.saneheaders'));
+      expect(out[0]?.ruleId).toBe('extension-saneheaders-detected');
+      expect(out[0]?.severity).toBe('info');
+    });
+
+    it('handles all eight PyMdown extensions in a single pass', () => {
+      const out = diagnosePlugins(
+        [],
+        exts(
+          'pymdownx.arithmatex',
+          'pymdownx.progressbar',
+          'pymdownx.striphtml',
+          'pymdownx.blocks.dialog',
+          'pymdownx.blocks.grid',
+          'pymdownx.escapeall',
+          'pymdownx.pathconverter',
+          'pymdownx.saneheaders',
+        ),
+      );
+      expect(out).toHaveLength(8);
+    });
   });
 });

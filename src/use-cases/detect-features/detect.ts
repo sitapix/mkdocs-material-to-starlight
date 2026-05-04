@@ -3,8 +3,9 @@
  * dependencies and plugin wiring in the generated Starlight project.
  *
  * Currently detected:
- *   - 'math'    — `$$...$$` block or `$...$` inline (pymdownx.arithmatex)
- *   - 'mermaid' — ```mermaid``` fenced block (via pymdownx.superfences)
+ *   - 'math'          — `$$...$$` block or `$...$` inline (pymdownx.arithmatex)
+ *   - 'mermaid'       — ```mermaid``` fenced block (via pymdownx.superfences)
+ *   - 'github-alerts' — `> [!NOTE]` / `[!TIP]` / etc. GitHub blockquote alerts
  *
  * Pure: takes a source string, returns a `Set<DetectedFeature>`. The site-
  * level orchestrator unions these per-file sets and passes the union to
@@ -17,6 +18,7 @@
  */
 
 import type { DetectedFeature } from '../serialize-config/package-json.js';
+import { sourceContainsGithubAlerts } from '../normalize/scan-github-alerts.js';
 
 const MERMAID_FENCE = /^ {0,3}```\s*mermaid\b/m;
 const MATH_BLOCK = /\$\$[\s\S]+?\$\$/;
@@ -29,6 +31,9 @@ export function detectFeatures(source: string): ReadonlySet<DetectedFeature> {
   }
   if (MATH_BLOCK.test(source) || MATH_INLINE.test(source)) {
     out.add('math');
+  }
+  if (sourceContainsGithubAlerts(source)) {
+    out.add('github-alerts');
   }
   return out;
 }

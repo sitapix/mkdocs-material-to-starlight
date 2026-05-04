@@ -30,26 +30,58 @@ export interface AdmonitionOpening {
   readonly indent: number;
 }
 
+// Strict canonical Material syntax: `!!! type [inline [end]] ["Title"]`.
 const PATTERN =
   /^(?<indent> *)(?<marker>!!!|\?\?\?\+|\?\?\?) +(?<type>[A-Za-z0-9][A-Za-z0-9_-]*)(?<modifiers>(?: +inline(?: +end)?)?)(?: +"(?<title>[^"]*)")? *$/;
 
+// Lenient fallback used after the strict pattern fails. Captures the trailing
+// text after the type (and optional `inline [end]` modifiers) as a literal
+// title. Real-world content frequently drops the quotes (`!!! warning Foo`)
+// or uses a dash separator (`!!! warning - Foo`); we recover gracefully so
+// the admonition still converts to a Starlight aside.
+const LENIENT_PATTERN =
+  /^(?<indent> *)(?<marker>!!!|\?\?\?\+|\?\?\?) +(?<type>[A-Za-z0-9][A-Za-z0-9_-]*)(?<modifiers>(?: +inline(?: +end)?)?) +(?<rest>\S.*?) *$/;
+
 export function parseAdmonitionLine(line: string): AdmonitionOpening | null {
-  const match = line.match(PATTERN);
-  if (match === null || match.groups === undefined) {
-    return null;
+  const strict = line.match(PATTERN);
+  if (strict !== null && strict.groups !== undefined) {
+    const groups = strict.groups;
+    const rawTitle = groups['title'];
+    return {
+      marker: groups['marker'] as AdmonitionMarker,
+      type: groups['type'] ?? '',
+      title: rawTitle === undefined || rawTitle === '' ? null : rawTitle,
+      hasEmptyTitle: rawTitle === '',
+      inline: parseInline(groups['modifiers'] ?? ''),
+      indent: (groups['indent'] ?? '').length,
+    };
   }
 
-  const groups = match.groups;
-  const rawTitle = groups['title'];
-
+  const lenient = line.match(LENIENT_PATTERN);
+  if (lenient === null || lenient.groups === undefined) return null;
+  const groups = lenient.groups;
+  const rest = (groups['rest'] ?? '').trim();
   return {
     marker: groups['marker'] as AdmonitionMarker,
     type: groups['type'] ?? '',
-    title: rawTitle === undefined || rawTitle === '' ? null : rawTitle,
-    hasEmptyTitle: rawTitle === '',
+    title: cleanLenientTitle(rest),
+    hasEmptyTitle: false,
     inline: parseInline(groups['modifiers'] ?? ''),
     indent: (groups['indent'] ?? '').length,
   };
+}
+
+/**
+ * Strip leading dash separators (e.g. `- Foo`) and unwrap surrounding quotes
+ * if the title is double-quoted but contains internal quotes (greedy match —
+ * `"on the "jsonable" nature of JSON schema"` → `on the "jsonable" nature of JSON schema`).
+ */
+function cleanLenientTitle(rest: string): string | null {
+  let title = rest.replace(/^-\s+/, '');
+  if (title.startsWith('"') && title.endsWith('"') && title.length >= 2) {
+    title = title.slice(1, -1);
+  }
+  return title.length === 0 ? null : title;
 }
 
 function parseInline(modifiers: string): InlineMode | null {

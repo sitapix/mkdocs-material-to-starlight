@@ -194,9 +194,9 @@ const REGISTRY_ENTRIES: ReadonlyArray<DiagnosticEntry> = [
     id: 'plugin-mkdocstrings-no-equivalent',
     severity: 'warning',
     description:
-      'mkdocs.yml lists `mkdocstrings` (Python API autodoc); Starlight has no Python autodoc path.',
+      'mkdocs.yml lists `mkdocstrings` (Python API autodoc); Starlight has no Python autodoc path. (TypeScript projects can use `starlight-typedoc` for the equivalent JS/TS workflow.)',
     fix:
-      'Pre-generate Markdown from docstrings (Sphinx, pdoc) before conversion, or write a custom Astro content loader that emits Starlight pages.',
+      'For Python: pre-generate Markdown from docstrings (Sphinx, pdoc, or `mkdocstrings -d` ahead of conversion), or write a custom Astro content loader that emits Starlight pages. For TypeScript: install `starlight-typedoc` and add it to your Starlight plugins array — it generates pages from TypeDoc output during the Astro build.',
   },
   {
     id: 'plugin-jupyter-no-equivalent',
@@ -379,9 +379,9 @@ const REGISTRY_ENTRIES: ReadonlyArray<DiagnosticEntry> = [
     id: 'extension-md-shortcode-found',
     severity: 'info',
     description:
-      'A Material `<!-- md:* -->` shortcode (e.g. `<!-- md:version 1.2 -->`, `<!-- md:flag experimental -->`) was found in source. The converter does not render the badge automatically.',
+      'A Material `<!-- md:* -->` shortcode (e.g. `<!-- md:version 1.2 -->`, `<!-- md:flag experimental -->`) was found in source. The converter promotes each shortcode to a Starlight `<Badge>` JSX component and the file is auto-promoted to `.mdx`.',
     fix:
-      'Replace with literal text or a small Astro component, OR write a remark plugin to handle the shortcode.',
+      'No action required — the emitted `<Badge text="..." variant="..." />` renders the same intent as the Material badge. Verify the variant choice (note/tip/caution/danger/success/default) matches your visual expectation; tweak inline if needed.',
   },
   {
     id: 'extension-only-mkdocs-stripped',
@@ -644,7 +644,7 @@ const REGISTRY_ENTRIES: ReadonlyArray<DiagnosticEntry> = [
     description:
       '`theme.logo` and/or `theme.favicon` detected — assets copied and wired into the starlight `logo` and `head` config.',
     fix:
-      'Verify the logo renders at the expected size (Starlight scales differently than Material). Note: `theme.icon.{admonition,tag,previous,next,edit,view}` are dropped — Starlight has no override surface for these. The repo icon is honored via the `social` config; the rest must be reimplemented in CSS or component overrides.',
+      'Verify the logo renders at the expected size (Starlight scales differently than Material). The repo icon is honored via the `social` config. For the rest: `starlight-plugin-icons` covers sidebar, codeblock, and filetree icon customization (install manually if you used `theme.icon` for nav icons). Admonition / page-action icon overrides remain unmapped and require Starlight component overrides (`Aside.astro`, `PageActions.astro`).',
     relatedFeatureId: 'theme-logo-icons',
   },
   {
@@ -660,7 +660,7 @@ const REGISTRY_ENTRIES: ReadonlyArray<DiagnosticEntry> = [
     id: 'theme-feature-unsupported',
     severity: 'warning',
     description:
-      'A `theme.features` entry has no Starlight equivalent and was dropped (e.g., toc.integrate, navigation.prune, header.autohide, content.action.view, announce.dismiss, search.share, navigation.top, navigation.expand).',
+      'A `theme.features` entry has no first-class Starlight equivalent and was dropped (e.g., toc.integrate, navigation.prune, header.autohide, search.share, navigation.top, navigation.expand). Note: `announce.dismiss` and `content.action.view` ARE covered now via `starlight-announcement` and `starlight-page-actions` respectively (auto-installed when detected).',
     fix:
       'Read the per-feature note in the diagnostic message — most have a one-line component-override path (Banner.astro, PageSidebar.astro, Header.astro) that reimplements the behavior client-side. The full overrides reference is at https://starlight.astro.build/reference/overrides/.',
     relatedFeatureId: 'theme-features',
@@ -847,6 +847,15 @@ const REGISTRY_ENTRIES: ReadonlyArray<DiagnosticEntry> = [
     relatedFeatureId: 'plugin-swagger-ui',
   },
   {
+    id: 'plugin-social-mapped',
+    severity: 'info',
+    description:
+      'mkdocs.yml lists Material\'s `social` plugin (per-page Open Graph card PNGs). No `starlight-*` plugin exists for this; the canonical Starlight pattern uses `astro-og-canvas`. Distinct from Starlight\'s `social: []` config (header social-media icon links).',
+    fix:
+      'The converter has installed `astro-og-canvas` and emitted a stub endpoint at `src/pages/og/[...slug].png.ts`. Run `npm install`, then customize the card layout (logo, fonts, colors, padding) — see https://github.com/delucis/astro-og-canvas#options. Optionally inject `<meta property="og:image">` per-page via Starlight\'s `head[]` config.',
+    relatedFeatureId: 'plugin-social',
+  },
+  {
     id: 'theme-feature-longtail-detected',
     severity: 'info',
     description:
@@ -886,10 +895,381 @@ const REGISTRY_ENTRIES: ReadonlyArray<DiagnosticEntry> = [
     id: 'grid-card-promoted-to-linkcard',
     severity: 'info',
     description:
-      'A grid card whose body contained a single link was promoted to a `<LinkCard>` component. Single-link navigation cards map cleanly to `<LinkCard title="..." href="...">` which is the Starlight native equivalent.',
+      'A grid card whose body was a single navigation link (optionally followed by a single plain-prose paragraph) was promoted to a `<LinkCard>` component. The link becomes the title/href; a trailing paragraph, when present and free of inline markup, becomes the `description=` attribute. This maps cleanly to Starlight\'s native `<LinkCard>` and avoids a generic `:::card` directive wrapper.',
     fix:
-      'No action required. Verify the emitted `<LinkCard>` title and href are correct. The file has been promoted to `.mdx` to support the JSX component.',
+      'No action required. Verify the emitted `<LinkCard>` title, href, and (when present) description are correct. The file has been promoted to `.mdx` to support the JSX component.',
     relatedFeatureId: 'grid-cards-linkcard',
+  },
+  {
+    id: 'md-button-promoted-to-linkbutton',
+    severity: 'info',
+    description:
+      'A Material `[label](url){ .md-button }` link was promoted to Starlight\'s `<LinkButton>` component. `.md-button` maps to `variant="secondary"`; `.md-button .md-button--primary` maps to `variant="primary"`. Resolvable inline icon shortcodes (e.g. `:material-rocket:`) become the `icon=` prop. The file is promoted to `.mdx` to support the JSX component.',
+    fix:
+      'No action required. Verify the emitted `<LinkButton>` href, variant, label, and (when present) icon are correct. If the original `.md-button--*` modifier was a project-specific variant (not the canonical `.md-button--primary`), choose between `variant="primary"`, `"secondary"`, and `"minimal"` manually.',
+    relatedFeatureId: 'buttons',
+  },
+  {
+    id: 'extension-arithmatex-detected',
+    severity: 'warning',
+    description:
+      '`pymdownx.arithmatex` was configured. The converter passes `$inline$` and `$$block$$` math through to remark-math, but Astro needs a rehype renderer to actually display the formulas.',
+    fix:
+      'Install `rehype-katex` (preferred for static rendering) or `rehype-mathjax`, then add it to the markdown integrations in `astro.config.mjs`: `markdown: { remarkPlugins: [remarkMath], rehypePlugins: [rehypeKatex] }`. Also add `import "katex/dist/katex.min.css"` to your global CSS.',
+  },
+  {
+    id: 'latex-delimiter-unsupported',
+    severity: 'warning',
+    description:
+      'Source uses Material\'s alternate LaTeX delimiters `\\(...\\)` (inline) or `\\[...\\]` (block), which Material recommends as a MathJax-friendly alternative to `$`/`$$`. remark-math (the math pipeline auto-wired into emitted Starlight projects) does not recognize backslash-paren delimiters by default, so they will pass through verbatim and render as literal backslashes.',
+    fix:
+      'Easiest path: rewrite to dollar delimiters in source — `\\(x\\)` → `$x$`, `\\[y\\]` → `$$y$$`. Alternative: configure a custom remark plugin in `astro.config.mjs` that recognizes backslash delimiters (e.g., a Pandoc-flavored math plugin), or write a small regex-based remark plugin to translate the delimiters before remark-math runs.',
+  },
+  {
+    id: 'math-runtime-script-superseded',
+    severity: 'info',
+    description:
+      'An `extra_javascript` entry references a MathJax or KaTeX runtime configuration script. Material loads these at runtime to render math in the browser, but Astro renders math at build time via remark-math + rehype-katex (auto-wired when `pymdownx.arithmatex` is detected), making the runtime script redundant and potentially conflicting with the rehype output.',
+    fix:
+      'Remove the script entry from your Astro config\'s `head[]` after confirming math still renders. The original script file is still copied through to `public/` for inspection but is no longer referenced.',
+  },
+  {
+    id: 'extension-progressbar-no-equivalent',
+    severity: 'warning',
+    description:
+      '`pymdownx.progressbar` was configured. The `[=85% "label"]` progress-bar syntax has no Starlight or Astro equivalent and will pass through as literal text.',
+    fix:
+      'Replace progress-bar markers with a custom Astro component, an inline `<progress>` element, or static text. There is no first-class Starlight component for progress bars.',
+  },
+  {
+    id: 'extension-striphtml-subsumed',
+    severity: 'info',
+    description:
+      '`pymdownx.striphtml` was configured. This MkDocs build-time HTML stripper has no role in the Astro pipeline; MDX/Astro handle HTML inclusion through their own component model.',
+    fix:
+      'No action required. Remove the extension entry from your migration notes — the behavior is subsumed.',
+  },
+  {
+    id: 'extension-blocks-dialog-no-equivalent',
+    severity: 'warning',
+    description:
+      '`pymdownx.blocks.dialog` was configured. The `/// dialog | …` block syntax has no Starlight equivalent and will pass through unchanged.',
+    fix:
+      'Replace dialog blocks with a custom MDX component (e.g., `<Dialog>`) defined under `src/components/`, or convert them to plain admonitions/asides. There is no first-class Starlight component for dialog wrappers.',
+  },
+  {
+    id: 'extension-blocks-grid-no-equivalent',
+    severity: 'warning',
+    description:
+      '`pymdownx.blocks.grid` was configured. This is the generic CSS-grid block (distinct from `grid cards`) and has no Starlight equivalent.',
+    fix:
+      'Replace grid blocks with hand-written `<div class="sl-grid">` markup using the migration CSS shim, or wrap content in a custom Astro component. The `<div class="grid cards">` shape IS still mapped — only the bare `pymdownx.blocks.grid` form is unmapped.',
+  },
+  {
+    id: 'extension-escapeall-detected',
+    severity: 'info',
+    description:
+      '`pymdownx.escapeall` was configured. MDX and remark already handle backslash escapes natively; some character escapes that Python-Markdown allowed may behave differently in MDX.',
+    fix:
+      'No automatic action. Spot-check passages that rely on escaping unusual characters (e.g., `\\!`, `\\(`) — MDX may treat some of them as JSX or directive syntax. Common cases (`\\*`, `\\_`, `\\\\`) still work.',
+  },
+  {
+    id: 'extension-pathconverter-subsumed',
+    severity: 'info',
+    description:
+      '`pymdownx.pathconverter` was configured. The converter\'s built-in link normalizer rewrites `.md` paths to Starlight slugs, which subsumes pathconverter\'s job.',
+    fix:
+      'No action required. Remove the extension entry from your migration notes — the behavior is subsumed by the converter\'s slug-map step.',
+  },
+  {
+    id: 'extension-saneheaders-detected',
+    severity: 'info',
+    description:
+      '`pymdownx.saneheaders` was configured. This extension restricts `#heading` parsing in inline contexts. Remark/MDX heading parsing follows CommonMark defaults, which approximate but do not exactly match saneheaders behavior.',
+    fix:
+      'No automatic action. Headings that worked under saneheaders should continue to work; spot-check files where you intentionally relied on saneheaders\' stricter parsing of `#` in mid-line contexts.',
+  },
+  {
+    id: 'material-insiders-feature-detected',
+    severity: 'info',
+    description:
+      'A Material for MkDocs *Insiders* feature was detected in `mkdocs.yml`. Insiders features are paid and not part of public Material — the open-source converter cannot reproduce them. Configs commonly drift between Insiders and non-Insiders sites because they are forked from public templates.',
+    fix:
+      'Read the diagnostic message — each Insiders feature includes the closest Starlight or Astro approximation. If your site is not actually built with Insiders, remove the feature/plugin entry from `mkdocs.yml`. If it is, plan a manual port of the affected behavior.',
+  },
+  {
+    id: 'plugin-pdf-export-mapped',
+    severity: 'info',
+    description:
+      '`mkdocs-pdf-export-plugin` (or its variant `mkdocs-with-pdf`) was configured. PDF export is not available as an Astro integration, but `starlight-to-pdf` is a CLI tool that runs against the built Starlight site to produce equivalent PDFs.',
+    fix:
+      'Install the CLI manually: `npm i -D starlight-to-pdf`, then run `npx starlight-to-pdf <site-url>` after each `astro build`. Wire it into your CI release step if you publish PDFs alongside web docs. The converter does not auto-install CLI tools (only Astro integrations).',
+  },
+  {
+    id: 'plugin-exclude-mapped',
+    severity: 'warning',
+    description:
+      '`mkdocs-exclude` was configured. The plugin removes specific paths from the MkDocs build. Astro/Starlight has no in-config path exclusion: every file under `src/content/docs/` becomes a published page.',
+    fix:
+      'Pick one: (a) move excluded paths out of `src/content/docs/` so Astro never sees them; (b) add `draft: true` to the frontmatter of each excluded page (Astro skips drafts in production builds, includes them in dev); (c) write a custom Astro content-collection filter via `defineCollection({ filter })`. The converter does not auto-translate exclusion patterns because `mkdocs-exclude` accepts arbitrary glob expressions that Astro\'s collection model expresses differently.',
+  },
+  {
+    id: 'plugin-git-authors-mapped',
+    severity: 'info',
+    description:
+      '`mkdocs-git-authors-plugin` or `mkdocs-git-committers-2` was configured. Both add per-page contributor metadata derived from `git log`. Starlight has no first-class per-page author/contributor block.',
+    fix:
+      'For project-wide contributor display, install the `starlight-contributor-list` community plugin (a single footer block of all repo contributors). For true per-page authors, write a small Astro component that runs `git log --format=%an --follow <file>` at build time and renders the result in the page footer via a component override. The converter does not auto-install either path because both require project-specific styling decisions.',
+  },
+  {
+    id: 'plugin-mkdocs-bibtex-no-equivalent',
+    severity: 'warning',
+    description:
+      '`mkdocs-bibtex` was configured. The plugin reads a `.bib` file and renders citations + bibliography pages. Starlight has no built-in citation system.',
+    fix:
+      'Pre-render citations to inline footnotes ahead of conversion (e.g. with Pandoc), or write a custom remark plugin that reads your `.bib` file and inlines `[@key]` references as footnotes. The converter does not auto-install a BibTeX pipeline.',
+  },
+  {
+    id: 'extra-consent-no-equivalent',
+    severity: 'warning',
+    description:
+      'mkdocs.yml `extra.consent` (Material\'s cookie consent dialog) was detected. Starlight has no built-in consent manager and does not auto-translate consent block configuration.',
+    fix:
+      'Install a third-party library such as `vanilla-cookieconsent` or `klaro`, configure it in a small Astro component, and wire the script into Starlight `head[]`. Alternatively, use a hosted consent management platform (OneTrust, Cookiebot) and add their snippet via `head[]`.',
+  },
+  {
+    id: 'extra-status-no-equivalent',
+    severity: 'info',
+    description:
+      'mkdocs.yml `extra.status` (Material\'s per-page lifecycle status name dictionary used with frontmatter `status: <key>`) was detected. Starlight has no equivalent dictionary mechanism.',
+    fix:
+      'Reproduce each status by placing a Starlight `<Badge>` inline next to the page heading in the affected pages (the file becomes `.mdx`). Alternatively, declare a `status` field in the docs frontmatter schema (`docsSchema().extend(...)`) and surface it via a custom PageTitle component override.',
+  },
+  {
+    id: 'tab-anchors-not-preserved',
+    severity: 'info',
+    description:
+      'Material content tabs were detected in a source file. Since pymdown-extensions 9.5.0 (with readable slugs since 9.6.0\'s `slugify` config), Material auto-generates an anchor link for each tab (e.g. `#linux`). Starlight\'s `<Tabs>+<TabItem>` has no `id` or anchor prop, so any in-page or cross-page links targeting a tab anchor will resolve to nothing after migration.',
+    fix:
+      'If your docs contain `[link](#tab-label)` references that targeted a specific tab, add a manual `<a id="tab-label" />` element inside the affected `<TabItem>` content (the file is already `.mdx` so JSX works). This restores anchor scrolling but does not activate a hidden tab — that requires client-side script. If no such cross-tab links exist, no action is required.',
+  },
+  {
+    id: 'material-tags-marker-detected',
+    severity: 'warning',
+    description:
+      'A Material `<!-- material/tags -->` index marker (with or without `{ scope, include, exclude, toc }` parameters) was detected in source. Material renders this marker as a list of all tagged pages; Starlight has no equivalent and the marker becomes an inert HTML comment in the converted output.',
+    fix:
+      'Install the `starlight-tags` community plugin (frostybee/starlight-tags) and replace this marker with its `<TagsList />` JSX component (the file becomes `.mdx`). Per-tag scoping/inclusion/exclusion that Material supports must be reproduced via the plugin\'s component props.',
+  },
+  {
+    id: 'frontmatter-search-boost',
+    severity: 'info',
+    description:
+      'Page frontmatter `search.boost: <number>` was detected — Material\'s Lunr per-page rank multiplier. Starlight\'s default Pagefind has no equivalent frontmatter field.',
+    fix:
+      'Pagefind ranking is configured at the site level via the `pagefind` option in `astro.config` (e.g. `weight`, `sort`), or per-element via `data-pagefind-weight` attributes inside the body. The boost frontmatter is dropped on conversion.',
+  },
+  {
+    id: 'frontmatter-search-exclude',
+    severity: 'info',
+    description:
+      'Page frontmatter `search.exclude: true` was detected — Material\'s Lunr per-page index exclusion.',
+    fix:
+      'Replace the `search: { exclude: true }` block with `pagefind: false` at the frontmatter top level for the same effect under Starlight\'s default Pagefind. For sub-page exclusion, use `data-pagefind-ignore` attributes inside the body.',
+  },
+  {
+    id: 'frontmatter-blog-categories',
+    severity: 'info',
+    description:
+      'Page frontmatter `categories:` was detected — Material blog plugin\'s thematic grouping field. `starlight-blog` does not have a separate categories taxonomy.',
+    fix:
+      'Either move category names into the `tags:` array (the converter does not auto-merge to avoid silent data shifts), or accept that `categories:` passes through as opaque YAML. `starlight-blog` only renders `tags:`.',
+  },
+  {
+    id: 'frontmatter-blog-pin',
+    severity: 'info',
+    description:
+      'Page frontmatter `pin: true|false` was detected — Material blog plugin\'s pin-to-top index feature. `starlight-blog` does not honor this field.',
+    fix:
+      'Reproduce by setting `featured: true` on the post (a `starlight-blog` convention surfaced in the sidebar) or by adjusting the post `date` field to control ordering.',
+  },
+  {
+    id: 'frontmatter-blog-links',
+    severity: 'info',
+    description:
+      'Page frontmatter `links:` was detected — Material blog plugin\'s related-reading list rendered in the post sidebar. `starlight-blog` has no equivalent.',
+    fix:
+      'Reproduce by inlining the links inside an "## Related" heading at the foot of the post body, or build a small Astro component that reads a `related:` frontmatter field via `getEntry()`.',
+  },
+  {
+    id: 'frontmatter-social-cards',
+    severity: 'info',
+    description:
+      'Page frontmatter `social:` block (`cards`, `cards_layout`, `cards_layout_options`) was detected — Material\'s per-page social-card override. The converter auto-wires `astro-og-canvas` for OG image generation, but per-page customisation works differently in Astro.',
+    fix:
+      'Edit the generator endpoint at `src/pages/og/[...slug].png.ts` and branch on the page slug or frontmatter for per-page layouts. To skip OG generation for a specific page, return a 404 from that endpoint when frontmatter sets `social.cards: false`. Hand-port any `cards_layout_options` (background_color, font_family) into the og-canvas configuration.',
+  },
+  {
+    id: 'blog-more-marker-detected',
+    severity: 'info',
+    description:
+      'A Material blog-post excerpt separator `<!-- more -->` was detected. `starlight-blog` derives post excerpts from frontmatter `excerpt:` (when present) or the first paragraph by default, not from an inline marker.',
+    fix:
+      'Move the intended excerpt content into an `excerpt:` frontmatter field on the post for parity, or accept `starlight-blog`\'s default behaviour (first paragraph). The marker passes through as an inert HTML comment.',
+  },
+  {
+    id: 'comments-frontmatter-detected',
+    severity: 'info',
+    description:
+      'Page frontmatter sets `comments: true`, Material\'s flag for activating an optional comments widget (typically Giscus). Starlight has no built-in comments system.',
+    fix:
+      'Install the `starlight-giscus` community plugin (dragomano/starlight-giscus) to recreate per-page comments via GitHub Discussions, or remove the `comments:` frontmatter key if comments were already disabled at the theme level.',
+  },
+  {
+    id: 'button-icon-stripped',
+    severity: 'info',
+    description:
+      'One or more icon shortcodes inside Material `.md-button` link labels resolved to a non-curated icon set (e.g. an obscure FontAwesome solid glyph) and were stripped from the emitted `<LinkButton>` label. The button text is clean, but the icon glyph is lost.',
+    fix:
+      'Three options. (1) Pass an `iconOverrides` map to the converter mapping each shortcode to the closest Starlight built-in icon name (see Starlight\'s icon catalog). (2) Edit the emitted `<LinkButton>` to add `<Icon name="…" slot="icon" />` from a custom Iconify integration if you need pixel-faithful icons. (3) Accept the loss if the icon was decorative.',
+    relatedFeatureId: 'buttons',
+  },
+  {
+    id: 'plugin-blog-custom-config',
+    severity: 'info',
+    description:
+      'Material\'s `blog` plugin has bespoke options beyond `enabled`, `blog_dir`, `post_dir` (defaults). `starlight-blog` accepts a different config shape and does not honor Material\'s URL templates, pagination knobs, author files, or category whitelists as-is.',
+    fix:
+      'Hand-port each option: URL formats (`post_url_format`, `archive_url_format`, `categories_url_format`) become Astro page route patterns under `src/content/docs/`. Pagination (`pagination_per_page`) maps to `starlight-blog`\'s `postsPerPage`. `authors_file` becomes the plugin\'s `authors` config object. `draft_if_future_date` requires a content-collection filter. `categories_allowed` requires the same filter plus a Zod schema enum.',
+    relatedFeatureId: 'plugin-blog',
+  },
+  {
+    id: 'extra-version-metadata',
+    severity: 'info',
+    description:
+      'mkdocs.yml `extra.version` carried `default:` and/or `alias: true` metadata beyond the bare `provider:` key. `starlight-versions` does not have a declarative `default`/`alias` field — both are reflected through the actual `versions: [...]` array in `astro.config`.',
+    fix:
+      'For `default:`, mark the matching entry as the canonical one (typically the first item, or the version without a date suffix). For `alias: true`, set each version\'s `label` field to `"<slug> (<alias>)"` so the dropdown surfaces both. The converter scaffolds the `versions: [{ slug: "2.0" }]` placeholder; edit it after migration.',
+  },
+  {
+    id: 'extra-tags-alias-map',
+    severity: 'info',
+    description:
+      'mkdocs.yml `extra.tags` (Material\'s tag-name → identifier alias map, paired with `theme.icon.tag.<id>` for per-tag icons) was detected. The `starlight-tags` plugin consumes plain-string tags from page frontmatter and does not have a built-in dictionary for assigning per-tag icons.',
+    fix:
+      'Tags will pass through as plain strings via `starlight-tags`. If per-tag icons matter to you, render them manually inside a custom Tag.astro component using your own slug → icon map. The `extra.tags` aliases themselves can be preserved by updating each page\'s `tags:` frontmatter to use the canonical (full) tag name rather than the abbreviation.',
+  },
+  {
+    id: 'copyright-text-detected',
+    severity: 'info',
+    description:
+      'mkdocs.yml `copyright:` was set. Starlight has no first-class `copyright` config option — the text would otherwise be silently dropped.',
+    fix:
+      'Recreate by overriding `Footer.astro` under `src/components/overrides/` with the supplied text rendered inside a `<footer class="sl-flex">` block, then register the override via Starlight `components: { Footer: "./src/components/overrides/Footer.astro" }`.',
+  },
+  {
+    id: 'repo-button-recommendation',
+    severity: 'info',
+    description:
+      'mkdocs.yml `repo_url` was set. The converter wires the URL into Starlight `editLink.baseUrl`, but does not auto-synthesise a header repo-button — Starlight surfaces repo links via the `social: [...]` config.',
+    fix:
+      'Add a `social` entry to your `astro.config` for the repo platform: `{ icon: "github" | "gitlab" | "bitbucket", label: <repo_name>, href: <repo_url> }`. Skip if you already had the same entry in mkdocs.yml `extra.social[]` (the converter has wired that path through).',
+  },
+  {
+    id: 'theme-icon-overrides-detected',
+    severity: 'info',
+    description:
+      'mkdocs.yml `theme.icon` overrides were detected. Starlight has its own icon catalog and slot system; most UI-chrome icons (menu, search, repo, edit, view, previous, next, top, close) cannot be remapped via config.',
+    fix:
+      'For UI-chrome overrides, reproduce via custom component overrides under `src/components/overrides/`. For `theme.icon.admonition.<type>`, set `<Aside icon="…">` per occurrence. For `theme.icon.tag.<id>`, build a custom Tag.astro component using your slug → icon map. For `theme.icon.logo`, pass `logo: { src }` in starlight() pointing at an SVG asset under `src/assets/`.',
+  },
+  {
+    id: 'theme-direction-rtl',
+    severity: 'info',
+    description:
+      'mkdocs.yml `theme.direction: rtl` was set. Starlight has no top-level direction switch — direction is applied per locale.',
+    fix:
+      'Add `dir: \'rtl\'` to the relevant Starlight `locales: { <code>: { label, lang, dir: \'rtl\' } }` entry. Starlight handles bidirectional text and the layout flip for the locale automatically.',
+  },
+  {
+    id: 'tablesort-detected',
+    severity: 'info',
+    description:
+      '`mkdocs.yml` `extra_javascript` references `tablesort`, Material\'s recommended approach for sortable tables. Astro/Starlight preserves the script reference but the `document$.subscribe(...)` initializer Material runs is MkDocs-specific and does not fire under Astro.',
+    fix:
+      'Add an Astro client script (in a custom Layout override) that runs `new Tablesort(table)` on every `<table>` after page load. Alternatively, accept the loss — most documentation tables do not need user-driven sorting.',
+  },
+  {
+    id: 'extra-analytics-provider-recommended',
+    severity: 'info',
+    description:
+      'mkdocs.yml `extra.analytics.provider` is set to a non-Google value (e.g. `plausible`, `tag-manager`, or a custom provider). The converter only auto-wires Google Analytics into Starlight `head[]`; other providers need a community plugin or a manual head[] script entry.',
+    fix:
+      'For Plausible: install `starlight-plausible` and pass your domain via plugin options. For GTM: install `starlight-gtm` and pass your container ID. For custom or other providers: add the provider\'s tracking snippet directly to your Starlight `head[]` config.',
+  },
+  {
+    id: 'extra-annotate-no-equivalent',
+    severity: 'info',
+    description:
+      'mkdocs.yml `extra.annotate` (custom Pygments selectors that Material uses to anchor popover code annotations to non-comment positions like JSON strings) was detected. Starlight code blocks (ExpressiveCode) do not render Material-style popover annotations at all — the converter already downgrades `(N)!` markers to plain `(N)` and leaves the trailing list as a numbered legend, so custom selectors have no effect.',
+    fix:
+      'No action required unless you want to reimplement the popover UX. To do so, write a custom MDX component (e.g. `<Annotation>`) under `src/components/` and replace the `(N)` markers manually with component invocations.',
+  },
+  {
+    id: 'code-block-opt-out-dropped',
+    severity: 'warning',
+    description:
+      'A fenced code block uses Material\'s per-block opt-out marker `.no-copy` or `.no-select` (e.g. ```` ``` { .yaml .no-copy } ````). ExpressiveCode (Starlight\'s code-block renderer) has no per-block toggle for the copy or select buttons, so these markers are silently stripped during conversion and the buttons remain enabled.',
+    fix:
+      'To globally hide the copy or selection buttons, customize ExpressiveCode plugins in `astro.config.mjs` — e.g., `expressiveCode: { plugins: [...remove the copy plugin] }`. Per-block disable is not supported by the Starlight code renderer; if you need it, replace the affected block with a custom MDX component or static `<pre>` markup.',
+  },
+  {
+    id: 'extra-css-code-customization-dropped',
+    severity: 'warning',
+    description:
+      'An `extra_css` file customizes Material\'s Pygments-based code rendering — either via Material CSS variables (`--md-code-hl-string-color`, `--md-code-fg-color`, `--md-code-bg-color`, `--md-code-hl-color`) or via Pygments token classes under `.highlight` / `.codehilite` (e.g. `.highlight .sb { color: ... }`). ExpressiveCode (Starlight\'s code renderer) uses Shiki inline-style colors, not Pygments classes, so these rules will have no effect on the rendered code.',
+    fix:
+      'Author a custom Shiki theme JSON (export the colors you want for each token type) and pass it to `expressiveCode: { themes: [...] }` in `astro.config.mjs`. To recolor the surrounding frame (background/foreground), use ExpressiveCode\'s `styleOverrides` option. The original CSS file is still copied through to the output and may continue to style non-code elements; only the code-block selectors are inert.',
+  },
+  {
+    id: 'github-alert-detected',
+    severity: 'info',
+    description:
+      'A GitHub-style alert blockquote (`> [!NOTE]`, `> [!TIP]`, `> [!IMPORTANT]`, `> [!WARNING]`, `> [!CAUTION]`) was detected in the source. Material does not natively render this syntax; Starlight does not either, but the `starlight-github-alerts` plugin transforms it into Starlight asides at build time.',
+    fix:
+      'No action required if you accept the auto-installed `starlight-github-alerts` plugin (added to `package.json` whenever any source file contains alerts). Alternative: convert each alert manually to a Starlight `:::note` / `:::tip` / `:::caution` / `:::danger` aside directive.',
+  },
+  {
+    id: 'nav-multi-topic-detected',
+    severity: 'info',
+    description:
+      'mkdocs.yml `nav:` has 2+ top-level sections each with their own subtree — Material\'s "navigation topics" pattern, where each section renders as its own sidebar root. Starlight by default flattens all sections into a single sidebar tree, which works but loses the clean per-topic separation.',
+    fix:
+      'Install the `starlight-sidebar-topics` community plugin (HiDeoo) for the closest equivalent to Material\'s behaviour: each top-level section becomes a switchable "topic" with its own scoped sidebar. If a single combined sidebar is acceptable, no action is needed — the converter\'s default output already builds a valid nav.',
+  },
+  {
+    id: 'heading-badge-class-detected',
+    severity: 'info',
+    description:
+      'An ATX heading carried an `attr_list` CSS class (e.g. `## What\'s New { .badge }`, `### Beta { .new }`). Starlight has no first-class API for classes on headings — the converter strips the `{ ... }` blob — so the styling is silently lost. The most common Material idiom for this is heading badges.',
+    fix:
+      'If the class was a heading badge, install the `starlight-heading-badges` plugin and re-add the badge as inline `<Badge>` JSX next to the heading text. If the class served another purpose (TOC exclusion, layout hint, custom styling), reproduce it via custom CSS or a rehype plugin — Starlight intentionally does not preserve heading-level classes.',
+  },
+  {
+    id: 'output-syntax-error',
+    severity: 'error',
+    description:
+      'A converted file failed to parse under the same MDX/Markdown parser Astro/Starlight uses at build time. The file would crash `astro build`.',
+    fix:
+      'Inspect the file at the reported line/column and fix the offending syntax. Common causes: an HTML element that needs to be self-closed in MDX, a `{` that MDX is interpreting as a JSX expression, an autolink `<https://…>` MDX rejects, or remark-stringify escaping that produced invalid syntax.',
+  },
+  {
+    id: 'output-validator-unavailable',
+    severity: 'info',
+    description:
+      'Output syntax validation was skipped because `@mdx-js/mdx` (the parser Astro uses) is not installed in the converter\'s runtime.',
+    fix:
+      'Install `@mdx-js/mdx` (or run the converter under Node with that package available) to enable post-conversion MDX/Markdown parse validation.',
   },
 ];
 

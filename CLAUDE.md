@@ -135,9 +135,9 @@ When you add a new transform/normalizer/plugin handler, the workflow is:
 ## CLI surface
 
 ```
-mkdocs-to-starlight <project-dir> <output-dir> [options]
-mkdocs-to-starlight <project-dir> --explain
-mkdocs-to-starlight compare <baseline-url> <converted-url> [options]
+mkdocs-material-to-starlight <project-dir> <output-dir> [options]
+mkdocs-material-to-starlight <project-dir> --explain
+mkdocs-material-to-starlight compare <baseline-url> <converted-url> [options]
 ```
 
 Convert options: `--snippet-base-path <path>` (repeatable), `--check` (run
@@ -166,8 +166,28 @@ contract and is covered by smoke tests.
 - `interface/api/convert-site.ts` — top-level shell that wires everything for
   the CLI and the programmatic API. New plugins/features get detected and
   threaded through here.
+- `interface/cli/main.ts` + `interface/cli/parse-args.ts` — CLI dispatcher
+  (convert / `--explain` / `compare` / interactive wizard). Argument parsing
+  and exit-code policy live here.
+- `interface/cli/wizard-runner.ts` + `domain/wizard/` + `use-cases/wizard/` +
+  `infrastructure/prompts/` — the interactive wizard subsystem. Auto-detects
+  features in `mkdocs.yml` and only asks about decisions that apply.
+- `domain/visual-diff/` + `use-cases/visual-diff/` + `infrastructure/browser/`
+  + `infrastructure/image/` — the `compare` subcommand pipeline. Optional
+  Playwright + pixelmatch adapters; lazy-imported, surface `driver-missing`
+  if the peer deps aren't installed.
 - `tests/integration/api-convert-site.test.ts` — end-to-end smoke for new
   features. If you wire a new plugin into `interface/api/`, add a test here.
+- `tests/integration/nesting-regression.test.ts` — structural-regression
+  suite for nested constructs (cards-in-grids, tabs-in-tabs). Asserts
+  containment, not just presence; catches the bugs that "presence" assertions
+  miss. Add a case here when you nest a new construct.
+- `tests/properties/` — idempotency property tests run the full pipeline
+  twice on the fixture corpus and assert byte-equality. Failure here means
+  order-coupling somewhere in the transform stack.
+- `tests/fixtures/real-world/` — real MkDocs sites (FastAPI, Pydantic, Polars,
+  httpx, Typer, SQLModel, AWS Nuke, Privacy Guides) with checked-in `*-out/`
+  expected outputs. Update both sides when you change emitter behavior.
 
 ## When in doubt
 

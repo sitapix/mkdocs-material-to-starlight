@@ -12,12 +12,12 @@ describe('createDiagnostic', () => {
       severity: 'warning',
       ruleId: 'mkdocs-admonition-inline-modifier-dropped',
       message: 'inline-end modifier dropped; restore via custom CSS',
-      source: 'mkdocs-to-starlight',
+      source: 'mkdocs-material-to-starlight',
     });
     expect(d.severity).toBe('warning');
     expect(d.ruleId).toBe('mkdocs-admonition-inline-modifier-dropped');
     expect(d.message).toBe('inline-end modifier dropped; restore via custom CSS');
-    expect(d.source).toBe('mkdocs-to-starlight');
+    expect(d.source).toBe('mkdocs-material-to-starlight');
     expect(d.place).toBeUndefined();
   });
 
@@ -26,7 +26,7 @@ describe('createDiagnostic', () => {
       severity: 'info',
       ruleId: 'snippet-expanded',
       message: 'expanded snippet at this location',
-      source: 'mkdocs-to-starlight',
+      source: 'mkdocs-material-to-starlight',
       place: { line: 42, column: 1 },
     });
     expect(d.place).toEqual({ line: 42, column: 1 });
@@ -38,7 +38,7 @@ describe('createDiagnostic', () => {
         severity: 'warning',
         ruleId: '',
         message: 'x',
-        source: 'mkdocs-to-starlight',
+        source: 'mkdocs-material-to-starlight',
       }),
     ).toThrow(/ruleId/);
   });
@@ -49,7 +49,7 @@ describe('createDiagnostic', () => {
         severity: 'warning',
         ruleId: 'r',
         message: '',
-        source: 'mkdocs-to-starlight',
+        source: 'mkdocs-material-to-starlight',
       }),
     ).toThrow(/message/);
   });
@@ -67,7 +67,7 @@ describe('isFatal', () => {
         severity,
         ruleId: 'r',
         message: 'm',
-        source: 'mkdocs-to-starlight',
+        source: 'mkdocs-material-to-starlight',
       });
       expect(isFatal(d)).toBe(expected);
     }

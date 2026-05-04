@@ -47,13 +47,13 @@ export interface CliOverrides {
 
 const VERSION = '0.1.0';
 
-const HELP_TEXT = `mkdocs-to-starlight — convert a MkDocs Material site to Astro Starlight
+const HELP_TEXT = `mkdocs-material-to-starlight — convert a MkDocs Material site to Astro Starlight
 
 Usage:
-  mkdocs-to-starlight                                  (interactive wizard)
-  mkdocs-to-starlight <project-dir> <output-dir> [options]
-  mkdocs-to-starlight <project-dir> --explain
-  mkdocs-to-starlight compare <baseline-url> <converted-url> [options]
+  mkdocs-material-to-starlight                                  (interactive wizard)
+  mkdocs-material-to-starlight <project-dir> <output-dir> [options]
+  mkdocs-material-to-starlight <project-dir> --explain
+  mkdocs-material-to-starlight compare <baseline-url> <converted-url> [options]
 
 General:
   -y, --yes                Accept defaults non-interactively (CI-safe)
@@ -135,7 +135,7 @@ export async function runCli(
     if (wizard.kind === 'cancelled') return 130;
     if (wizard.kind === 'non-interactive') return 2;
     io.stdout(
-      `Equivalent command: mkdocs-to-starlight ${wizard.equivalentFlags.join(' ')}`,
+      `Equivalent command: mkdocs-material-to-starlight ${wizard.equivalentFlags.join(' ')}`,
     );
     return runConvert(wizard.command, io, overrides);
   }

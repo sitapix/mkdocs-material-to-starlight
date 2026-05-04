@@ -3,15 +3,15 @@
 **Status:** Draft
 **Date:** 2026-05-02
 **Owner:** straightcheelingbro@gmail.com
-**Scope:** add an interactive TUI to `mkdocs-to-starlight` so users can run `npx mkdocs-to-starlight` with no arguments and be walked through a one-shot migration. Existing POSIX-style flags continue to work unchanged for scripted/CI use.
+**Scope:** add an interactive TUI to `mkdocs-material-to-starlight` so users can run `npx mkdocs-material-to-starlight` with no arguments and be walked through a one-shot migration. Existing POSIX-style flags continue to work unchanged for scripted/CI use.
 
 ---
 
 ## 1. Goals
 
-1. **Zero-arg launch.** `npx mkdocs-to-starlight` (no positionals, no flags) → wizard. Any flag/positional present → current non-interactive behavior.
+1. **Zero-arg launch.** `npx mkdocs-material-to-starlight` (no positionals, no flags) → wizard. Any flag/positional present → current non-interactive behavior.
 2. **Tiered prompt set.** Vanilla MkDocs sites see ~5 questions; complex sites surface conditional prompts only when the underlying feature is detected. An "Advanced" menu at the end exposes power-user toggles.
-3. **POSIX-compliant flag surface.** Every wizard answer maps to a flag, so `npx mkdocs-to-starlight … --yes` runs unattended and produces the same output as the wizard's defaults.
+3. **POSIX-compliant flag surface.** Every wizard answer maps to a flag, so `npx mkdocs-material-to-starlight … --yes` runs unattended and produces the same output as the wizard's defaults.
 4. **TTY/CI etiquette.** Honor `NO_COLOR`, `FORCE_COLOR`, `CI`. Auto-disable prompts when stdin/stdout aren't TTYs. Explicit flags override env.
 5. **npx-friendly.** Lazy-import @clack/prompts so the cold-start cost when running `--yes` (no wizard) stays near current.
 6. **Testable without a terminal.** Wizard logic is pure orchestration over a `Prompter` port. The clack adapter is one thin file with a smoke test.
@@ -218,7 +218,7 @@ Three new `ruleId`s land in `domain/diagnostics/registry.ts`:
 
 ## 8. UX details
 
-- **Intro:** `intro(picocolors.bgCyan(' mkdocs-to-starlight '))` + a one-line description.
+- **Intro:** `intro(picocolors.bgCyan(' mkdocs-material-to-starlight '))` + a one-line description.
 - **Outro:** `outro('Done. Next: cd <out-dir> && <pm> install && <pm> run dev')`. The `<pm>` placeholder uses the picked package manager. Non-interactive `--yes` mode emits the same line through stderr.
 - **Spinner:** wraps the actual conversion call (the slow part) with `spinner()`; `succeed`/`fail` on completion. The pre-pass `--explain` is fast enough to skip the spinner.
 - **Hyperlinks:** OSC 8 hyperlinks for documentation references (e.g., the Starlight config docs link in the outro). Falls back to plain URLs in non-supporting terminals.

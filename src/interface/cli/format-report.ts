@@ -9,9 +9,16 @@
  *   <source-path>:<line>:<column>  <severity>  <ruleId>  <message>
  *
  * Followed by a summary of severity counts.
+ *
+ * Security: every interpolated string (sourcePath, ruleId, message) is
+ * passed through `sanitizeForSingleLine` to defend against terminal-escape
+ * injection (CWE-150). A hostile mkdocs.yml or third-party error message
+ * could otherwise embed cursor-movement / window-title sequences that
+ * compromise the user's terminal session.
  */
 
 import type { TaggedDiagnostic } from '../../use-cases/convert-site/convert.js';
+import { sanitizeForSingleLine } from '../../infrastructure/terminal/sanitize-terminal-output.js';
 
 export function formatReport(diagnostics: ReadonlyArray<TaggedDiagnostic>): string {
   if (diagnostics.length === 0) {
@@ -27,12 +34,15 @@ export function formatReport(diagnostics: ReadonlyArray<TaggedDiagnostic>): stri
 }
 
 function formatOne(tagged: TaggedDiagnostic): string {
+  const safePath = sanitizeForSingleLine(tagged.sourcePath);
+  const safeRuleId = sanitizeForSingleLine(tagged.diagnostic.ruleId);
+  const safeMessage = sanitizeForSingleLine(tagged.diagnostic.message);
   const place = tagged.diagnostic.place;
   const locator =
     place === undefined
-      ? tagged.sourcePath
-      : `${tagged.sourcePath}:${String(place.line)}:${String(place.column)}`;
-  return `${locator}  ${tagged.diagnostic.severity}  ${tagged.diagnostic.ruleId}  ${tagged.diagnostic.message}`;
+      ? safePath
+      : `${safePath}:${String(place.line)}:${String(place.column)}`;
+  return `${locator}  ${tagged.diagnostic.severity}  ${safeRuleId}  ${safeMessage}`;
 }
 
 function summarize(diagnostics: ReadonlyArray<TaggedDiagnostic>): string {

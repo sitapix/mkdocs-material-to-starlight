@@ -42,6 +42,35 @@ describe('injectStarlightImports', () => {
     expect(importIdx).toBeGreaterThanOrEqual(fmEnd);
   });
 
+  it('emits a BLANK LINE between the import and the body content (MDX hygiene)', () => {
+    // Real-world bug: pydantic install.mdx ended up with the import
+    // immediately followed by body text, e.g.
+    //   import { Tabs } from '...';
+    //   Installation is as simple as:
+    // MDX accepts this, but tooling (and astro's MDX parser) is happier with
+    // an explicit blank line. The injector must produce:
+    //   import { Tabs } from '...';
+    //
+    //   Installation is as simple as:
+    const src = '---\ntitle: X\n---\n\nInstallation is as simple as:\n\n<Tabs></Tabs>\n';
+    const out = injectStarlightImports(src, ['Tabs']);
+    const lines = out.split('\n');
+    const importIdx = lines.findIndex((l) => l.startsWith('import '));
+    expect(importIdx).toBeGreaterThanOrEqual(0);
+    // The line immediately after the import must be empty (or a continuation
+    // import). Body content directly on the next line is the bug.
+    const nextLine = lines[importIdx + 1] ?? '';
+    expect(nextLine).toBe('');
+  });
+
+  it('also emits a blank line when no frontmatter is present', () => {
+    const out = injectStarlightImports('<Card>x</Card>\n', ['Card']);
+    const lines = out.split('\n');
+    const importIdx = lines.findIndex((l) => l.startsWith('import '));
+    const nextLine = lines[importIdx + 1] ?? '';
+    expect(nextLine).toBe('');
+  });
+
   it('does not inject when import line already present', () => {
     const src = "import { Aside } from '@astrojs/starlight/components';\n\n<Aside>x</Aside>\n";
     const out = injectStarlightImports(src, ['Aside']);

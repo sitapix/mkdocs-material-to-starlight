@@ -59,9 +59,15 @@ describe('detectLandingPage', () => {
       expect(result.text).toContain('tagline: The fast, modern framework');
     });
 
-    it('emits hero.image.file from the hero image', () => {
+    it('emits hero.image.html from the hero image (public-served path)', () => {
+      // Material's `images/logo.svg` is a relative path that Material
+      // resolves against the docs root. After conversion, it would be
+      // copied to `public/images/logo.svg` and is served from `/logo.svg`
+      // (basename, since the asset planner flattens). Starlight's hero
+      // schema requires `image.html` (raw markup) for public-folder paths
+      // because `image.file` only accepts src-relative bundled assets.
       const result = detectLandingPage(HERO_IMAGE_PAGE, 'index.md');
-      expect(result.text).toContain('file: images/logo.svg');
+      expect(result.text).toMatch(/html:.*\/logo\.svg/);
     });
 
     it('emits hero.actions with the first action as primary', () => {

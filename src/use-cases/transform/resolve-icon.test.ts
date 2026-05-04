@@ -30,6 +30,33 @@ describe('resolveIcon', () => {
     });
   });
 
+  it('maps paper-plane variants (Material docs canonical button-icon example) to forward-slash', () => {
+    // Material's "Adding icon buttons" reference uses
+    // `:fontawesome-solid-paper-plane:`. Starlight has no `paper-plane` icon,
+    // but `forward-slash` is its paper-airplane glyph (already used for the
+    // octicons-paper-airplane mapping).
+    expect(resolveIcon({ shortcode: ':fontawesome-solid-paper-plane:' })).toEqual({
+      kind: 'starlight-builtin',
+      name: 'forward-slash',
+      original: 'fontawesome-solid-paper-plane',
+    });
+    expect(resolveIcon({ shortcode: ':fontawesome-regular-paper-plane:' })).toEqual({
+      kind: 'starlight-builtin',
+      name: 'forward-slash',
+      original: 'fontawesome-regular-paper-plane',
+    });
+    expect(resolveIcon({ shortcode: ':material-send:' })).toEqual({
+      kind: 'starlight-builtin',
+      name: 'forward-slash',
+      original: 'material-send',
+    });
+    expect(resolveIcon({ shortcode: ':material-paper-airplane:' })).toEqual({
+      kind: 'starlight-builtin',
+      name: 'forward-slash',
+      original: 'material-paper-airplane',
+    });
+  });
+
   it('falls back to local-svg for an unmapped Material icon', () => {
     const result = resolveIcon({ shortcode: ':material-totally-made-up:' });
     expect(result).toEqual({

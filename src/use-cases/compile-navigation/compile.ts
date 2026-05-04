@@ -26,7 +26,7 @@ import {
   type Diagnostic,
 } from '../../domain/diagnostics/diagnostic.js';
 
-const SOURCE = 'mkdocs-to-starlight';
+const SOURCE = 'mkdocs-material-to-starlight';
 
 export interface NavCompileResult {
   readonly entries: ReadonlyArray<SidebarEntry>;

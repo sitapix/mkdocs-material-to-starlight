@@ -16,7 +16,16 @@ export interface MkdocsConfig {
   readonly docsDir: string;
   readonly useDirectoryUrls: boolean;
   readonly repoUrl: string | null;
+  /**
+   * Display label for the repository button. Material renders this next to
+   * the repo icon; Starlight surfaces it as the `social: [{ label }]` entry
+   * for the repo platform. When null, the converter falls back to the host
+   * platform name (e.g. "GitHub").
+   */
+  readonly repoName: string | null;
   readonly editUri: string | null;
+  /** Top-level `copyright:` text. Surfaced as a Footer-override diagnostic. */
+  readonly copyright: string | null;
   readonly theme: MkdocsTheme | null;
   readonly nav: ReadonlyArray<MkdocsNavEntry> | null;
   readonly plugins: ReadonlyArray<MkdocsPlugin>;

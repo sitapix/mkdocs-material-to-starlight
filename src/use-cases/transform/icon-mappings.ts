@@ -328,6 +328,15 @@ export const CURATED_ICON_MAP: Readonly<Record<string, string>> = {
   'fontawesome-solid-pencil': 'pencil',
   'fontawesome-solid-copy': 'copy',
   'fontawesome-solid-share': 'forward-slash',
+  // Send / paper-plane family. Material's canonical button-icon example
+  // (squidfunk.github.io/mkdocs-material/reference/buttons/) uses
+  // `:fontawesome-solid-paper-plane:`. Starlight has no paper-plane icon,
+  // but `forward-slash` is its paper-airplane glyph (also used by the
+  // octicons-paper-airplane mapping below).
+  'fontawesome-solid-paper-plane': 'forward-slash',
+  'fontawesome-regular-paper-plane': 'forward-slash',
+  'material-send': 'forward-slash',
+  'material-paper-airplane': 'forward-slash',
   'fontawesome-solid-download': 'cloud-download',
   'fontawesome-solid-upload': 'cloud-upload',
   'fontawesome-solid-cloud': 'cloud-download',

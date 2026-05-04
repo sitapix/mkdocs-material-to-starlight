@@ -4,20 +4,30 @@
  *   [Subscribe](https://example.com){ .md-button }
  *   [Subscribe](https://example.com){ .md-button .md-button--primary }
  *
- * Material uses `attr_list` to attach a CSS class to the link. Starlight has
- * a `<LinkButton>` component that mirrors this visually, but emitting JSX
- * forces the page to `.mdx`. We instead emit inline HTML
- * (`<a href="..." class="md-button">label</a>`) which works in plain `.md`,
- * preserves the link semantics, and lets the user opt into Starlight's
- * `<LinkButton>` per page if they want by upgrading the file to `.mdx`.
+ * Material uses `attr_list` to attach a CSS class to the link. Starlight ships
+ * `<LinkButton>` (`@astrojs/starlight/components`) which renders the same UI
+ * affordance natively; emitting it here lets Starlight's theme handle dark
+ * mode, focus rings, accessibility, and Liquid-Glass-style accent variants
+ * for free. The file is automatically promoted to `.mdx` by the downstream
+ * `detectMdxNeeds` step (PascalCase JSX tag → mdx).
  *
- * Idempotency: only `[label](url){ .md-button[ ...] }` patterns are
- * recognized; HTML output contains no `.md-button` source markers, so
- * `normalize(normalize(x)) === normalize(x)`.
+ * Variant mapping mirrors Material's two documented variants:
+ *   - `.md-button`                          → `variant="secondary"` (subtle CTA)
+ *   - `.md-button .md-button--primary`      → `variant="primary"`   (accent CTA)
+ *
+ * Icon shortcodes inside the link text (`[Send :fontawesome-solid-paper-plane:](#)`)
+ * are extracted via `extractLabelIcon`. Resolvable shortcodes are promoted
+ * to the `icon=` JSX prop; unresolved ones are stripped from the visible
+ * label so the user doesn't see a literal `:foo:` artifact.
+ *
+ * Idempotency: `<LinkButton …>` output contains no `.md-button` source markers,
+ * so `normalize(normalize(x)) === normalize(x)`.
  *
  * Fenced-code safety: lines inside triple-backtick fences are passed through
  * verbatim so a button example inside a code block is not rewritten.
  */
+
+import { extractLabelIcon } from '../transform/extract-label-icon.js';
 
 const FENCE = /^ {0,3}(```|~~~)/;
 const BUTTON_RE =
@@ -45,11 +55,15 @@ function rewriteLine(line: string): string {
       url: string;
       classes: string;
     };
-    const classNames = groups.classes
-      .split(/\s+/)
-      .filter((token) => token.startsWith('.'))
-      .map((token) => token.slice(1))
-      .join(' ');
-    return `<a href="${groups.url}" class="${classNames}">${groups.label}</a>`;
+    const variant = groups.classes.includes('.md-button--primary')
+      ? 'primary'
+      : 'secondary';
+    const { iconName, label } = extractLabelIcon({ rawLabel: groups.label });
+    const iconAttr = iconName === null ? '' : ` icon="${escapeAttr(iconName)}"`;
+    return `<LinkButton href="${escapeAttr(groups.url)}" variant="${variant}"${iconAttr}>${label}</LinkButton>`;
   });
+}
+
+function escapeAttr(text: string): string {
+  return text.replace(/"/g, '&quot;');
 }

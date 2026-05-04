@@ -1,23 +1,21 @@
-# mkdocs-to-starlight
+# mkdocs-material-to-starlight
+
+[![CI](https://github.com/sitapix/mkdocs-material-to-starlight/actions/workflows/ci.yml/badge.svg)](https://github.com/sitapix/mkdocs-material-to-starlight/actions/workflows/ci.yml)
+[![npm version](https://img.shields.io/npm/v/mkdocs-material-to-starlight.svg)](https://www.npmjs.com/package/mkdocs-material-to-starlight)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
+[![Node](https://img.shields.io/node/v/mkdocs-material-to-starlight.svg)](./package.json)
 
 Convert MkDocs Material documentation sites to Astro Starlight. Built on the unified/remark ecosystem with plugin-isolated, idempotent, diagnostic-first transforms.
 
 ## Quick start
 
-Install Node ≥ 20, then:
+Requires Node ≥ 20. Run the interactive wizard against your MkDocs project — no install needed:
 
 ```bash
-git clone <this repo>
-cd mkdocs-to-starlight
-npm install
-npm run build
+npx mkdocs-material-to-starlight
 ```
 
-Run on a real MkDocs Material project:
-
-```bash
-node ./dist/interface/cli/bin.js path/to/your-mkdocs-project ./output
-```
+The wizard auto-detects features in your `mkdocs.yml` and only asks about decisions that actually apply. When it finishes, it prints the equivalent unattended command so you can reproduce the run in CI.
 
 The output directory will contain a complete, buildable Astro/Starlight project:
 
@@ -38,13 +36,13 @@ Then `cd output && npm install && npm run dev`.
 
 ```sh
 # Interactive wizard (recommended for first-time conversions)
-npx mkdocs-to-starlight
+npx mkdocs-material-to-starlight
 
 # Unattended (CI / scripted)
-npx mkdocs-to-starlight ./mkdocs-project ./starlight-out --yes
+npx mkdocs-material-to-starlight ./mkdocs-project ./starlight-out --yes
 
 # See what will happen, without writing anything
-npx mkdocs-to-starlight ./mkdocs-project --explain
+npx mkdocs-material-to-starlight ./mkdocs-project --explain
 ```
 
 The wizard auto-detects features in your `mkdocs.yml` (tabs, snippets, RSS,
@@ -56,9 +54,9 @@ wizard prints at the end.
 ## CLI
 
 ```
-mkdocs-to-starlight <project-dir> <output-dir> [options]
-mkdocs-to-starlight <project-dir> --explain
-mkdocs-to-starlight compare <baseline-url> <converted-url> [options]
+mkdocs-material-to-starlight <project-dir> <output-dir> [options]
+mkdocs-material-to-starlight <project-dir> --explain
+mkdocs-material-to-starlight compare <baseline-url> <converted-url> [options]
 
 Convert options:
   --snippet-base-path <path>   Resolve PyMdown snippets against this directory.
@@ -154,7 +152,7 @@ src/
 ## Programmatic API
 
 ```ts
-import { convertSiteFromDisk } from 'mkdocs-to-starlight';
+import { convertSiteFromDisk } from 'mkdocs-material-to-starlight';
 
 const result = await convertSiteFromDisk({
   projectDir: '/path/to/mkdocs-project',
@@ -205,4 +203,4 @@ The structural regression suite in `tests/integration/nesting-regression.test.ts
 
 ## License
 
-MIT (forthcoming).
+[MIT](./LICENSE) © sitapix

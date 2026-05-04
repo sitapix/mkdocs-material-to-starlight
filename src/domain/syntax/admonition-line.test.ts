@@ -93,4 +93,30 @@ describe('parseAdmonitionLine', () => {
   it('does not mistake a quoted-string-containing paragraph for an admonition', () => {
     expect(parseAdmonitionLine('foo "bar"')).toBeNull();
   });
+
+  it('parses an unquoted title (lenient — Material expects quotes but real-world content drops them)', () => {
+    // Real-world example from pydantic: `!!! warning Polymorphic serialization of standard library dataclasses`
+    const out = parseAdmonitionLine('!!! warning Polymorphic serialization of standard library dataclasses');
+    expect(out).not.toBeNull();
+    expect(out?.type).toBe('warning');
+    expect(out?.title).toBe('Polymorphic serialization of standard library dataclasses');
+  });
+
+  it('parses a dash-prefixed unquoted title (real-world aws-nuke shape)', () => {
+    // Real-world example: `!!! warning - Cloud Control API - Alternative Resource`
+    const out = parseAdmonitionLine('!!! warning - Cloud Control API - Alternative Resource');
+    expect(out).not.toBeNull();
+    expect(out?.type).toBe('warning');
+    // Leading dash + space stripped; remaining text becomes the title
+    expect(out?.title).toBe('Cloud Control API - Alternative Resource');
+  });
+
+  it('parses an admonition with embedded quotes inside the title (greedy match)', () => {
+    // Real-world example from pydantic: `!!! note "on the "jsonable" nature of JSON schema"`
+    const out = parseAdmonitionLine('!!! note "on the "jsonable" nature of JSON schema"');
+    expect(out).not.toBeNull();
+    expect(out?.type).toBe('note');
+    // Title is the full text between the first and last quote
+    expect(out?.title).toBe('on the "jsonable" nature of JSON schema');
+  });
 });

@@ -41,7 +41,7 @@ const SHORTCODE_RE = /:[a-z][a-z0-9-]*[a-z0-9]:/g;
 // (other attrs are out of scope for Phase 1). The blob may contain other
 // attrs in any order; we extract title via a focused regex below.
 const TITLE_ATTR_RE = /\btitle\s*=\s*"([^"]*)"/;
-const SOURCE = 'mkdocs-to-starlight';
+const SOURCE = 'mkdocs-material-to-starlight';
 
 interface TextDirectiveLike {
   readonly type: 'textDirective';

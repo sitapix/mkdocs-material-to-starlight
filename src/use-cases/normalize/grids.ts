@@ -18,6 +18,8 @@
  * The card variant unwraps each top-level list item into a :::card directive,
  * UNLESS the card body is a single bare Markdown link — in that case it is
  * promoted directly to `<LinkCard title="..." href="...">` (Starlight native).
+ * If the link is followed by a single plain-prose paragraph, that paragraph
+ * is captured as the LinkCard's `description=` attribute.
  *
  * The generic variant simply wraps the body in :::grid. Unclosed grid blocks
  * are passed through verbatim — the caller may emit a diagnostic by searching
@@ -44,6 +46,14 @@ const FENCE = /^ {0,3}(```|~~~)/;
  * escapes inside an HTML attribute (e.g. `__Validators__` → bad).
  */
 const BARE_LINK_RE = /^\[([^\]_*:!\[]+)\]\(([^)]+)\)\s*$/;
+
+/**
+ * Material's icon shortcode (e.g. `:material-clock:`, `:fontawesome-solid-rocket:`,
+ * `:octicons-mark-github-16:`). Anchored with optional surrounding whitespace
+ * so the same pattern can strip leading and trailing forms.
+ */
+const ICON_LEADING_RE = /^:[A-Za-z][A-Za-z0-9_-]*:\s*/;
+const ICON_TRAILING_RE = /\s*:[A-Za-z][A-Za-z0-9_-]*:$/;
 
 export function normalizeCardGrids(source: string): string {
   const lines = source.split('\n');
@@ -145,21 +155,132 @@ function renderCardGrid(
 }
 
 /**
- * If the card body has a single non-blank line that is a bare Markdown link
- * and nothing else, return a `<LinkCard>` JSX self-closing tag. Otherwise null.
+ * If the card body's first non-blank line is a bare Markdown link AND either
+ * (a) nothing else follows, or
+ * (b) a single plain-prose paragraph follows after a blank line,
+ * return a `<LinkCard>` JSX self-closing tag (with optional `description=`).
+ * Otherwise null.
+ *
+ * "Plain-prose" rejects descriptions that contain markdown that would not
+ * render correctly as a string attribute: links (`[`), inline code (`` ` ``),
+ * raw HTML (`<`), block-level structures (lists, headings, quotes, fences,
+ * tables, horizontal rules), or multiple paragraphs.
  */
 function tryRenderLinkCard(
   indent: string,
   dedented: ReadonlyArray<string>,
 ): ReadonlyArray<string> | null {
-  const nonBlank = dedented.filter((l) => l.trim().length > 0);
-  if (nonBlank.length !== 1) return null;
-  const only = (nonBlank[0] ?? '').trim();
-  const m = BARE_LINK_RE.exec(only);
-  if (m === null) return null;
-  const title = (m[1] ?? '').trim();
-  const href = (m[2] ?? '').trim();
-  return [`${indent}<LinkCard title="${title}" href="${href}" />`];
+  const linkInfo = matchLeadingBareLink(dedented);
+  if (linkInfo === null) return null;
+  const { title, href, restStartIndex } = linkInfo;
+  const description = extractPlainDescription(dedented, restStartIndex);
+  if (description === 'reject') return null;
+  const attrs = description === null
+    ? `title="${title}" href="${href}"`
+    : `title="${title}" href="${href}" description="${escapeAttr(description)}"`;
+  return [`${indent}<LinkCard ${attrs} />`];
+}
+
+interface LeadingLink {
+  readonly title: string;
+  readonly href: string;
+  readonly restStartIndex: number;
+}
+
+/**
+ * Locate the first non-blank line and require it — after stripping a leading
+ * Material icon, a trailing Material icon, and a single pair of outer
+ * emphasis delimiters (`**…**`, `__…__`, `*…*`, `_…_`) — to be a bare
+ * Markdown link. Returns the captured title/href and the index of the line
+ * *after* the link line, so the caller can scan for a description paragraph.
+ */
+function matchLeadingBareLink(
+  dedented: ReadonlyArray<string>,
+): LeadingLink | null {
+  for (let i = 0; i < dedented.length; i += 1) {
+    const line = (dedented[i] ?? '').trim();
+    if (line.length === 0) continue;
+    const stripped = stripLinkPresentation(line);
+    const m = stripped.match(BARE_LINK_RE);
+    if (m === null) return null;
+    return {
+      title: (m[1] ?? '').trim(),
+      href: (m[2] ?? '').trim(),
+      restStartIndex: i + 1,
+    };
+  }
+  return null;
+}
+
+/**
+ * Strip Material-specific decoration around a link line so the underlying
+ * link can be matched: leading icon, trailing icon, then a single pair of
+ * outer emphasis delimiters. Each strip is conservative: applied at most
+ * once and only when the entire wrapper is present, never partially.
+ */
+function stripLinkPresentation(line: string): string {
+  let result = line.replace(ICON_LEADING_RE, '').replace(ICON_TRAILING_RE, '');
+  result = result.trim();
+  for (const delim of ['**', '__', '*', '_']) {
+    if (
+      result.length >= delim.length * 2 + 1 &&
+      result.startsWith(delim) &&
+      result.endsWith(delim)
+    ) {
+      result = result.slice(delim.length, result.length - delim.length).trim();
+      break;
+    }
+  }
+  return result;
+}
+
+/**
+ * Scan from `start` for an optional plain-prose description paragraph.
+ *
+ *   null      → no description (only blank lines remain). Caller emits a
+ *               LinkCard without a `description=` attribute.
+ *   'reject'  → there is content after the link, but it isn't a single
+ *               plain-prose paragraph. Caller falls back to `:::card`.
+ *   string    → the joined, single-spaced description text.
+ */
+function extractPlainDescription(
+  dedented: ReadonlyArray<string>,
+  start: number,
+): string | null | 'reject' {
+  let i = start;
+  while (i < dedented.length && (dedented[i] ?? '').trim().length === 0) {
+    i += 1;
+  }
+  if (i === dedented.length) return null;
+  const paragraph: string[] = [];
+  while (i < dedented.length && (dedented[i] ?? '').trim().length > 0) {
+    const line = (dedented[i] ?? '').trim();
+    if (!isPlainProseLine(line)) return 'reject';
+    paragraph.push(line);
+    i += 1;
+  }
+  while (i < dedented.length) {
+    if ((dedented[i] ?? '').trim().length > 0) return 'reject';
+    i += 1;
+  }
+  return paragraph.join(' ');
+}
+
+/**
+ * A plain-prose line has no characters that would render incorrectly as a
+ * string attribute and no leading block-level markdown markers.
+ */
+function isPlainProseLine(trimmed: string): boolean {
+  if (/[[`<]/.test(trimmed)) return false;
+  if (/^[#>|]/.test(trimmed)) return false;
+  if (/^([-*+]|\d+\.)\s/.test(trimmed)) return false;
+  if (/^(```|~~~)/.test(trimmed)) return false;
+  if (/^(-{3,}|={3,}|\*{3,}|_{3,})$/.test(trimmed)) return false;
+  return true;
+}
+
+function escapeAttr(text: string): string {
+  return text.replace(/"/g, '&quot;');
 }
 
 /**

@@ -19,6 +19,13 @@ export interface AstroConfigInput {
   readonly siteName: string;
   readonly siteDescription: string | null;
   readonly siteUrl: string | null;
+  /**
+   * MkDocs `use_directory_urls` setting. When false, the source site uses
+   * flat `/page.html` URLs; emit `build: { format: 'file' }` so Astro
+   * mirrors that shape. Astro's default (`directory`) matches the MkDocs
+   * default (`true`), so no entry is emitted in that case.
+   */
+  readonly useDirectoryUrls?: boolean;
   readonly sidebar: ReadonlyArray<SidebarEntry>;
   readonly detectedFeatures?: ReadonlyArray<DetectedFeature>;
   /** Slug-to-slug redirect map extracted from the `mkdocs-redirects` plugin. */
@@ -86,10 +93,18 @@ export function serializeAstroConfig(input: AstroConfigInput): string {
   const hasBlog = features.has('blog');
   const hasTags = features.has('tags');
   const hasLastUpdated = features.has('last-updated');
+  const hasKbd = features.has('kbd');
+  const hasGithubAlerts = features.has('github-alerts');
+  const hasAnnouncement = features.has('announcement');
+  const hasPageActions = features.has('page-actions');
 
   const imports: string[] = [
     `import { defineConfig } from 'astro/config';`,
     `import starlight from '@astrojs/starlight';`,
+    // Default-on AI-assistant accessibility plugin — emits llms.txt routes from
+    // Starlight content with no per-site config. Gap-analysis (2026-05-03)
+    // bundles this for every emitted Starlight project.
+    `import starlightLlmsTxt from 'starlight-llms-txt';`,
   ];
   if (hasMermaid) {
     imports.push(`import mermaid from 'astro-mermaid';`);
@@ -106,6 +121,18 @@ export function serializeAstroConfig(input: AstroConfigInput): string {
   if (hasTags) {
     imports.push(`import starlightTags from 'starlight-tags';`);
   }
+  if (hasKbd) {
+    imports.push(`import starlightKbd from 'starlight-kbd';`);
+  }
+  if (hasGithubAlerts) {
+    imports.push(`import starlightGithubAlerts from 'starlight-github-alerts';`);
+  }
+  if (hasAnnouncement) {
+    imports.push(`import starlightAnnouncement from 'starlight-announcement';`);
+  }
+  if (hasPageActions) {
+    imports.push(`import starlightPageActions from 'starlight-page-actions';`);
+  }
   if (hasMath) {
     imports.push(`import remarkMath from 'remark-math';`);
     imports.push(`import rehypeKatex from 'rehype-katex';`);
@@ -118,6 +145,12 @@ export function serializeAstroConfig(input: AstroConfigInput): string {
 
   if (input.siteUrl !== null) {
     lines.push(`  site: ${quote(input.siteUrl)},`);
+  }
+  if (input.useDirectoryUrls === false) {
+    // Mirror MkDocs `use_directory_urls: false` so flat `/page.html` URLs
+    // continue to work after migration. Astro's default is `directory`,
+    // which matches MkDocs' default — emit only when the user opted out.
+    lines.push("  build: { format: 'file' },");
   }
 
   const redirects = input.redirects ?? {};
@@ -223,33 +256,58 @@ export function serializeAstroConfig(input: AstroConfigInput): string {
     lines.push('      },');
   }
   const enableLinksValidator = input.enableLinksValidator === true;
-  if (hasImageZoom || hasVersions || hasBlog || hasTags || enableLinksValidator) {
-    lines.push('      plugins: [');
-    if (hasImageZoom) {
-      lines.push('        imageZoom(),');
-    }
-    if (hasVersions) {
-      const versionSlugs = input.mikeVersions;
-      if (versionSlugs === undefined) {
-        lines.push('        starlightVersions({ versions: [{ slug: \'2.0\' }] }),');
-      } else if (versionSlugs.length === 0) {
-        lines.push('        starlightVersions({ versions: [] }),');
-      } else {
-        const vList = versionSlugs.map((s) => `{ slug: ${quote(s)} }`).join(', ');
-        lines.push(`        starlightVersions({ versions: [${vList}] }),`);
-      }
-    }
-    if (hasBlog) {
-      lines.push('        starlightBlog(),');
-    }
-    if (hasTags) {
-      lines.push('        starlightTags(),');
-    }
-    if (enableLinksValidator) {
-      lines.push('        starlightLinksValidator(),');
-    }
-    lines.push('      ],');
+  // starlight-llms-txt is unconditional — every emitted site gets it (see import block).
+  lines.push('      plugins: [');
+  lines.push('        starlightLlmsTxt(),');
+  if (hasImageZoom) {
+    lines.push('        imageZoom(),');
   }
+  if (hasVersions) {
+    const versionSlugs = input.mikeVersions;
+    if (versionSlugs === undefined) {
+      lines.push('        starlightVersions({ versions: [{ slug: \'2.0\' }] }),');
+    } else if (versionSlugs.length === 0) {
+      lines.push('        starlightVersions({ versions: [] }),');
+    } else {
+      const vList = versionSlugs.map((s) => `{ slug: ${quote(s)} }`).join(', ');
+      lines.push(`        starlightVersions({ versions: [${vList}] }),`);
+    }
+  }
+  if (hasBlog) {
+    lines.push('        starlightBlog(),');
+  }
+  if (hasTags) {
+    lines.push('        starlightTags(),');
+  }
+  if (hasKbd) {
+    // starlight-kbd 0.4.0+ requires a `types` array with exactly one
+    // entry flagged `default: true`. Material's `pymdownx.keys` doesn't
+    // carry layout metadata, so emit a single default type the user can
+    // extend.
+    lines.push("        starlightKbd({ types: [{ id: 'default', label: 'Keyboard', default: true }] }),");
+  }
+  if (hasGithubAlerts) {
+    lines.push('        starlightGithubAlerts(),');
+  }
+  if (hasAnnouncement) {
+    // Plugin requires user to fill in announcement text/schedule; converter
+    // emits a placeholder so users know exactly what to fill in.
+    lines.push('        starlightAnnouncement({ title: \'Announcement\', message: \'Configure starlight-announcement options here.\' }),');
+  }
+  if (hasPageActions) {
+    lines.push('        starlightPageActions(),');
+  }
+  if (enableLinksValidator) {
+    // Migrated MkDocs sites routinely link to pages that the original
+    // build generated dynamically (`mkdocs-click` produces a CLI reference,
+    // `mkdocstrings` produces autodoc pages, etc.) but the converter
+    // cannot reproduce statically. The plugin's strict defaults make those
+    // links fatal at build time. Soften the policy so the build completes
+    // and surface broken-link information via the converter's own
+    // `broken-link` diagnostic in MIGRATION_NOTES.md instead.
+    lines.push('        starlightLinksValidator({ errorOnRelativeLinks: false, errorOnInvalidHashes: false, errorOnLocalLinks: false }),');
+  }
+  lines.push('      ],');
   lines.push('    }),');
   if (hasMermaid) {
     lines.push('    mermaid(),');

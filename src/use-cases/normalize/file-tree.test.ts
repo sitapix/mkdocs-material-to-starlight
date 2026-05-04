@@ -128,5 +128,53 @@ describe('normalizeFileTrees', () => {
       expect(result.promoted).toBe(false);
       expect(result.text).toBe(src);
     });
+
+    it('does NOT mistake a closing fence of a non-tree code block as a tree fence open (fastapi regression)', () => {
+      // Real-world fastapi index.md regression: the closing ``` of a Python
+      // code block was misread as the OPENING of a no-language fence, then
+      // the promoter swallowed everything up to the next ``` (a console
+      // block 30 lines later) and emitted that as a <FileTree>. Result:
+      // unrelated prose, headings, and HTML wrapped in <FileTree> bullets.
+      // The console block contains many `│` characters (the file-tree box-
+      // drawing detector) so the heuristic falsely classifies the absorbed
+      // content as a directory tree.
+      const src = [
+        '```Python',
+        'from foo import bar',
+        '```',                       // close of Python fence
+        '',
+        '**Note**:',                 // first non-blank after close
+        '',
+        'Some prose with no tree structure.',
+        '',
+        '```console',
+        '$ run',
+        '│ row 1 │',
+        '│ row 2 │',
+        '│ row 3 │',
+        '│ row 4 │',
+        '```',
+        '',
+      ].join('\n');
+      const result = normalizeFileTrees(src);
+      expect(result.promoted).toBe(false);
+      expect(result.text).not.toContain('<FileTree>');
+    });
+
+    it('does NOT promote a fence whose first non-blank line is markdown prose, not a directory name', () => {
+      // The first-line heuristic must reject obvious-prose tokens like bold
+      // (`**X**`), punctuated text (`Note:`), or anything with formatting —
+      // not just things containing slashes or spaces.
+      const src = [
+        '```',
+        '**Note**:',
+        '├── stuff',
+        '└── more',
+        '```',
+        '',
+      ].join('\n');
+      const result = normalizeFileTrees(src);
+      expect(result.promoted).toBe(false);
+    });
   });
 });

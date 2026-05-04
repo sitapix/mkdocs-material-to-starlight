@@ -62,7 +62,7 @@ describe('comprehensive end-to-end conversion', () => {
     }
 
     const indexOut = readFileSync(
-      join(outputDir, 'src', 'content', 'docs', 'index.md'),
+      join(outputDir, 'src', 'content', 'docs', 'index.mdx'),
       'utf8',
     );
 
@@ -76,10 +76,10 @@ describe('comprehensive end-to-end conversion', () => {
     expect(indexOut).toContain('<details>');
     expect(indexOut).toContain('<summary>Click to reveal</summary>');
 
-    // Content tabs
-    expect(indexOut).toContain('<div class="sl-tabs">');
-    expect(indexOut).toContain('data-label="macOS"');
-    expect(indexOut).toContain('data-label="Linux"');
+    // Content tabs → Starlight <Tabs>+<TabItem> (default MDX mode)
+    expect(indexOut).toContain('<Tabs>');
+    expect(indexOut).toContain('<TabItem label="macOS">');
+    expect(indexOut).toContain('<TabItem label="Linux">');
 
     // Card grid
     expect(indexOut).toContain('<div class="sl-card-grid">');

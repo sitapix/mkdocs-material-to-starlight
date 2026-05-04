@@ -165,8 +165,8 @@ const TABLE: ReadonlyArray<MappingRow> = [
     featureId: 'buttons',
     materialInput: '[label](url){ .md-button[ .md-button--primary] }',
     requiredExtensions: ['attr_list'],
-    starlightOutput: '<a href="url" class="md-button[ md-button--primary]">label</a> (or <LinkButton> in .mdx)',
-    fileExt: 'md',
+    starlightOutput: '`<LinkButton href="url" variant="secondary|primary">label</LinkButton>` Starlight built-in component; file promoted to `.mdx`. Inline icon shortcodes (e.g. `:material-rocket:`) are extracted into the `icon=` prop when they resolve to a Starlight built-in icon.',
+    fileExt: 'mdx',
     conversionType: 'text-pre-parse',
     risk: 'low',
   },
@@ -273,7 +273,7 @@ const TABLE: ReadonlyArray<MappingRow> = [
     featureId: 'plugin-mike',
     materialInput: 'mkdocs.yml plugins: [mike] (versioning plugin)',
     requiredExtensions: [],
-    starlightOutput: 'starlight-versions Starlight plugin auto-wired (versions list left as a stub)',
+    starlightOutput: 'starlight-versions Starlight plugin auto-wired (versions list left as a stub); starlight-changelogs companion package added to package.json deps so users can publish release notes alongside the version switcher',
     fileExt: 'md',
     conversionType: 'recommended-dep',
     risk: 'medium',
@@ -479,7 +479,7 @@ const TABLE: ReadonlyArray<MappingRow> = [
     materialInput:
       'mkdocs.yml `theme.logo`, `theme.favicon`, and `theme.icon.{logo,repo,edit,view,admonition,tag,previous,next}` keys',
     starlightOutput:
-      'logo asset copied into src/assets/ and wired as `logo: { src, alt }`; favicon copied into public/ and linked via `head: [{ tag: "link", attrs: { rel: "icon", href: "..." } }]`; `theme.icon.repo` mapped to `social: [{ icon }]`; remaining `theme.icon.*` keys (admonition, tag, previous, next, edit, view) are dropped with a diagnostic — Starlight has no equivalent override surface',
+      'logo asset copied into src/assets/ and wired as `logo: { src, alt }`; favicon copied into public/ and linked via `head: [{ tag: "link", attrs: { rel: "icon", href: "..." } }]`; `theme.icon.repo` mapped to `social: [{ icon }]`; remaining `theme.icon.*` keys (admonition, tag, previous, next, edit, view) are dropped with a diagnostic — Starlight has no equivalent first-party override surface, but `starlight-plugin-icons` provides PARTIAL coverage (sidebar, codeblock, and filetree icon customization). Admonition / page-action icon overrides remain unmapped and require component overrides.',
     requiredExtensions: [],
     fileExt: 'md',
     conversionType: 'recommended-dep',
@@ -502,7 +502,7 @@ const TABLE: ReadonlyArray<MappingRow> = [
       'mkdocs.yml `theme.features` list — navigation.tabs, navigation.sections, navigation.expand, navigation.path, navigation.indexes, navigation.tracking, navigation.instant, navigation.prune, navigation.top, toc.integrate, toc.follow, header.autohide, content.tabs.link, content.code.copy, content.action.edit, content.action.view, search.suggest, search.highlight, search.share, announce.dismiss',
     requiredExtensions: [],
     starlightOutput:
-      'per-feature mapping: navigation.indexes → starlight `pagefind` + group index pages (no-op, on by default); navigation.instant → no-op (Astro view transitions handle this via `<ClientRouter />`); content.action.edit → starlight `editLink: { baseUrl }`; content.action.view → no equivalent (diagnostic); navigation.tabs → top-level sidebar groups (Starlight default); toc.integrate, toc.follow, header.autohide, navigation.prune → diagnostic-only (no Starlight equivalent); search.* → replaced by Pagefind defaults',
+      'per-feature mapping: navigation.indexes → starlight `pagefind` + group index pages (no-op, on by default); navigation.instant → no-op (Astro view transitions handle this via `<ClientRouter />`); content.action.edit → starlight `editLink: { baseUrl }`; content.action.view → `starlight-page-actions` (auto-installed); announce.dismiss → `starlight-announcement` (auto-installed); navigation.tabs → top-level sidebar groups (Starlight default); toc.integrate, toc.follow, header.autohide, navigation.prune → diagnostic-only (no Starlight equivalent); search.* → replaced by Pagefind defaults',
     fileExt: 'md',
     conversionType: 'recommended-dep',
     risk: 'medium',
@@ -545,7 +545,7 @@ const TABLE: ReadonlyArray<MappingRow> = [
       'mkdocs.yml header surface — `extra.announce` (or overrides/main.html announcement bar), `repo_url` + `repo_name` + `edit_uri`, `theme.features: [announce.dismiss, header.autohide]`',
     requiredExtensions: [],
     starlightOutput:
-      'announcement → starlight `banner: { content }`; repo_url/repo_name → `social: [{ icon: "github" | "gitlab" | "bitbucket", label, href }]`; edit_uri → `editLink: { baseUrl }`; announce.dismiss + header.autohide have no Starlight equivalent (diagnostic)',
+      'announcement → starlight `banner: { content }`; repo_url/repo_name → `social: [{ icon: "github" | "gitlab" | "bitbucket", label, href }]`; edit_uri → `editLink: { baseUrl }`; announce.dismiss → `starlight-announcement` (auto-installed); header.autohide has no Starlight equivalent (diagnostic)',
     fileExt: 'md',
     conversionType: 'recommended-dep',
     risk: 'medium',
@@ -651,10 +651,10 @@ const TABLE: ReadonlyArray<MappingRow> = [
   {
     featureId: 'grid-cards-linkcard',
     materialInput:
-      'A `<div class="grid cards">` card whose body is a single bullet containing a single link (`- [Title](href)`) — a pure navigation card',
+      'A `<div class="grid cards">` card whose body is either a single bare Markdown link (`- [Title](href)`) or a bare link followed by a single plain-prose paragraph — a navigation card with optional description',
     requiredExtensions: ['attr_list', 'md_in_html'],
     starlightOutput:
-      '`<LinkCard title="Title" href="/slug">` Starlight built-in component; file promoted to `.mdx`',
+      '`<LinkCard title="Title" href="/slug">` (or `<LinkCard title=… href=… description="…">` when a plain paragraph follows the link) Starlight built-in component; file promoted to `.mdx`',
     fileExt: 'mdx',
     conversionType: 'text-pre-parse',
     risk: 'low',

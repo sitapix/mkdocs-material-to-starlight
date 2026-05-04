@@ -63,6 +63,7 @@ export function normalizeSmartSymbols(source: string): string {
   const lines = source.split('\n');
   const output: string[] = [];
   let inFence = false;
+  let inHtmlComment = false;
 
   for (const line of lines) {
     if (FENCE.test(line)) {
@@ -70,7 +71,30 @@ export function normalizeSmartSymbols(source: string): string {
       inFence = !inFence;
       continue;
     }
-    output.push(inFence ? line : rewriteLine(line));
+    if (inFence) {
+      output.push(line);
+      continue;
+    }
+    // Track multi-line HTML-comment state so substitutions never fire
+    // inside `<!-- ... -->` (or its non-strict 3+-dash variants), even when
+    // the open and close span many lines. A `-->` close on its own line
+    // would otherwise be rewritten as `→` and break downstream MDX
+    // sanitisation.
+    if (inHtmlComment) {
+      output.push(line);
+      if (/-{2,}>/.test(line)) inHtmlComment = false;
+      continue;
+    }
+    const openMatch = line.match(/<!-{2,}/);
+    if (openMatch !== null && openMatch.index !== undefined) {
+      const after = line.slice(openMatch.index + (openMatch[0]?.length ?? 0));
+      if (!/-{2,}>/.test(after)) {
+        output.push(line);
+        inHtmlComment = true;
+        continue;
+      }
+    }
+    output.push(rewriteLine(line));
   }
   return output.join('\n');
 }

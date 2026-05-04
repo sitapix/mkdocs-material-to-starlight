@@ -53,7 +53,7 @@ describe('tabs inside admonition (mkdocs-material regression)', () => {
       }
 
       const indexOut = readFileSync(
-        join(outputDir, 'src', 'content', 'docs', 'index.md'),
+        join(outputDir, 'src', 'content', 'docs', 'index.mdx'),
         'utf8',
       );
 
