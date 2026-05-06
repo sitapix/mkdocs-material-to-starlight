@@ -659,6 +659,56 @@ describe('sanitizeMdxSyntax', () => {
     });
   });
 
+  describe('multi-line inline-code spans (CommonMark §6.1)', () => {
+    it('treats a backtick span that wraps onto a second line as code, not as a new opener', () => {
+      // Real-world (thoughtspot/cs_tools/changelog/1-6-0.md): bold prose
+      // contains `\`ALTER TABLE …\nSET NOT NULL\` command.**{ .fc-red }`.
+      // The inline-code span `ALTER TABLE … SET NOT NULL` legitimately spans
+      // two lines (CommonMark allows this within a paragraph). The earlier
+      // walker reset state at every `\n`, so the closing `\`` on line 2 was
+      // read as a NEW opener — `{ .fc-red }` then survived the strip pass
+      // and acorn rejected the bare attr list as a JS expression.
+      const src = [
+        '`ALTER TABLE TS_METADATA_OBJECT ALTER COLUMN is_sage_enabled',
+        'SET NOT NULL` command.**{ .fc-red }',
+        '',
+      ].join('\n');
+      const out = sanitizeMdxSyntax(src);
+      // The PyMdown attr list at the end MUST be stripped (it sits outside
+      // the inline-code span, not inside it).
+      expect(out).not.toContain('{ .fc-red }');
+    });
+
+    it('treats a stray odd-count of backticks on one line as orphan, NOT poisoning subsequent paragraphs', () => {
+      // Real-world (PowerTools api_gateway.mdx line 922): a typo'd inline-
+      // code span with 9 backticks on one line. After the paragraph break
+      // (blank line), state must reset — otherwise every subsequent
+      // sanitization pass thinks the rest of the document is inline-code.
+      const src = [
+        'Para with `mismatched ` backticks ` here.', // 5 ticks → 2 closed pairs + 1 orphan
+        '',
+        '<!-- comment must still get rewritten -->',
+        '',
+      ].join('\n');
+      const out = sanitizeMdxSyntax(src);
+      // The HTML comment after the blank line MUST get rewritten — proves
+      // we left inline-code state by the next paragraph.
+      expect(out).toContain('{/* comment must still get rewritten */}');
+      expect(out).not.toContain('<!--');
+    });
+
+    it('matches closing run length: 2-backtick close does not match a 1-backtick opener', () => {
+      // CommonMark requires the closing run to match the opener exactly.
+      // `` `\` foo \`\` bar \` `` starts a 1-tick code span. The middle
+      // 2-tick run is content. The closing 1-tick reopens — actually
+      // closes the original. Net: text is "`foo `` bar`" rendered as code.
+      const src = '`open `` close`\n';
+      const out = sanitizeMdxSyntax(src);
+      // No transform should fire inside the code span; output equals input.
+      expect(out).toBe(src);
+    });
+  });
+
   describe('inline-code state resets at newlines (CommonMark rule)', () => {
     it('does not let a stray odd-count-backticks line poison the rest of the document', () => {
       // Real-world AWS Powertools `api_gateway.mdx` line 922:
@@ -821,6 +871,59 @@ describe('sanitizeMdxSyntax', () => {
       const out = sanitizeMdxSyntax(src);
       // The `<` after the fence is in prose and must be escaped.
       expect(out).toContain('8&lt;-- text');
+    });
+
+    it('auto-closes orphan `<span>` openers at the next paragraph break', () => {
+      // Real-world (thoughtspot/cs_tools/guides/process-searchable.md):
+      // an outer `<sub>` block wraps `<b>...</b> <span class="fc-gray">…`
+      // whose closer the author forgot. MDX errors with "Expected a
+      // closing tag for `<span>` before the end of paragraph". The
+      // `<span>` is mid-paragraph (after `<b>...</b> `), so the
+      // start-of-line strip doesn't apply. Defensive auto-close at the
+      // next blank line preserves the intent.
+      const src = [
+        '<b class="fc-purple">x</b> <span class="fc-gray">Head on over to the',
+        'docs to learn more.',
+        '',
+        'next paragraph',
+        '',
+      ].join('\n');
+      const out = sanitizeMdxSyntax(src);
+      expect(out).toContain('</span>');
+    });
+
+    it('unescapes `\\<X>` and `\\</X>` left by remark-stringify in front of JSX tags', () => {
+      // remark-stringify escapes `<` to `\<` after some markdown idioms
+      // (closing emphasis, end-of-line) to keep CommonMark unambiguous.
+      // MDX, however, reads `\<` as a backslash-escape and refuses to
+      // parse the following `/sup>` as a closing tag — leaving the
+      // earlier `<sup>` opener orphaned. Real-world (thoughtspot/cs_tools):
+      // bold/italic spans wrap `<sup>` inline elements.
+      const src = '<sup>foo\\</sup>\n';
+      const out = sanitizeMdxSyntax(src);
+      expect(out).toContain('</sup>');
+      expect(out).not.toContain('\\</sup>');
+    });
+
+    it('rewrites `<sup>x</>` to `<sup>x</sup>` so the orphan opener gets a matching closer', () => {
+      // Real-world (thoughtspot/cs_tools): source authors write `<sup>foo</>`
+      // as a shorthand for `<sup>foo</sup>`. CommonMark would render it
+      // (HTML pass-through is permissive); MDX rejects the bare `</>`
+      // (empty fragment closer with no opener). Without rewriting, the
+      // existing orphan-fragment-delimiter escaper turns `</>` into
+      // `&lt;/&gt;` and leaves `<sup>` opener without a matching closer.
+      const src = '<sup>_note_</>\n';
+      const out = sanitizeMdxSyntax(src);
+      expect(out).toContain('</sup>');
+      expect(out).not.toContain('</>');
+      expect(out).not.toContain('&lt;/&gt;');
+    });
+
+    it('handles `<sub class="x">y</>` (orphan-fragment closer with attrs on opener)', () => {
+      const src = '<sub class="fc-gray">requires py 3.9</>\n';
+      const out = sanitizeMdxSyntax(src);
+      expect(out).toContain('</sub>');
+      expect(out).not.toContain('</>');
     });
 
     it('escapes shell-style `${VAR}` interpolation that MDX would read as $+{expr}', () => {

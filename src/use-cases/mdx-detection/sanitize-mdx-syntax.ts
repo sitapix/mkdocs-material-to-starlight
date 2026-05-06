@@ -94,8 +94,216 @@ export function sanitizeMdxSyntax(source: string, report?: SanitizeReport): stri
   out = escapeAmbiguousLessThan(out);
   out = escapeOrphanOpenBrace(out);
   out = escapeMalformedAttrList(out);
+  // Rewrite `<X>...</>` (empty-fragment closer used as shorthand for
+  // `</X>`) BEFORE the orphan-fragment-delimiter pass — otherwise that
+  // pass escapes the `</>` to entities and leaves the opener orphan.
+  out = rewriteOrphanFragmentCloserAsTag(out);
   out = escapeOrphanFragmentDelimiters(out);
+  // remark-stringify escapes `<` → `\<` after some markdown contexts
+  // (notably right after closing emphasis or strong) to keep CommonMark
+  // unambiguous. MDX reads `\<` as a literal-`<` escape and refuses to
+  // treat the following `tagname>` as a JSX tag — orphaning the matching
+  // opener earlier in the document. Real-world (thoughtspot/cs_tools):
+  // `_text_\</sup>` leaves `<sup>` without a closer. Drop the backslash
+  // when it sits directly in front of a well-formed JSX-shaped tag.
+  out = unescapeBackslashedJsxTags(out);
+  // Last resort: auto-close any inline `<TagName attrs>` opener whose
+  // closer the source forgot. MDX requires every JSX element to be
+  // closed before the surrounding paragraph ends; without an auto-
+  // close, the outer block (e.g. `<sub>…</sub>`) inherits the orphan
+  // and the build fails with "Expected a closing tag for `<span>`".
+  // Real-world (thoughtspot/cs_tools/guides/process-searchable.md).
+  out = autoCloseOrphanInlineTags(out);
   return out;
+}
+
+/**
+ * Scan paragraph by paragraph (separated by blank lines). Within each
+ * paragraph, maintain a tag stack. At paragraph end, emit closers for
+ * any tags still on the stack. Conservative — only fires on
+ * `<TagName attrs>` shapes (i.e. tags with attributes; bare opener
+ * patterns are handled by other passes), and only inside the dominant
+ * "inline-style wrapper" use case (span, b, i, sup, sub, em, strong,
+ * mark, small, big, code, kbd, q, abbr, cite, dfn, var, samp). Block-
+ * level elements (div, p, etc.) are deliberately excluded — their
+ * "missing close" is usually a bigger structural issue.
+ */
+function autoCloseOrphanInlineTags(source: string): string {
+  const INLINE_TAGS: ReadonlySet<string> = new Set([
+    'span', 'b', 'i', 'sup', 'sub', 'em', 'strong', 'mark', 'small',
+    'big', 'code', 'kbd', 'q', 'abbr', 'cite', 'dfn', 'var', 'samp', 'u',
+  ]);
+  // Document-level pass first: count opener vs closer pairs per tag
+  // name. Only the names with MORE openers than closers globally have
+  // unmatched orphans we should auto-close. This keeps a per-paragraph
+  // pass from prematurely closing tags like `<sub>` that are meant to
+  // span multiple paragraphs (their closer appears later in the doc).
+  const balance = new Map<string, number>();
+  const OPEN_RE = /<([A-Za-z][A-Za-z0-9-]*)(\s[^>]*)?>/g;
+  const CLOSE_RE = /<\/([A-Za-z][A-Za-z0-9-]*)\s*>/g;
+  for (const m of source.matchAll(OPEN_RE)) {
+    const name = (m[1] ?? '').toLowerCase();
+    const attrs = m[2] ?? '';
+    if (attrs.trimEnd().endsWith('/')) continue;
+    if (!INLINE_TAGS.has(name)) continue;
+    balance.set(name, (balance.get(name) ?? 0) + 1);
+  }
+  for (const m of source.matchAll(CLOSE_RE)) {
+    const name = (m[1] ?? '').toLowerCase();
+    if (!INLINE_TAGS.has(name)) continue;
+    balance.set(name, (balance.get(name) ?? 0) - 1);
+  }
+  const orphanedNames = new Set<string>();
+  for (const [name, count] of balance) {
+    if (count > 0) orphanedNames.add(name);
+  }
+  if (orphanedNames.size === 0) return source;
+
+  // Per-paragraph pass: for each paragraph block, walk events and emit
+  // closers only for tags whose name is in `orphanedNames`.
+  const parts = source.split(/(\n\s*\n)/);
+  return parts.map((part) => {
+    if (/^\n\s*\n$/.test(part)) return part;
+    if (!part.includes('<')) return part;
+    return autoCloseInBlock(part, INLINE_TAGS, orphanedNames);
+  }).join('');
+}
+
+function autoCloseInBlock(
+  block: string,
+  inlineTags: ReadonlySet<string>,
+  orphanedNames: ReadonlySet<string>,
+): string {
+  const stack: string[] = [];
+  const OPEN_RE = /<([A-Za-z][A-Za-z0-9-]*)(\s[^>]*)?>/g;
+  const CLOSE_RE = /<\/([A-Za-z][A-Za-z0-9-]*)\s*>/g;
+  type Event = { pos: number; kind: 'open' | 'close'; name: string };
+  const events: Event[] = [];
+  for (const m of block.matchAll(OPEN_RE)) {
+    const name = m[1] ?? '';
+    const attrs = m[2] ?? '';
+    if (attrs.trimEnd().endsWith('/')) continue;
+    if (!inlineTags.has(name.toLowerCase())) continue;
+    events.push({ pos: m.index ?? 0, kind: 'open', name });
+  }
+  for (const m of block.matchAll(CLOSE_RE)) {
+    const name = m[1] ?? '';
+    if (!inlineTags.has(name.toLowerCase())) continue;
+    events.push({ pos: m.index ?? 0, kind: 'close', name });
+  }
+  events.sort((a, b) => a.pos - b.pos);
+  for (const e of events) {
+    if (e.kind === 'open') stack.push(e.name);
+    else {
+      const idx = stack.lastIndexOf(e.name);
+      if (idx !== -1) stack.length = idx;
+    }
+  }
+  // Only close stack entries whose tag name is globally orphaned (more
+  // openers than closers across the whole source). Tags with balanced
+  // counts but a paragraph-local imbalance are tags whose closer lives
+  // in a LATER paragraph — preserve that structure.
+  const toClose = stack.filter((n) => orphanedNames.has(n.toLowerCase()));
+  if (toClose.length === 0) return block;
+  const trailingMatch = block.match(/(\s*)$/);
+  const trail = trailingMatch?.[0] ?? '';
+  const head = block.slice(0, block.length - trail.length);
+  const closers = toClose.reverse().map((n) => `</${n}>`).join('');
+  return `${head}${closers}${trail}`;
+}
+
+/** Turn `\<TagName>` / `\</TagName>` / `\<TagName attrs>` into the
+ *  unescaped form so MDX recognises them as JSX. Conservative — only
+ *  fires when the next char is `/` or a letter and the run looks like a
+ *  closing/opening tag of a single identifier. */
+function unescapeBackslashedJsxTags(source: string): string {
+  return source.replace(
+    /\\(<\/?[A-Za-z][A-Za-z0-9-]*(?:\s[^>]*)?>)/g,
+    (_full, tag: string) => tag,
+  );
+}
+
+/**
+ * Rewrite `<TagName>…</>` to `<TagName>…</TagName>` so MDX accepts it.
+ *
+ * Real-world (thoughtspot/cs_tools): authors write `<sup>note</>` as a
+ * shorthand for `<sup>note</sup>`. CommonMark passes the HTML through
+ * permissively; MDX rejects the bare `</>` (empty-fragment closer with
+ * no opener) — and the existing orphan-fragment-delimiter escaper makes
+ * it worse by turning `</>` into `&lt;/&gt;`, leaving the `<sup>` opener
+ * without a matching closer.
+ *
+ * Algorithm: walk the source, maintain a stack of unmatched simple
+ * `<TagName>` openers (no attributes-with-`{`). When we see `</>`, if
+ * the stack is non-empty, pop the top tag and rewrite the `</>` to its
+ * matching `</TagName>`. Otherwise leave it for the orphan-fragment
+ * pass to escape.
+ *
+ * Conservative: only fires for opener tags whose name is a single
+ * identifier (no `<TagName attr={...}>` JSX-expression complexity), and
+ * only inside paragraph context (we bail at fenced-code starts). Pure;
+ * idempotent — `</TagName>` won't match `</>`.
+ */
+function rewriteOrphanFragmentCloserAsTag(source: string): string {
+  if (!source.includes('</>')) return source;
+  // Tag-stack walk. `<TagName>` (no `/`) opens; `</TagName>` closes the
+  // top of stack if it matches; `</>` rewrites to `</topOfStack>`.
+  const stack: string[] = [];
+  const out: string[] = [];
+  let i = 0;
+  while (i < source.length) {
+    const ch = source[i];
+    if (ch !== '<') {
+      out.push(ch ?? '');
+      i += 1;
+      continue;
+    }
+    // `</>` — empty fragment closer.
+    if (source[i + 1] === '/' && source[i + 2] === '>') {
+      const top = stack.pop();
+      if (top !== undefined) {
+        out.push(`</${top}>`);
+      } else {
+        out.push('</>');
+      }
+      i += 3;
+      continue;
+    }
+    // `</TagName>` — closing tag.
+    if (source[i + 1] === '/') {
+      const closeMatch = source.slice(i).match(/^<\/([A-Za-z][A-Za-z0-9-]*)\s*>/);
+      if (closeMatch !== null) {
+        const name = closeMatch[1] ?? '';
+        // Pop matching opener if found near top of stack (best-effort —
+        // mismatched HTML is common and we don't want to crash here).
+        const idx = stack.lastIndexOf(name);
+        if (idx !== -1) stack.length = idx;
+        out.push(closeMatch[0]);
+        i += closeMatch[0].length;
+        continue;
+      }
+      out.push(ch ?? '');
+      i += 1;
+      continue;
+    }
+    // `<TagName>` or `<TagName attrs>` — opening tag.
+    const openMatch = source.slice(i).match(/^<([A-Za-z][A-Za-z0-9-]*)(\s[^>]*)?>/);
+    if (openMatch !== null) {
+      const name = openMatch[1] ?? '';
+      const attrs = openMatch[2] ?? '';
+      // Skip self-closing `<X />` (attrs ends with `/`) — no closer needed.
+      const isSelfClose = attrs.trimEnd().endsWith('/');
+      if (!isSelfClose) {
+        stack.push(name);
+      }
+      out.push(openMatch[0]);
+      i += openMatch[0].length;
+      continue;
+    }
+    out.push(ch ?? '');
+    i += 1;
+  }
+  return out.join('');
 }
 
 /**
@@ -885,7 +1093,21 @@ function walkOutsideCode(
   // closed by the inner line — escapers then skipped the post-fence
   // prose and a stray `<--` crashed MDX.
   let openFence: { char: '`' | '~'; length: number } | null = null;
-  let inInlineCode = false;
+  // Track the OPENING backtick run length (CommonMark §6.1): a code span
+  // opens with a run of N backticks and closes with a matching run of
+  // exactly N backticks. Single-char "is there a backtick now" tracking
+  // can't distinguish a closing from an opening when N differs across
+  // lines. Real-world (thoughtspot/cs_tools): a code span legitimately
+  // spans two lines — `\`ALTER TABLE …\nSET NOT NULL\`` — and the
+  // closing tick on line 2 was previously misread as a new opener,
+  // poisoning the rest of the paragraph.
+  //
+  // `null` = not in code; otherwise = the opening run length we wait
+  // for. State only resets on a paragraph break (blank line) so a stray
+  // odd-count typo on one line doesn't poison the rest of the document
+  // beyond the surrounding paragraph (PowerTools api_gateway.mdx
+  // regression).
+  let openInlineCodeRun: number | null = null;
   let atLineStart = true;
 
   while (i < source.length) {
@@ -902,7 +1124,7 @@ function walkOutsideCode(
       // the fence check on a mid-line slice of just-backticks and toggled
       // `inFence`, swallowing the rest of the document including a
       // valid `<https://…>` autolink that should have been rewritten.
-      if (!inInlineCode) {
+      if (openInlineCodeRun === null) {
         const eol = source.indexOf('\n', i);
         const line = source.slice(i, eol === -1 ? source.length : eol);
         const marker = fenceMarker(line);
@@ -934,14 +1156,15 @@ function walkOutsideCode(
       out.push(ch);
       i += 1;
       atLineStart = true;
-      // CommonMark: inline-code spans cannot span newlines. Reset the
-      // inline-code state at every line break so a stray odd-count of
-      // backticks on one line (real-world: PowerTools api_gateway.mdx
-      // line 922 has 9 backticks because of a typo'd inline-code span)
-      // does not poison every subsequent line, causing the rest of the
-      // file to be treated as inline-code and skipping all sanitization
-      // (HTML comments, void-element self-close, etc.).
-      inInlineCode = false;
+      // Paragraph break (`\n\n` — blank line) ends any open inline-code
+      // span. CommonMark code spans live within a single paragraph; a
+      // blank line between two paragraphs definitively resets the state.
+      // This bounds the blast radius of a stray odd-count backtick typo
+      // (PowerTools api_gateway.mdx regression) without forcing single-
+      // line spans (thoughtspot/cs_tools regression).
+      if (openInlineCodeRun !== null && (source[i] === '\n' || source[i] === undefined)) {
+        openInlineCodeRun = null;
+      }
       continue;
     }
     if (openFence !== null) {
@@ -955,20 +1178,31 @@ function walkOutsideCode(
       // (pyodide-mkdocs-theme `python_libs.md`): an inline code fence
       // wrapper inside an admonition is stringified by remark as
       // `\\\`\\\`\\\`python { … }` — three backslash-escaped backticks. If
-      // we toggle `inInlineCode` for each, we'd be in code-state when we
-      // reach the `{`, and `escapeMalformedAttrList` would skip it,
+      // we toggle inline-code state for each, we'd be in code-state when
+      // we reach the `{`, and `escapeMalformedAttrList` would skip it,
       // letting MDX hit `title="…"` as a JSX expression and crash acorn.
       if (countTrailingBackslashes(source, i) % 2 === 1) {
         out.push(ch);
         i += 1;
         continue;
       }
-      out.push(ch);
-      inInlineCode = !inInlineCode;
-      i += 1;
+      // Count the contiguous backtick run starting here.
+      let runEnd = i;
+      while (runEnd < source.length && source[runEnd] === '`') runEnd += 1;
+      const runLength = runEnd - i;
+      if (openInlineCodeRun === null) {
+        // Opening: remember the run length so only a matching close fires.
+        openInlineCodeRun = runLength;
+      } else if (runLength === openInlineCodeRun) {
+        // Matching close — exit the span.
+        openInlineCodeRun = null;
+      }
+      // Otherwise: a non-matching run inside the span is content; stay open.
+      out.push(source.slice(i, runEnd));
+      i = runEnd;
       continue;
     }
-    if (inInlineCode) {
+    if (openInlineCodeRun !== null) {
       out.push(ch ?? '');
       i += 1;
       continue;

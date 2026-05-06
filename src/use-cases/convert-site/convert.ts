@@ -157,24 +157,27 @@ export async function convertSite(
     input.i18nLocales ?? [],
   );
   // When the blog plugin is enabled, drop landing pages that
-  // starlight-blog auto-generates. starlight-blog treats every page in the
-  // blog directory as a post (requiring `date:` and `authors:`
-  // frontmatter); keeping a source `<blogDir>/index.md` (or the
-  // `<blogDir>/tags.md` / `<blogDir>/archive.md` index pages many Material
-  // sites ship) crashes `astro build` with "Missing date for blog entry
-  // '<…>'." starlight-blog renders the equivalents itself.
+  // starlight-blog auto-generates. We map Material's `<blogDir>/posts/*`
+  // posts convention onto starlight-blog's `prefix: '<blogDir>/posts'`,
+  // so the auto-generated landings live at `<blogDir>/posts/{index,tags,
+  // archive}.md`. Sibling pages directly under `<blogDir>/` (e.g.
+  // `<blogDir>/index.md`, `<blogDir>/get-help.md`) are real nav pages
+  // OUTSIDE the prefix and stay. Real-world (percona/docs-home):
+  // `new/get-help.md` is a help-link page, not a blog post.
   const blogIndexPaths = input.blogDir !== undefined
     ? new Set([
-        `${input.blogDir}/index.md`,
-        `${input.blogDir}/index.mdx`,
-        // Material's blog plugin auto-generates a tags landing page; the
-        // user's source often has a stub `tags.md` (e.g. `# Tags\n[TAGS]`)
-        // that's not a real post.
-        `${input.blogDir}/tags.md`,
-        `${input.blogDir}/tags.mdx`,
-        // Same shape for archive landings.
-        `${input.blogDir}/archive.md`,
-        `${input.blogDir}/archive.mdx`,
+        // The blog landing in Material is `<blogDir>/index.md`, but we
+        // moved posts under `<blogDir>/posts/`, so starlight-blog now
+        // auto-generates the landing at `<blogDir>/posts/`. The source's
+        // own `<blogDir>/index.md` (if any) becomes a regular nav page.
+        // Drop only files that actually CONFLICT with starlight-blog's
+        // auto-gen at `<blogDir>/posts/{index,tags,archive}.md`.
+        `${input.blogDir}/posts/index.md`,
+        `${input.blogDir}/posts/index.mdx`,
+        `${input.blogDir}/posts/tags.md`,
+        `${input.blogDir}/posts/tags.mdx`,
+        `${input.blogDir}/posts/archive.md`,
+        `${input.blogDir}/posts/archive.mdx`,
       ])
     : new Set<string>();
   const emitPaths = readmeRename.paths.filter((p) => !blogIndexPaths.has(p));

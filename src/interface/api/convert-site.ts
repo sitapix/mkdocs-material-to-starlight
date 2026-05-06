@@ -486,19 +486,25 @@ export async function convertSiteFromDisk(
   }
 
   // When the blog plugin is enabled, the converter drops auto-generated
-  // landing pages (`<blogDir>/{index,tags,archive}.md`) from emitPaths so
-  // starlight-blog can render them itself. The sidebar compiler hasn't
-  // seen that drop yet — any `nav:` entry referencing those files would
-  // survive into astro.config.mjs and crash the build with
-  // "AstroUserError: The slug 'blog/tags' does not exist." Filter them
-  // here, before applyPagesOverrides locks the entry shape in.
+  // landing pages (`<blogDir>/posts/{index,tags,archive}.md`) from
+  // emitPaths so starlight-blog can render them itself. The sidebar
+  // compiler hasn't seen that drop — any `nav:` entry referencing those
+  // files would survive into astro.config.mjs and crash the build with
+  // "AstroUserError: The slug '<…>' does not exist." Filter them here,
+  // before applyPagesOverrides locks the entry shape in. Sibling files
+  // OUTSIDE `<blogDir>/posts/` (e.g. `<blogDir>/index.md`) are real nav
+  // pages and stay in both emitPaths and the sidebar.
   const droppedBlogSlugs = (() => {
     const bp = config.value.plugins.find((p) => p.name === 'blog');
     if (bp === undefined) return new Set<string>();
     const dir = typeof bp.options['blog_dir'] === 'string'
       ? (bp.options['blog_dir'] as string)
       : 'blog';
-    return new Set([`${dir}/index`, `${dir}/tags`, `${dir}/archive`]);
+    return new Set([
+      `${dir}/posts/index`,
+      `${dir}/posts/tags`,
+      `${dir}/posts/archive`,
+    ]);
   })();
   const filteredSidebarEntries = filterSidebarSlugs(
     sidebarResult.value.entries,
