@@ -30,6 +30,8 @@ import { compileSidebarEntries } from '../../use-cases/convert-site/compile-side
 import { createNodeFileSystem } from '../../infrastructure/fs/node-file-system.js';
 import type { FileSystem } from '../../domain/ports/file-system.js';
 import { createNodeDirectoryReader } from '../../infrastructure/fs/node-directory-reader.js';
+import { createNodeConfigDiscoverer } from '../../infrastructure/fs/node-config-discoverer.js';
+import { resolveProjectDir } from '../../use-cases/discover-config/resolve-project-dir.js';
 import { createJsYamlDecoder } from '../../infrastructure/yaml/js-yaml-decoder.js';
 import { parseMkdocsConfig } from '../../use-cases/config/parse-mkdocs.js';
 import { expandMetaBundles } from '../../use-cases/config/expand-meta-bundles.js';
@@ -37,6 +39,7 @@ import { preprocessMkdocsEnvTags } from '../../use-cases/config/preprocess-mkdoc
 import { preprocessMkdocsPythonTags } from '../../use-cases/config/preprocess-mkdocs-python-tags.js';
 import { resolveInherits } from '../../use-cases/config/inherit-config.js';
 import { applyPagesOverrides } from '../../use-cases/compile-navigation/apply-pages.js';
+import { filterSidebarSlugs } from '../../use-cases/compile-navigation/filter-sidebar-slugs.js';
 import { parseLiterateNav } from '../../use-cases/config/parse-literate-nav.js';
 import { createDiagnostic } from '../../domain/diagnostics/diagnostic.js';
 import type { MkdocsNavEntry } from '../../domain/config/mkdocs-config.js';
@@ -170,6 +173,7 @@ export interface ConvertSiteFromDiskOutput {
 export interface ConvertSiteFromDiskError {
   readonly code:
     | 'config-not-found'
+    | 'config-ambiguous'
     | 'yaml-decode-failed'
     | 'config-invalid'
     | 'directory-read-failed'
@@ -179,6 +183,13 @@ export interface ConvertSiteFromDiskError {
     | 'nav-compile-failed'
     | 'output-not-empty';
   readonly message: string;
+  /**
+   * Set when `code === 'config-ambiguous'`: every `mkdocs.yml`/`mkdocs.yaml`
+   * that survived the discoverer's prune list, in rank order. The CLI
+   * renders these as a numbered list so the user can re-run the converter
+   * pointing at the intended subdirectory directly.
+   */
+  readonly candidates?: ReadonlyArray<string>;
 }
 
 const STARLIGHT_CONTENT_PREFIX = ['src', 'content', 'docs'] as const;
@@ -203,8 +214,37 @@ export async function convertSiteFromDisk(
   const fs = createNodeFileSystem();
   const dirReader = createNodeDirectoryReader();
   const yamlDecoder = createJsYamlDecoder();
+  const configDiscoverer = createNodeConfigDiscoverer();
 
-  const configPath = join(input.projectDir, 'mkdocs.yml');
+  // Resolve the effective project directory before any other I/O. If the
+  // user pointed us at a wrapper dir (common in monorepos that put docs
+  // under `website/` or `packages/<name>/website/`), the discoverer
+  // redirects to the unique candidate; on multiple matches we surface
+  // them as `config-ambiguous` so the user can pick one explicitly.
+  const resolved = await resolveProjectDir(input.projectDir, fs, configDiscoverer);
+  if (!resolved.ok) {
+    if (resolved.error.kind === 'ambiguous') {
+      const list = resolved.error.candidates
+        .map((c, i) => `  ${String(i + 1)}. ${c}`)
+        .join('\n');
+      return err({
+        code: 'config-ambiguous',
+        message:
+          `Multiple mkdocs.yml/.yaml found under ${resolved.error.searchedDir}. ` +
+          `Re-run pointing at the intended subdirectory directly:\n${list}\n` +
+          `Example: \`mkdocs-material-to-starlight ${resolved.error.searchedDir}/${dirOfRel(resolved.error.candidates[0] ?? '')} <output-dir>\``,
+        candidates: resolved.error.candidates,
+      });
+    }
+    return err({
+      code: 'config-not-found',
+      message: `mkdocs.yml not found under ${input.projectDir} (searched the project tree to depth 4, pruning node_modules/dist/build/.git/site/...).`,
+    });
+  }
+  const projectDir = resolved.value.projectDir;
+  const autoDiscovery = resolved.value.autoDiscovery;
+
+  const configPath = join(projectDir, 'mkdocs.yml');
   const configRead = await fs.readText(configPath);
   if (!configRead.ok) {
     return err({
@@ -237,7 +277,7 @@ export async function convertSiteFromDisk(
       // referenced but the submodule was renamed to `website-template/`).
       // We list YAML files via DirectoryReader and filter by basename.
       let candidatesNote = '';
-      const yamlListing = await dirReader.list(input.projectDir, ['.yml', '.yaml']);
+      const yamlListing = await dirReader.list(projectDir, ['.yml', '.yaml']);
       if (yamlListing.ok) {
         const candidates = yamlListing.value
           .filter((p) => {
@@ -296,7 +336,7 @@ export async function convertSiteFromDisk(
     }
   }
 
-  const docsDir = join(input.projectDir, config.value.docsDir);
+  const docsDir = join(projectDir, config.value.docsDir);
   const sourceListing = await dirReader.list(docsDir, ['.md', '.mdx']);
   if (!sourceListing.ok) {
     return err({
@@ -338,7 +378,7 @@ export async function convertSiteFromDisk(
   const resolvedSnippetBasePaths =
     input.snippetBasePaths === undefined
       ? undefined
-      : input.snippetBasePaths.map((p) => join(input.projectDir, p));
+      : input.snippetBasePaths.map((p) => join(projectDir, p));
   const repoContext = parseRepoUrl(config.value.repoUrl);
 
   const autoAppendContent = await readAutoAppendContent(
@@ -445,7 +485,26 @@ export async function convertSiteFromDisk(
     return err({ code: 'nav-compile-failed', message: sidebarResult.error });
   }
 
-  const sidebarWithPages = applyPagesOverrides(sidebarResult.value.entries, pagesResult.value);
+  // When the blog plugin is enabled, the converter drops auto-generated
+  // landing pages (`<blogDir>/{index,tags,archive}.md`) from emitPaths so
+  // starlight-blog can render them itself. The sidebar compiler hasn't
+  // seen that drop yet — any `nav:` entry referencing those files would
+  // survive into astro.config.mjs and crash the build with
+  // "AstroUserError: The slug 'blog/tags' does not exist." Filter them
+  // here, before applyPagesOverrides locks the entry shape in.
+  const droppedBlogSlugs = (() => {
+    const bp = config.value.plugins.find((p) => p.name === 'blog');
+    if (bp === undefined) return new Set<string>();
+    const dir = typeof bp.options['blog_dir'] === 'string'
+      ? (bp.options['blog_dir'] as string)
+      : 'blog';
+    return new Set([`${dir}/index`, `${dir}/tags`, `${dir}/archive`]);
+  })();
+  const filteredSidebarEntries = filterSidebarSlugs(
+    sidebarResult.value.entries,
+    droppedBlogSlugs,
+  );
+  const sidebarWithPages = applyPagesOverrides(filteredSidebarEntries, pagesResult.value);
 
   const featuresFromPlugins = detectFeaturesFromPlugins(
     config.value.plugins,
@@ -490,10 +549,21 @@ export async function convertSiteFromDisk(
       })()
     : undefined;
   const blogOptionsBase = blogPlugin !== undefined ? blogPlugin.options : {};
+  // Author resolution priority:
+  //   1. `plugins.blog.authors:` is an object map → use it verbatim.
+  //   2. Otherwise (missing OR a flag like `authors: true`), prefer the
+  //      sidecar `.authors.yml` if present. Real-world (ksaaskil): mkdocs.yml
+  //      has `authors: true` + `authors_file: "{blog}/.authors.yml"`, so the
+  //      flag wins under "any defined" semantics and the file's contents
+  //      never reach starlight-blog — every post then fails with
+  //      "Author 'ksaaskil' not found in the blog configuration."
+  const baseAuthors = blogOptionsBase['authors'];
+  const baseAuthorsIsObjectMap =
+    baseAuthors !== null && typeof baseAuthors === 'object' && !Array.isArray(baseAuthors);
   const blogOptions = blogPlugin !== undefined && (
     Object.keys(blogOptionsBase).length > 0 || authorsFromFile !== undefined
   )
-    ? (authorsFromFile !== undefined && blogOptionsBase['authors'] === undefined
+    ? (authorsFromFile !== undefined && !baseAuthorsIsObjectMap
         ? { ...blogOptionsBase, authors: authorsFromFile }
         : blogOptionsBase)
     : undefined;
@@ -593,7 +663,7 @@ export async function convertSiteFromDisk(
     diagnostic: ReturnType<typeof createDiagnostic>;
   }> = [];
   for (const hookRel of hookPaths) {
-    const hookFull = join(input.projectDir, hookRel);
+    const hookFull = join(projectDir, hookRel);
     const read = await fs.readText(hookFull);
     if (!read.ok) {
       hookDiagnostics.push({
@@ -993,7 +1063,7 @@ export async function convertSiteFromDisk(
         cssEntries.push([trimmed, docsRead.value]);
         continue;
       }
-      const projectRead = await fs.readText(join(input.projectDir, trimmed));
+      const projectRead = await fs.readText(join(projectDir, trimmed));
       if (projectRead.ok) cssEntries.push([trimmed, projectRead.value]);
     }
     for (const d of scanMaterialCodeCssVars(cssEntries)) {
@@ -1008,7 +1078,30 @@ export async function convertSiteFromDisk(
     (d) => ({ sourcePath: 'mkdocs.yml', diagnostic: d }),
   );
 
+  // Surface the auto-discovery redirect (when it fired) in the diagnostic
+  // stream so it lands in CI logs and `MIGRATION_NOTES.md` next to every
+  // other config-level finding. Call-site honest: the user who ran the
+  // converter against `<repo>` sees exactly which subdir we picked.
+  const autoDiscoveryDiagnostics =
+    autoDiscovery === null
+      ? []
+      : [
+          {
+            sourcePath: 'mkdocs.yml',
+            diagnostic: createDiagnostic({
+              severity: 'info',
+              ruleId: 'mkdocs-config-auto-discovered',
+              source: 'mkdocs-material-to-starlight',
+              message:
+                `No mkdocs.yml at ${autoDiscovery.fromDir} — auto-discovered ` +
+                `${autoDiscovery.discoveredRelPath} and converted from ${projectDir}. ` +
+                `Pass that path directly on subsequent runs to skip discovery.`,
+            }),
+          },
+        ];
+
   const allDiagnostics = [
+    ...autoDiscoveryDiagnostics,
     ...siteResult.value.diagnostics,
     ...pluginDiagnostics,
     ...sectionIndexDiagnostics,
@@ -1354,12 +1447,23 @@ export async function convertSiteFromDisk(
   }
 
   return ok({
-    diagnostics: siteResult.value.diagnostics,
+    // Include site-conversion + auto-discovery + plugin-level diagnostics
+    // so callers see every signal — auto-discovery in particular surfaces
+    // a redirect message when we found mkdocs.yml in a nested folder.
+    diagnostics: [
+      ...autoDiscoveryDiagnostics,
+      ...siteResult.value.diagnostics,
+    ],
     sidebarSource: serializeSidebar(sidebarWithPages),
     astroConfigSource,
     packageJsonSource,
     migrationNotesSource,
   });
+}
+
+function dirOfRel(relPath: string): string {
+  const idx = relPath.lastIndexOf('/');
+  return idx === -1 ? '' : relPath.slice(0, idx);
 }
 
 function snippetExtensionOptions(
