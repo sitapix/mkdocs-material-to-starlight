@@ -2,40 +2,41 @@
  * Top-level programmatic API: convert a MkDocs project on disk into a
  * Starlight-shaped output directory.
  *
- * This is the single place where every layer of the converter is wired
- * together. Use-cases stay pure; infrastructure adapters provide the I/O;
- * this function is the imperative shell that hands them to one another.
+ * The single place where every layer wires together. Use-cases stay pure;
+ * infrastructure adapters do the I/O; this function is the imperative shell.
  *
- * Inputs:
- *   projectDir  — absolute path to the MkDocs project (containing mkdocs.yml)
- *   outputDir   — absolute path where the Astro/Starlight project will be written
+ * Inputs: `projectDir` (absolute path containing `mkdocs.yml`), `outputDir`
+ * (absolute target).
  *
- * Outputs:
- *   diagnostics    — every per-file warning aggregated and tagged with source path
- *   sidebarSource  — JS source for the `sidebar` field in `astro.config.mjs`
+ * Outputs: `diagnostics` (per-file warnings tagged with source path),
+ * `sidebarSource` (JS source for `sidebar` in `astro.config.mjs`).
  *
- * Errors are typed (config-not-found, yaml-decode-failed, config-invalid,
- * slug-conflict, file-write-failed). The function never throws on user
- * input; only on programmer error or OS conditions outside the contract.
+ * Errors are typed (`config-not-found`, `yaml-decode-failed`,
+ * `config-invalid`, `slug-conflict`, `file-write-failed`). Never throws on
+ * user input; only on programmer error or OS conditions.
  */
 
 import { copyFile, mkdir, writeFile, readdir } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
+import { posix } from 'node:path';
 import { ok, err, type Result } from '../../domain/result.js';
 import { planAssetCopies, type AssetCopy } from '../../use-cases/copy-assets/plan.js';
+import { buildDeferredWizardDiagnostics } from '../../use-cases/convert-site/wizard-decision-diagnostics.js';
+import {
+  collectUnknownFrontmatterFieldNames,
+  enrichMissingDocsDirMessage,
+} from '../../use-cases/convert-site/diagnostic-enrichment.js';
+import { compileSidebarEntries } from '../../use-cases/convert-site/compile-sidebar-entries.js';
 import { createNodeFileSystem } from '../../infrastructure/fs/node-file-system.js';
 import type { FileSystem } from '../../domain/ports/file-system.js';
 import { createNodeDirectoryReader } from '../../infrastructure/fs/node-directory-reader.js';
 import { createJsYamlDecoder } from '../../infrastructure/yaml/js-yaml-decoder.js';
 import { parseMkdocsConfig } from '../../use-cases/config/parse-mkdocs.js';
+import { expandMetaBundles } from '../../use-cases/config/expand-meta-bundles.js';
 import { preprocessMkdocsEnvTags } from '../../use-cases/config/preprocess-mkdocs-env-tags.js';
 import { preprocessMkdocsPythonTags } from '../../use-cases/config/preprocess-mkdocs-python-tags.js';
 import { resolveInherits } from '../../use-cases/config/inherit-config.js';
-import { parseNavTree } from '../../use-cases/config/nav-tree.js';
-import { compileNavigation } from '../../use-cases/compile-navigation/compile.js';
-import { scanNavTopics } from '../../use-cases/detect-features/nav-topics.js';
 import { applyPagesOverrides } from '../../use-cases/compile-navigation/apply-pages.js';
-import { applySectionIndex } from '../../use-cases/compile-navigation/section-index.js';
 import { parseLiterateNav } from '../../use-cases/config/parse-literate-nav.js';
 import { createDiagnostic } from '../../domain/diagnostics/diagnostic.js';
 import type { MkdocsNavEntry } from '../../domain/config/mkdocs-config.js';
@@ -68,6 +69,7 @@ import { serializeAstroConfig } from '../../use-cases/serialize-config/astro-con
 import { serializeContentConfig } from '../../use-cases/serialize-config/content-config.js';
 import { serializePackageJson } from '../../use-cases/serialize-config/package-json.js';
 import { serializeMigrationNotes } from '../../use-cases/serialize-config/migration-notes.js';
+import { inferFrontmatterTypes } from '../../use-cases/validate-output/infer-frontmatter-types.js';
 import { serializeRssEndpoint } from '../../use-cases/serialize-config/rss-endpoint.js';
 import { serializeOgEndpoint } from '../../use-cases/serialize-config/og-endpoint.js';
 import { serializeStyleSheet } from '../../use-cases/serialize-config/styles.js';
@@ -84,7 +86,6 @@ import {
   scanMathScripts,
 } from '../../use-cases/detect-features/scan-bulk-diagnostics.js';
 import { scanMaterialCodeCssVars } from '../../use-cases/detect-features/scan-code-css-vars.js';
-import type { SidebarEntry } from '../../domain/starlight/sidebar.js';
 
 export interface ConvertSiteFromDiskInput {
   readonly projectDir: string;
@@ -221,10 +222,63 @@ export async function convertSiteFromDisk(
     return err({ code: 'yaml-decode-failed', message: decoded.error.message });
   }
 
-  const config = parseMkdocsConfig(decoded.value);
-  if (!config.ok) {
-    return err({ code: 'config-invalid', message: config.error.message });
+  const parseResult = parseMkdocsConfig(decoded.value);
+  if (!parseResult.ok) {
+    // If config-validation failed AND there were missing INHERIT targets,
+    // surface that as the likely root cause — the inherited file would have
+    // supplied the missing field (e.g. `site_name`) and its absence is what
+    // breaks parsing. Without this, users see a confusing
+    // `site_name is required` error and don't realize their submodule path
+    // is wrong / unfetched.
+    if (inherited.missing.length > 0) {
+      // Quick scan: look for any other `mkdocs.yml`/`mkdocs.yaml` files in
+      // the project that might be the actual INHERIT target the user
+      // intended (common with renamed submodules — e.g. `docs_template/`
+      // referenced but the submodule was renamed to `website-template/`).
+      // We list YAML files via DirectoryReader and filter by basename.
+      let candidatesNote = '';
+      const yamlListing = await dirReader.list(input.projectDir, ['.yml', '.yaml']);
+      if (yamlListing.ok) {
+        const candidates = yamlListing.value
+          .filter((p) => {
+            const base = p.split('/').pop() ?? '';
+            return base === 'mkdocs.yml' || base === 'mkdocs.yaml';
+          })
+          .filter((p) => p !== 'mkdocs.yml' && p !== 'mkdocs.yaml')
+          .slice(0, 5);
+        if (candidates.length > 0) {
+          candidatesNote =
+            ` Found ${String(candidates.length)} other mkdocs config file${candidates.length === 1 ? '' : 's'} in the project that might be the intended target: ` +
+            candidates.map((c) => `\`${c}\``).join(', ') +
+            `. Did you mean one of these? Update the \`INHERIT:\` line, or symlink the expected directory.`;
+        }
+      }
+      return err({
+        code: 'config-invalid',
+        message:
+          `${parseResult.error.message}. ` +
+          `Note: mkdocs.yml uses INHERIT but the referenced file(s) could not be read: ` +
+          inherited.missing.join(', ') +
+          `. The missing file would have supplied the field(s) the parser is rejecting. ` +
+          `Common causes: an unfetched git submodule (run \`git submodule update --init --recursive\`), ` +
+          `a stale path in the INHERIT directive, or a CI-generated symlink that doesn't exist locally.` +
+          candidatesNote,
+      });
+    }
+    return err({ code: 'config-invalid', message: parseResult.error.message });
   }
+  // Expand `pymdownx.extra` (and the legacy `extra`) meta-bundle into its
+  // 8 component extensions so every downstream detector that matches on
+  // individual extension names sees them. Without this, a site that
+  // shortcuts via `pymdownx.extra` would silently miss footnotes,
+  // tables, attr_list, def_list, etc. coverage.
+  const config = {
+    ok: true as const,
+    value: {
+      ...parseResult.value,
+      markdownExtensions: expandMetaBundles(parseResult.value.markdownExtensions),
+    },
+  };
 
   // Idempotency guard: if output dir exists and is non-empty, demand --force.
   if (input.force !== true) {
@@ -247,14 +301,20 @@ export async function convertSiteFromDisk(
   if (!sourceListing.ok) {
     return err({
       code: 'directory-read-failed',
-      message: sourceListing.error.message,
+      message: enrichMissingDocsDirMessage(
+        sourceListing.error.message,
+        config.value.plugins,
+      ),
     });
   }
   const allFiles = await dirReader.list(docsDir, ASSET_EXTENSIONS);
   if (!allFiles.ok) {
     return err({
       code: 'directory-read-failed',
-      message: allFiles.error.message,
+      message: enrichMissingDocsDirMessage(
+        allFiles.error.message,
+        config.value.plugins,
+      ),
     });
   }
   const themeOptionsForExcludes = config.value.theme?.options ?? {};
@@ -326,6 +386,16 @@ export async function convertSiteFromDisk(
     macrosScanEnabled,
     emitMdxTabs,
     tabsLinked: hasTabsLink,
+    // When the Material `blog` plugin is configured, propagate `blog_dir`
+    // (defaulting to `blog`) so convertSite skips the source's
+    // `<blogDir>/index.md` — starlight-blog auto-generates the landing
+    // page and emitting the source's index would crash `astro build`.
+    ...((() => {
+      const bp = config.value.plugins.find((p) => p.name === 'blog');
+      if (bp === undefined) return {};
+      const dir = typeof bp.options['blog_dir'] === 'string' ? (bp.options['blog_dir'] as string) : 'blog';
+      return { blogDir: dir };
+    })()),
     snippetDedentSubsections: snippetExtensionOptions(
       config.value.markdownExtensions,
     )['dedent_subsections'] === true,
@@ -364,6 +434,12 @@ export async function convertSiteFromDisk(
     literateNav.tree,
     siteResult.value.slugMap,
     sectionIndexEnabled,
+    (() => {
+      const bp = config.value.plugins.find((p) => p.name === 'blog');
+      if (bp === undefined) return {};
+      const dir = typeof bp.options['blog_dir'] === 'string' ? (bp.options['blog_dir'] as string) : 'blog';
+      return { blogDir: dir };
+    })(),
   );
   if (!sidebarResult.ok) {
     return err({ code: 'nav-compile-failed', message: sidebarResult.error });
@@ -383,6 +459,52 @@ export async function convertSiteFromDisk(
       ...featuresFromThemeFlags,
     ]),
   ].sort();
+
+  // Extract per-plugin option dicts so the astro-config + og-endpoint
+  // serializers can translate the load-bearing knobs (blog_dir,
+  // pagination_per_page, tags_hierarchy, cards_layout_options, …) into
+  // their starlight-* / astro-og-canvas equivalents. Unrecognized keys
+  // are dropped during translation; the plugin-blog/-tags/-social
+  // diagnostics remain the canonical pointers to manual remediation.
+  const blogPlugin = config.value.plugins.find((p) => p.name === 'blog');
+  const tagsPlugin = config.value.plugins.find((p) => p.name === 'tags');
+  const socialPlugin = config.value.plugins.find((p) => p.name === 'social');
+  // Material blog plugin: blog_dir defaults to `blog`. Authors live in
+  // `<docs_dir>/<blog_dir>/.authors.yml`. starlight-blog needs them as
+  // the `authors` field of the plugin invocation; without this, every
+  // blog post fails with "Author 'X' not found in the blog configuration."
+  const blogDir = typeof blogPlugin?.options['blog_dir'] === 'string'
+    ? (blogPlugin.options['blog_dir'] as string)
+    : 'blog';
+  const authorsYmlPath = join(docsDir, blogDir, '.authors.yml');
+  const authorsYmlRead = await fs.readText(authorsYmlPath);
+  const authorsFromFile = authorsYmlRead.ok
+    ? (() => {
+        const decoded = yamlDecoder.decode(authorsYmlRead.value);
+        if (!decoded.ok) return undefined;
+        const root = decoded.value as Record<string, unknown> | null;
+        if (root === null || typeof root !== 'object') return undefined;
+        const authors = root['authors'];
+        if (authors === null || typeof authors !== 'object') return undefined;
+        return authors as Record<string, unknown>;
+      })()
+    : undefined;
+  const blogOptionsBase = blogPlugin !== undefined ? blogPlugin.options : {};
+  const blogOptions = blogPlugin !== undefined && (
+    Object.keys(blogOptionsBase).length > 0 || authorsFromFile !== undefined
+  )
+    ? (authorsFromFile !== undefined && blogOptionsBase['authors'] === undefined
+        ? { ...blogOptionsBase, authors: authorsFromFile }
+        : blogOptionsBase)
+    : undefined;
+  const tagsOptions = tagsPlugin !== undefined && Object.keys(tagsPlugin.options).length > 0
+    ? tagsPlugin.options
+    : undefined;
+  const rawSocialLayout = socialPlugin?.options['cards_layout_options'];
+  const socialCardsLayoutOptions =
+    rawSocialLayout !== null && typeof rawSocialLayout === 'object'
+      ? (rawSocialLayout as Readonly<Record<string, unknown>>)
+      : undefined;
 
   // Plugin-level diagnostics (for plugins that have no Starlight equivalent
   // or are deprecated by Material itself). These are emitted once per run,
@@ -784,7 +906,7 @@ export async function convertSiteFromDisk(
     });
   }
 
-  const deferredDiagnostics = buildDeferredDiagnostics(input);
+  const deferredDiagnostics = buildDeferredWizardDiagnostics(input);
 
   // Hoisted: needed both by the CSS scanner below and by config serialization.
   const extraAssets = extractExtraAssets(config.value.extras);
@@ -959,15 +1081,68 @@ export async function convertSiteFromDisk(
       : `/${js.src.replace(/^\/+/, '')}`,
   }));
   const themeOptions = config.value.theme?.options ?? {};
-  const logoSrc = typeof themeOptions.logo === 'string' ? themeOptions.logo : null;
-  const faviconRaw = typeof themeOptions.favicon === 'string' ? themeOptions.favicon : null;
-  const enableLinksValidator = input.linksValidator !== false;
+  // Starlight's `logo.src` and `favicon` accept ONLY local file paths
+  // (resolved relative to the project root or under `src/assets/`). External
+  // URLs (`https://…/logo.svg`) are not allowed — Astro/Vite resolves the
+  // value as a Vite module and `Rollup failed to resolve import "…"` at
+  // build time. Real-world break (DarrenOfficial, Enveloppe, shenweiyan):
+  // the source `theme.logo` is a CDN URL we have no way to download. Drop
+  // the emission entirely when the value is an absolute URL — Starlight
+  // falls back to its default chrome and the build succeeds.
+  const isLocalAssetPath = (v: unknown): v is string =>
+    typeof v === 'string' && !/^[a-z][a-z0-9+\-.]*:\/\//i.test(v);
+  const logoSrcCandidate = isLocalAssetPath(themeOptions.logo) ? themeOptions.logo : null;
+  const faviconRawCandidate = isLocalAssetPath(themeOptions.favicon) ? themeOptions.favicon : null;
+  // Pre-check: a logo/favicon path that doesn't resolve to an existing
+  // file would otherwise produce a config that emits `logo: { src: … }`
+  // referencing a missing import, and Rollup fails the build with
+  // "Rollup failed to resolve import". Real-world break (Enveloppe):
+  // the source declares `theme.favicon: assets/meta/favicons.png` but
+  // the file isn't in the repo. We `await fs.exists` here (well, attempt
+  // a stat) so the config is built only for paths we can actually copy.
+  const checkLocalAssetExists = async (rel: string | null): Promise<boolean> => {
+    if (rel === null) return false;
+    return fs.exists(join(docsDir, rel));
+  };
+  const logoSrc = (await checkLocalAssetExists(logoSrcCandidate)) ? logoSrcCandidate : null;
+  // Starlight's `favicon` field accepts only .ico, .gif, .jpg/.jpeg, .png,
+  // and .svg. Material sites occasionally use other formats (e.g. .webp,
+  // .avif) — emitting those would crash `astro:config:setup` with
+  // "favicon must be a .ico, .gif, .jpg, .png, or .svg file". Drop the
+  // emission when the extension isn't accepted; Starlight falls back to
+  // its default favicon and the build succeeds. Real-world break:
+  // demosense/tidylake's source declared `favicon: img/favicon.webp`.
+  const FAVICON_ACCEPTED_EXT = /\.(ico|gif|jpe?g|png|svg)$/i;
+  const faviconExtensionRejected =
+    faviconRawCandidate !== null && !FAVICON_ACCEPTED_EXT.test(faviconRawCandidate);
+  const faviconRawAccepted =
+    faviconRawCandidate !== null && !faviconExtensionRejected
+      ? faviconRawCandidate
+      : null;
+  const faviconRaw = (await checkLocalAssetExists(faviconRawAccepted)) ? faviconRawAccepted : null;
+  // starlight-links-validator: opt-in (default OFF) since 2026-05-05.
+  //
+  // Real-world Material sites routinely link to non-content paths (`/LICENSE`,
+  // `/CHANGELOG`, `/contributing`, etc. that point at GitLab/GitHub web
+  // surfaces, gh-pages aliases, or static files) AND to dynamic pages that
+  // MkDocs generated (mkdocs-click CLI references, mkdocstrings autodoc).
+  // The plugin's defaults reject all of these at `astro build`, breaking
+  // every migrated build out-of-the-box.
+  //
+  // The converter's own `broken-link` diagnostic catches the genuinely
+  // missing cross-content links during conversion (and surfaces them in
+  // MIGRATION_NOTES.md). That covers the validator's primary value
+  // proposition for migration users without the noise.
+  //
+  // Users who want strict pre-deploy validation can opt in via the
+  // `linksValidator: true` API flag (or the `--strict-links` CLI flag).
+  const enableLinksValidator = input.linksValidator === true;
   const logoEntry =
     logoSrc === null
       ? {}
       : {
           logo: {
-            src: `./src/assets/${basenameOf(logoSrc)}`,
+            src: `./src/assets/${posix.basename(logoSrc)}`,
             ...(input.logoReplacesTitle === true ? { replacesTitle: true as const } : {}),
           },
         };
@@ -987,7 +1162,7 @@ export async function convertSiteFromDisk(
     ...(editLinkBaseUrl === null ? {} : { editLinkBaseUrl }),
     ...(tableOfContents === undefined ? {} : { tableOfContents }),
     ...logoEntry,
-    ...(faviconRaw === null ? {} : { favicon: `/${basenameOf(faviconRaw)}` }),
+    ...(faviconRaw === null ? {} : { favicon: `/${posix.basename(faviconRaw)}` }),
     ...(expressiveCodeConfig === undefined
       ? {}
       : { expressiveCode: { themes: expressiveCodeConfig.themes } }),
@@ -1003,6 +1178,8 @@ export async function convertSiteFromDisk(
         }
       : {}),
     ...(input.mikeVersions !== undefined ? { mikeVersions: input.mikeVersions } : {}),
+    ...(blogOptions !== undefined ? { blogOptions } : {}),
+    ...(tagsOptions !== undefined ? { tagsOptions } : {}),
   });
   const packageJsonSource = serializePackageJson({
     siteName: config.value.siteName,
@@ -1020,12 +1197,33 @@ export async function convertSiteFromDisk(
     sourceDocs,
   });
 
+  // Auto-extend the generated `src/content.config.ts` schema with every
+  // frontmatter field that triggered an `unknown-frontmatter-field`
+  // diagnostic. Without this, every project that uses fields like `tags` or
+  // `date` would fail `astro build` until the user manually edits the file.
+  // Field types are inferred from observed values; users can tighten later.
+  const extendedFrontmatterFields = inferFrontmatterTypes(
+    collectUnknownFrontmatterFieldNames(allDiagnostics),
+    sourceDocs,
+  );
+
   const paletteStrategy = input.palette;
   const stylesheetSource = serializeStyleSheet(palette, themeFonts ?? null, paletteStrategy);
+  // RSS endpoint requires a parseable absolute `site:` URL — the
+  // `@astrojs/rss` runtime crashes the build with "Invalid input: expected
+  // string, received undefined (site)" when site is missing or invalid.
+  // We already skip emitting `site:` when `siteUrl` is non-URL-shaped
+  // (Python YAML-tag substitutions, env-var placeholders), so the same
+  // gate must also disable RSS or the user opts in to a guaranteed build
+  // failure. Real-world break (jobindjohn/obsidian-publish-mkdocs).
+  const isValidSiteUrl =
+    config.value.siteUrl !== null &&
+    /^https?:\/\//i.test(config.value.siteUrl) &&
+    (() => { try { return Boolean(new URL(config.value.siteUrl ?? '')); } catch { return false; } })();
   const rssEnabled =
     input.rss === false ? false :
-    input.rss === true ? true :
-    allFeatures.includes('rss');
+    input.rss === true ? isValidSiteUrl :
+    (allFeatures.includes('rss') && isValidSiteUrl);
   const rssEndpointSource = rssEnabled
     ? serializeRssEndpoint({
         siteName: config.value.siteName,
@@ -1034,7 +1232,12 @@ export async function convertSiteFromDisk(
       })
     : null;
   const ogEndpointSource = allFeatures.includes('og-cards')
-    ? serializeOgEndpoint({ siteName: config.value.siteName })
+    ? serializeOgEndpoint({
+        siteName: config.value.siteName,
+        ...(socialCardsLayoutOptions !== undefined
+          ? { cardsLayoutOptions: socialCardsLayoutOptions }
+          : {}),
+      })
     : null;
   // starlight-tags 1.0+ requires a `tags.yml` at the project root listing
   // every tag the site uses. Material's tags plugin doesn't carry this
@@ -1054,6 +1257,7 @@ export async function convertSiteFromDisk(
     ogEndpointSource,
     tagsYmlSource,
     configFormat: input.configFormat ?? 'mjs',
+    extendedFrontmatterFields,
   });
   if (!writeResult.ok) {
     return err({ code: 'file-write-failed', message: writeResult.error });
@@ -1071,10 +1275,31 @@ export async function convertSiteFromDisk(
     sourcePath: string;
     diagnostic: ReturnType<typeof createDiagnostic>;
   }> = [];
+  if (faviconExtensionRejected && faviconRawCandidate !== null) {
+    assetPostDiagnostics.push({
+      sourcePath: 'mkdocs.yml',
+      diagnostic: createDiagnostic({
+        severity: 'warning',
+        ruleId: 'favicon-extension-unsupported',
+        source: 'mkdocs-material-to-starlight',
+        message:
+          `theme.favicon: \`${faviconRawCandidate}\` uses an extension Starlight ` +
+          `does not accept (allowed: .ico, .gif, .jpg/.jpeg, .png, .svg). The ` +
+          `favicon was dropped from the generated astro.config.mjs so the build ` +
+          `succeeds; Starlight falls back to its default chrome.`,
+      }),
+    });
+  }
+  // When the logo file doesn't exist on disk, skip emitting the `logo:`
+  // config entry — Starlight's `logo.src` is resolved as a Vite import and
+  // a missing file fails the build with "Rollup failed to resolve import".
+  // Real-world break (Enveloppe/mkdocs-publisher-template): the source
+  // references `assets/meta/favicons.png` but the file isn't in the
+  // repo. Diagnostic surfaces the missing file; emission is suppressed.
   if (logoSrc !== null) {
     const logoCopy = await copyOne(
       join(docsDir, logoSrc),
-      join(input.outputDir, 'src', 'assets', basenameOf(logoSrc)),
+      join(input.outputDir, 'src', 'assets', posix.basename(logoSrc)),
     );
     if (!logoCopy.ok) {
       assetPostDiagnostics.push({
@@ -1091,7 +1316,7 @@ export async function convertSiteFromDisk(
   if (faviconRaw !== null) {
     const faviconCopy = await copyOne(
       join(docsDir, faviconRaw),
-      join(input.outputDir, 'public', basenameOf(faviconRaw)),
+      join(input.outputDir, 'public', posix.basename(faviconRaw)),
     );
     if (!faviconCopy.ok) {
       assetPostDiagnostics.push({
@@ -1135,11 +1360,6 @@ export async function convertSiteFromDisk(
     packageJsonSource,
     migrationNotesSource,
   });
-}
-
-function basenameOf(path: string): string {
-  const idx = path.lastIndexOf('/');
-  return idx === -1 ? path : path.slice(idx + 1);
 }
 
 function snippetExtensionOptions(
@@ -1191,44 +1411,6 @@ async function copyAssetsToPublic(
     }
   }
   return ok(true);
-}
-
-interface CompiledSidebar {
-  readonly entries: ReadonlyArray<SidebarEntry>;
-  readonly diagnostics: ReadonlyArray<import('../../domain/diagnostics/diagnostic.js').Diagnostic>;
-}
-
-async function compileSidebarEntries(
-  navRaw: ReadonlyArray<unknown> | null,
-  preParsed: ReadonlyArray<MkdocsNavEntry> | null,
-  slugMap: Parameters<typeof compileNavigation>[1],
-  sectionIndexEnabled: boolean,
-): Promise<Result<CompiledSidebar, string>> {
-  let tree: ReadonlyArray<MkdocsNavEntry>;
-  if (preParsed !== null) {
-    tree = preParsed;
-  } else if (navRaw === null || navRaw.length === 0) {
-    return ok({ entries: [], diagnostics: [] });
-  } else {
-    const parsed = parseNavTree(navRaw);
-    if (!parsed.ok) {
-      return err(parsed.error.message);
-    }
-    tree = parsed.value;
-  }
-  const transformed = sectionIndexEnabled
-    ? applySectionIndex(tree)
-    : { nav: tree, diagnostics: [] };
-  const sidebar = compileNavigation(transformed.nav, slugMap);
-  const topicDiagnostics = scanNavTopics(transformed.nav);
-  return ok({
-    entries: sidebar.entries,
-    diagnostics: [
-      ...transformed.diagnostics,
-      ...sidebar.diagnostics,
-      ...topicDiagnostics,
-    ],
-  });
 }
 
 interface LiterateNavResult {
@@ -1286,6 +1468,7 @@ interface WriteOutputsInput {
   readonly ogEndpointSource: string | null;
   readonly tagsYmlSource: string | null;
   readonly configFormat: 'mjs' | 'ts';
+  readonly extendedFrontmatterFields: Readonly<Record<string, string>>;
 }
 
 async function writeOutputs(input: WriteOutputsInput): Promise<Result<true, string>> {
@@ -1301,7 +1484,7 @@ async function writeOutputs(input: WriteOutputsInput): Promise<Result<true, stri
     [[astroConfigFilename], input.astroConfigSource],
     [['package.json'], input.packageJsonSource],
     [['MIGRATION_NOTES.md'], input.migrationNotesSource],
-    [['src', 'content.config.ts'], serializeContentConfig()],
+    [['src', 'content.config.ts'], serializeContentConfig(input.extendedFrontmatterFields)],
     [['src', 'styles', 'mkdocs-migration.css'], input.stylesheetSource],
   ];
   if (input.rssEndpointSource !== null) {
@@ -1331,99 +1514,6 @@ async function writeOne(target: string, content: string): Promise<Result<true, s
     const message = cause instanceof Error ? cause.message : String(cause);
     return err(`failed to write ${target}: ${message}`);
   }
-}
-
-function buildDeferredDiagnostics(
-  input: ConvertSiteFromDiskInput,
-): Array<{ sourcePath: string; diagnostic: ReturnType<typeof createDiagnostic> }> {
-  const diags: Array<{ sourcePath: string; diagnostic: ReturnType<typeof createDiagnostic> }> = [];
-  const add = (message: string) =>
-    diags.push({
-      sourcePath: 'mkdocs.yml',
-      diagnostic: createDiagnostic({
-        severity: 'info',
-        ruleId: 'wizard-decision-applied',
-        source: 'mkdocs-material-to-starlight',
-        message,
-      }),
-    });
-
-  if (input.cards !== undefined) {
-    add(
-      `Configured: --cards=${input.cards} requested. The MDX <Card>/<CardGrid> output path is not yet implemented in this build; falling back to HTML + shim. (Tracked for v2.)`,
-    );
-  }
-  if (input.mdxMode !== undefined) {
-    add(
-      `Configured: --mdx-mode=${input.mdxMode} requested. MDX mode selection is not yet implemented in this build; using auto-detection. (Tracked for v2.)`,
-    );
-  }
-  if (input.keepExplicitHeadingIds === true) {
-    add(
-      `Configured: --keep-explicit-heading-ids requested. Explicit heading ID preservation is not yet implemented in this build; IDs may be re-generated. (Tracked for v2.)`,
-    );
-  }
-  if (input.noSmartSymbols === true) {
-    add(
-      `Configured: --no-smart-symbols requested. Smart-symbol suppression is not yet implemented in this build. (Tracked for v2.)`,
-    );
-  }
-  if (input.noEmojiShortcodes === true) {
-    add(
-      `Configured: --no-emoji-shortcodes requested. Emoji shortcode suppression is not yet implemented in this build. (Tracked for v2.)`,
-    );
-  }
-  if (input.noInlineMarks === true) {
-    add(
-      `Configured: --no-inline-marks requested. Inline marks suppression is not yet implemented in this build. (Tracked for v2.)`,
-    );
-  }
-  if (input.noAutoAppend === true) {
-    add(
-      `Configured: --no-auto-append requested. Auto-append suppression is not yet implemented in this build. (Tracked for v2.)`,
-    );
-  }
-  if (input.snippetMaxDepth !== undefined) {
-    add(
-      `Configured: --snippet-max-depth=${String(input.snippetMaxDepth)} requested. Snippet depth limiting is not yet implemented in this build. (Tracked for v2.)`,
-    );
-  }
-  if (input.snippetDedentSubsections === true) {
-    add(
-      `Configured: --snippet-dedent-subsections requested. Snippet subsection dedenting is not yet implemented in this build. (Tracked for v2.)`,
-    );
-  }
-  if (input.expressiveCodeTheme !== undefined) {
-    add(
-      `Configured: --expressive-code-theme=${input.expressiveCodeTheme} requested. ExpressiveCode theme override is not yet implemented in this build; using auto-detected theme. (Tracked for v2.)`,
-    );
-  }
-  if (input.admonitionMapPath !== undefined) {
-    add(
-      `Configured: --admonition-map=${input.admonitionMapPath} requested. Custom admonition mapping is not yet implemented in this build; using built-in map. (Tracked for v2.)`,
-    );
-  }
-  if (input.extraAssets !== undefined && input.extraAssets.length > 0) {
-    add(
-      `Configured: --extra-asset paths requested (${String(input.extraAssets.length)} items). Extra asset inclusion is not yet implemented in this build. (Tracked for v2.)`,
-    );
-  }
-  if (input.locales !== undefined && input.locales.length > 0) {
-    add(
-      `Configured: --locale codes requested (${input.locales.join(', ')}). Locale override is not yet implemented in this build; using auto-detected i18n config. (Tracked for v2.)`,
-    );
-  }
-  if (input.suppressRules !== undefined && input.suppressRules.length > 0) {
-    add(
-      `Configured: --suppress rules requested (${input.suppressRules.join(', ')}). Rule suppression is not yet implemented in this build; all diagnostics are emitted. (Tracked for v2.)`,
-    );
-  }
-  if (input.sidebarTopics === false) {
-    add(
-      `Configured: sidebarTopics: false requested. The starlight-sidebar-topics auto-install path is not implemented in this build; sidebar remains flat. (Tracked for v2.)`,
-    );
-  }
-  return diags;
 }
 
 async function readAutoAppendContent(

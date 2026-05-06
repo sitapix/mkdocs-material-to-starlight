@@ -482,6 +482,14 @@ const REGISTRY_ENTRIES: ReadonlyArray<DiagnosticEntry> = [
       'Place the favicon at the path declared in mkdocs.yml relative to docs_dir, OR remove the `favicon:` setting from astro.config.mjs.',
   },
   {
+    id: 'favicon-extension-unsupported',
+    severity: 'warning',
+    description:
+      'theme.favicon path used a file extension Starlight does not accept. Starlight\'s schema only allows `.ico`, `.gif`, `.jpg`/`.jpeg`, `.png`, and `.svg` favicons; emitting any other extension (e.g. `.webp`, `.avif`) crashes `astro:config:setup` with "favicon must be a .ico, .gif, .jpg, .png, or .svg file". The converter dropped the favicon emission so the build succeeds — Starlight falls back to its default chrome.',
+    fix:
+      'Re-encode the source favicon to one of the accepted formats (PNG is the safest choice for general use; SVG for vector logos) and put it back at the same path under docs_dir, then re-run the converter. As a quicker workaround, drop the `favicon:` setting from mkdocs.yml entirely and Starlight will use its built-in default.',
+  },
+  {
     id: 'palette-translated',
     severity: 'info',
     description:

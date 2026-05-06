@@ -27,4 +27,61 @@ describe('serializeContentConfig', () => {
     const out = serializeContentConfig();
     expect(out.endsWith('\n')).toBe(true);
   });
+
+  it('emits a bare docsSchema() when no extra fields are provided', () => {
+    const out = serializeContentConfig({});
+    // No `extend:` block, no zod import.
+    expect(out).toContain('schema: docsSchema(),');
+    expect(out).not.toContain("from 'astro/zod'");
+    expect(out).not.toContain('extend:');
+  });
+
+  it('emits docsSchema({ extend }) when unknown frontmatter fields are passed', () => {
+    // Real-world: zbghost325/XRIML-WIKI uses `tags`, `date`, `version` across
+    // 30+ pages. Auto-extending the generated content.config.ts means the
+    // build works out of the box; users tighten types only if they want to.
+    const out = serializeContentConfig({
+      tags: 'z.array(z.string()).optional()',
+      date: 'z.coerce.date().optional()',
+      version: 'z.string().optional()',
+    });
+    expect(out).toContain("import { z } from 'astro/zod';");
+    expect(out).toContain('schema: docsSchema({');
+    expect(out).toContain('extend: z.object({');
+    expect(out).toContain('tags: z.array(z.string()).optional(),');
+    expect(out).toContain('date: z.coerce.date().optional(),');
+    expect(out).toContain('version: z.string().optional(),');
+  });
+
+  it('quotes field names that aren\'t valid JS identifiers (hyphens, leading digits, etc.)', () => {
+    // Real-world (iolanta-tech/python-yaml-ld, tbklang/documentation):
+    // sources use kebab-case frontmatter fields like `header-includes`
+    // and `is-blocked-by`. Emitting them as bare TS identifiers
+    // (`header-includes: z...`) crashes esbuild with `Expected "}" but
+    // found "-"`. Quoting makes the property key a valid string literal.
+    const out = serializeContentConfig({
+      'header-includes': 'z.unknown().optional()',
+      'is-blocked-by': 'z.string().optional()',
+      author: 'z.string().optional()',
+    });
+    expect(out).toContain('"header-includes": z.unknown().optional(),');
+    expect(out).toContain('"is-blocked-by": z.string().optional(),');
+    // Plain identifiers stay unquoted.
+    expect(out).toContain('author: z.string().optional(),');
+  });
+
+  it('orders extended field names alphabetically for stable output', () => {
+    // Idempotency: running the converter twice on the same input must produce
+    // the same content.config.ts. Sort the field list deterministically.
+    const out = serializeContentConfig({
+      zeta: 'z.string().optional()',
+      alpha: 'z.string().optional()',
+      mu: 'z.string().optional()',
+    });
+    const alphaIdx = out.indexOf('alpha:');
+    const muIdx = out.indexOf('mu:');
+    const zetaIdx = out.indexOf('zeta:');
+    expect(alphaIdx).toBeLessThan(muIdx);
+    expect(muIdx).toBeLessThan(zetaIdx);
+  });
 });
