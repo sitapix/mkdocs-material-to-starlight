@@ -16,6 +16,7 @@
  */
 
 import { fenceMarker } from '../../domain/syntax/fence.js';
+import { quoteUnquotedHtmlAttrs } from './quote-unquoted-attrs.js';
 
 /** HTML void elements per the WHATWG spec. MDX requires explicit self-close. */
 const VOID_ELEMENTS: ReadonlySet<string> = new Set([
@@ -82,6 +83,13 @@ export function sanitizeMdxSyntax(source: string, report?: SanitizeReport): stri
   // would either trip MDX or get mistakenly interpreted as a real tag.
   out = escapeScriptBlockContents(out);
   out = selfCloseVoidElements(out);
+  // Quote unquoted HTML attribute values BEFORE the placeholder/angle-
+  // bracket escapers run — `<div class=foo>` is valid HTML but invalid
+  // JSX. Without this, the escapers either pass it through (and MDX
+  // crashes) or escape the brackets unnecessarily. Real-world break:
+  // thoughtspot/cs_tools/changelog uses `<div class=grid-define-columns
+  // data-columns=2 markdown="block">` mid-document.
+  out = quoteUnquotedHtmlAttrs(out);
   out = escapePlaceholderAngleBrackets(out);
   out = escapeAmbiguousLessThan(out);
   out = escapeOrphanOpenBrace(out);
@@ -369,6 +377,15 @@ function escapeOrphanOpenBrace(source: string): string {
     const next = src[i + 1] ?? '';
     if (next === '{' || next === '!' || next === '#') return null;
     if (next === '/' && src[i + 2] === '*') return null;
+    // Heuristic 0a: `{>` or `{<` — CritiCMarkup-style brace openers that
+    // survived earlier passes, e.g. `**{> [link] <}**` from
+    // thoughtspot/cs_tools. acorn rejects expressions starting with `>`
+    // or `<` in expression position. Always escape — JSX expressions
+    // never start with these characters.
+    if (next === '>' || next === '<') {
+      out.push('&#123;');
+      return i + 1;
+    }
     // Heuristic 0: shell / template-literal `${VAR}` interpolation. MDX
     // reads `$` as text and `{...}` as a JSX expression that references an
     // undefined identifier — at RUNTIME, not parse time. Real-world:

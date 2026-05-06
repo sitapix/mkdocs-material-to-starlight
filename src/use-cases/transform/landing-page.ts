@@ -248,8 +248,8 @@ function buildSplashPage(
   if (actions.length > 0) {
     heroLines.push('  actions:');
     for (const action of actions) {
-      heroLines.push(`    - text: ${action.text}`);
-      heroLines.push(`      link: ${action.link}`);
+      heroLines.push(`    - text: ${quoteYamlScalar(action.text)}`);
+      heroLines.push(`      link: ${quoteYamlScalar(action.link)}`);
       heroLines.push(`      icon: right-arrow`);
       heroLines.push(`      variant: ${action.variant}`);
     }
