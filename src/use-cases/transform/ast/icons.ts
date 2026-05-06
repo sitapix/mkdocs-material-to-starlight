@@ -23,7 +23,7 @@
 
 import { visit, SKIP } from 'unist-util-visit';
 import type { Plugin } from 'unified';
-import type { Html, PhrasingContent, Root, Text } from 'mdast';
+import type { PhrasingContent, Root, Text } from 'mdast';
 import { resolveIcon, type IconDescriptor } from '../resolve-icon.js';
 import { createDiagnostic, type Diagnostic } from '../../../domain/diagnostics/diagnostic.js';
 
@@ -64,7 +64,7 @@ export const transformIcons: Plugin<[IconTransformOptions], Root> = (options) =>
   };
 };
 
-type SplitNode = Text | Html;
+type SplitNode = Text | MdxJsxTextElementNode;
 
 function splitTextNode(
   node: Text,
@@ -123,7 +123,7 @@ function pushIfNonEmpty(out: SplitNode[], value: string): void {
   out.push({ type: 'text', value });
 }
 
-function toIconHtml(descriptor: IconDescriptor, label: string | null): Html {
+function toIconHtml(descriptor: IconDescriptor, label: string | null): MdxJsxTextElementNode {
   if (descriptor.kind === 'starlight-builtin') {
     return makeIconHtml(descriptor.name, label);
   }
@@ -137,30 +137,40 @@ function toIconHtml(descriptor: IconDescriptor, label: string | null): Html {
   return makeIconHtml(descriptor.original, label);
 }
 
-function makeIconHtml(name: string, label: string | null): Html {
-  // Self-closing JSX so `detectMdxNeeds`' tag scanner counts it without
-  // requiring a closing tag, and Starlight's MDX renderer resolves it via
-  // the auto-injected `Icon` import.
-  //
-  // Add `class="sl-inline-icon"` so the icon stays inline with surrounding
-  // text. Starlight's `markdown.css` applies `display: block` to every
-  // `<svg>` inside `.sl-markdown-content`, breaking phrases like "this icon
-  // ✏️ appears here." onto multiple lines. The converter ships a CSS rule
-  // in `mkdocs-migration.css` that targets `.sl-inline-icon` with higher
-  // specificity (and via the unlayered `customCss` cascade beating
-  // Starlight's layered rule) to restore inline-block behaviour. We avoid
-  // wrapping in `<span class="not-content">` because MDX block-parsing
-  // sometimes treats `<span>` at the start of a serialized HTML node as
-  // block-level, breaking the surrounding paragraph.
-  const labelAttr = label === null ? '' : ` aria-label="${escapeAttr(label)}"`;
-  return {
-    type: 'html',
-    value: `<Icon name="${escapeAttr(name)}" class="sl-inline-icon"${labelAttr} />`,
-  };
+interface MdxJsxAttribute {
+  readonly type: 'mdxJsxAttribute';
+  readonly name: string;
+  readonly value: string;
 }
 
-function escapeAttr(value: string): string {
-  return value.replace(/&/g, '&amp;').replace(/"/g, '&quot;');
+interface MdxJsxTextElementNode {
+  readonly type: 'mdxJsxTextElement';
+  readonly name: string;
+  readonly attributes: ReadonlyArray<MdxJsxAttribute>;
+  readonly children: ReadonlyArray<unknown>;
+}
+
+function makeIconHtml(name: string, label: string | null): MdxJsxTextElementNode {
+  // Inline-flavored mdxJsxTextElement so the icon nests cleanly inside text
+  // without breaking surrounding paragraphs. The `class="sl-inline-icon"`
+  // attribute pairs with a CSS rule in `mkdocs-migration.css` (shipped via
+  // customCss) that overrides Starlight's `display: block` on every <svg>
+  // inside `.sl-markdown-content` — without it, phrases like "this icon ✏️
+  // appears here" wrap onto multiple lines. Self-closing (no children) so
+  // `detectMdxNeeds`' tag scanner counts it without needing a closer.
+  const attributes: MdxJsxAttribute[] = [
+    { type: 'mdxJsxAttribute', name: 'name', value: name },
+    { type: 'mdxJsxAttribute', name: 'class', value: 'sl-inline-icon' },
+  ];
+  if (label !== null) {
+    attributes.push({ type: 'mdxJsxAttribute', name: 'aria-label', value: label });
+  }
+  return {
+    type: 'mdxJsxTextElement',
+    name: 'Icon',
+    attributes,
+    children: [],
+  };
 }
 
 interface TrailingAttrs {
