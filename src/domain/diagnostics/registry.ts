@@ -1,24 +1,18 @@
 /**
- * The diagnostic registry — single declarative list of every `ruleId` the
+ * The diagnostic registry: single declarative list of every `ruleId` the
  * converter is allowed to emit.
  *
- * Why this exists. Diagnostics are the converter's primary user-facing
- * channel for "this didn't go cleanly." Their `ruleId` field is what users
- * grep for in CI logs and `MIGRATION_NOTES.md`. If two emit sites use the
- * same string with different meaning, or if a typo silently introduces a
- * new ID, users lose the ability to filter or search reliably.
+ * Diagnostics are the converter's primary "this didn't go cleanly" channel.
+ * Users grep `ruleId` in CI logs and `MIGRATION_NOTES.md`, so duplicates,
+ * typos, or unregistered IDs break filtering and search.
  *
- * The registry enforces three invariants, each backed by a test:
+ * Three invariants, each backed by a test:
  *   1. Every production-emitted `ruleId` is registered.
- *   2. Every registry entry has a non-empty description and a documented
- *      remediation path.
+ *   2. Every registry entry has a non-empty description and remediation path.
  *   3. IDs are unique.
  *
- * The optional `relatedFeatureId` ties a diagnostic back to a row in the
- * conversion-mapping table (`domain/conversion-mapping/table.ts`) so a user
- * who sees a diagnostic can look up the canonical conversion description.
- *
- * Pure data. No behavior beyond accessor helpers.
+ * `relatedFeatureId` ties a diagnostic to a row in `conversion-mapping/table.ts`
+ * so users can look up the canonical conversion description. Pure data.
  */
 
 import type { Severity } from './diagnostic.js';
@@ -75,7 +69,7 @@ const REGISTRY_ENTRIES: ReadonlyArray<DiagnosticEntry> = [
     description:
       'Frontmatter contains a top-level field that is not in Starlight\'s docsSchema.',
     fix:
-      'Either remove the field, or extend the schema in `src/content.config.ts` via `docsSchema({ extend: z.object({ ... }) })`.',
+      'The generated `src/content.config.ts` auto-extends `docsSchema({ extend: z.object({ ... }) })` with every detected field. Types are inferred from observed values — review and tighten as needed.',
   },
   {
     id: 'unknown-jsx-component',
@@ -96,18 +90,18 @@ const REGISTRY_ENTRIES: ReadonlyArray<DiagnosticEntry> = [
   },
   {
     id: 'snippet-cycle',
-    severity: 'error',
+    severity: 'warning',
     description:
-      'A `--8<--` snippet inclusion forms a cycle (file A includes file B which includes file A).',
+      'A `--8<--` snippet inclusion forms a cycle (file A includes file B which includes file A). The cycle is broken and the offending marker is left in source — not a build failure, but the include site still shows the literal `--8<--` directive in the rendered page.',
     fix:
       'Break the cycle by inlining one side or restructuring the shared content into a separate non-cyclic file.',
     relatedFeatureId: 'snippets',
   },
   {
     id: 'snippet-depth-exceeded',
-    severity: 'error',
+    severity: 'warning',
     description:
-      'A `--8<--` snippet chain nests deeper than the configured maximum (default 8).',
+      'A `--8<--` snippet chain nests deeper than the configured maximum (default 8). The chain is truncated and the deepest marker is left in source.',
     fix:
       'Flatten the snippet hierarchy or raise the depth limit if the structure is genuinely needed.',
     relatedFeatureId: 'snippets',
@@ -204,7 +198,7 @@ const REGISTRY_ENTRIES: ReadonlyArray<DiagnosticEntry> = [
     description:
       'mkdocs.yml lists `mkdocs-jupyter` (.ipynb rendering); Starlight has no native notebook renderer.',
     fix:
-      'Convert notebooks to Markdown ahead of time (`jupyter nbconvert --to markdown`), or implement a custom Astro loader for .ipynb.',
+      'Migration anchors: (1) `jupyter nbconvert --to markdown` — pre-render notebooks to Markdown before running the converter; outputs land in `docs_dir/` and convert normally. (2) `astro-quarto` — Quarto-based Astro integration that renders `.qmd` (the modern .ipynb superset). (3) Custom Astro loader: extend `docsLoader()` with an `.ipynb` reader that emits MDX entries; cell outputs become Expressive Code blocks.',
   },
   {
     id: 'astro-check-error',
@@ -403,9 +397,9 @@ const REGISTRY_ENTRIES: ReadonlyArray<DiagnosticEntry> = [
     id: 'feature-tabs-link-detected',
     severity: 'info',
     description:
-      'Material `content.tabs.link` feature (cross-page tab synchronization) detected. Starlight `<Tabs>` accepts a `syncKey` prop for the same behavior.',
+      'Material `content.tabs.link` feature (cross-page tab synchronization) detected. Starlight `<Tabs>` accepts a `syncKey` prop for the same behavior — tabs sharing a `syncKey` value sync selection across the whole site, persisted via localStorage.',
     fix:
-      'No action required — the converter has emitted `syncKey` on each generated tab block.',
+      'Migration anchor: derive a stable `syncKey` from the tab labels (e.g., a sorted-label hash). The converter\'s `package-managers-tabs` mapping already does this for the npm/yarn/pnpm/bun pattern (`syncKey="pkg"`). For other recurring tab-label sets, add the same convention manually: `<Tabs syncKey="env">` for prod/staging/dev, etc. See https://starlight.astro.build/components/tabs/#synchronizing-tabs.',
   },
   {
     id: 'feature-tabs-link-occurrence',
@@ -662,7 +656,7 @@ const REGISTRY_ENTRIES: ReadonlyArray<DiagnosticEntry> = [
     description:
       'A `theme.features` entry has no first-class Starlight equivalent and was dropped (e.g., toc.integrate, navigation.prune, header.autohide, search.share, navigation.top, navigation.expand). Note: `announce.dismiss` and `content.action.view` ARE covered now via `starlight-announcement` and `starlight-page-actions` respectively (auto-installed when detected).',
     fix:
-      'Read the per-feature note in the diagnostic message — most have a one-line component-override path (Banner.astro, PageSidebar.astro, Header.astro) that reimplements the behavior client-side. The full overrides reference is at https://starlight.astro.build/reference/overrides/.',
+      'Migration anchors per feature: (a) `navigation.instant.*` (XHR navigation, prefetch, progress) → Astro\'s `<ClientRouter />` from `astro:transitions` provides view-transition-style nav with prefetch hints. (b) `navigation.tracking` (URL anchor sync on scroll) → custom client script in `Head.astro` listening to `IntersectionObserver`. (c) `navigation.prune` (HTML reduction) → no equivalent; ignore. (d) `toc.integrate` / `toc.follow` → override `TableOfContents.astro` and merge into `Sidebar.astro`. (e) `header.autohide` → override `Header.astro` with a scroll-listener that toggles a `--sl-nav-translate` CSS var. (f) `search.share` → override `Search.astro` to add a "copy link to query" button. The full overrides reference is at https://starlight.astro.build/reference/overrides/.',
     relatedFeatureId: 'theme-features',
   },
   {
@@ -696,18 +690,18 @@ const REGISTRY_ENTRIES: ReadonlyArray<DiagnosticEntry> = [
     id: 'extra-analytics-feedback-dropped',
     severity: 'warning',
     description:
-      '`extra.analytics.feedback` (the Material "Was this page helpful?" widget) was dropped — Starlight has no equivalent.',
+      '`extra.analytics.feedback` (the Material "Was this page helpful?" widget) was dropped — Starlight has no built-in equivalent.',
     fix:
-      'Reimplement the widget as a custom component override (e.g., add a small Astro component to the page footer that calls `gtag(\'event\', \'feedback\', { rating: ... })`), or install a community Starlight plugin that provides a feedback prompt.',
+      'Migration anchors: (1) **FeelBack** — the recommended community widget listed at https://starlight.astro.build/resources/plugins/ (search "FeelBack"). Install via `<script src="https://cdn.feelback.dev/...">` injected into Starlight `head[]`. (2) Custom Footer override — add a small Astro component that calls `gtag(\'event\', \'feedback\', { rating: ... })` to forward the rating to GA4. (3) Reuse `starlight-page-actions` (already auto-installed when `content.action.view` is enabled) and add a custom action that opens an issue/PR for the page.',
     relatedFeatureId: 'extra-analytics',
   },
   {
     id: 'extra-analytics-provider-unsupported',
     severity: 'warning',
     description:
-      '`extra.analytics.provider` was set to a value the converter does not recognize (only `google` is auto-injected today). The analytics block is dropped.',
+      'mkdocs.yml `extra.analytics.provider` is a custom or unrecognized value. The converter only auto-wires Google Analytics, and no community Starlight plugin is known for this provider.',
     fix:
-      'For matomo/plausible/custom providers, manually add the loader script to the starlight `head` config. The converter intentionally does not generate snippets for analytics tools whose terms or scripts may have changed since this release.',
+      'Add the provider\'s tracking snippet directly to your Starlight `head[]` config in `astro.config.mjs`. The converter intentionally does not generate snippets for analytics tools whose terms or scripts may have changed since this release.',
     relatedFeatureId: 'extra-analytics',
   },
   {
@@ -829,12 +823,45 @@ const REGISTRY_ENTRIES: ReadonlyArray<DiagnosticEntry> = [
       'Re-add the desired attributes as MDX `<a>` props if needed, or use an Astro component.',
   },
   {
+    id: 'block-attr-list-stripped',
+    severity: 'info',
+    description:
+      'A bare PyMdown `attr_list` line (e.g., `{ .card }` or `{ #id style="..." }`) decorating the previous block was stripped during MDX promotion. Starlight has no equivalent post-MDX attribute hook, and MDX itself parses the bare `{...}` as a JS expression — which fails on `.class`/CSS-shaped contents.',
+    fix:
+      'Re-attach the desired classes or attributes as JSX props on the preceding element. Pure heading-anchor `{#id}` lines are not stripped; they remain visibly escaped so the user can re-anchor them manually.',
+  },
+  {
+    id: 'inline-attr-list-stripped',
+    severity: 'info',
+    description:
+      'An inline PyMdown `attr_list` block (e.g., `:icon[name]{ .lg .middle }` or `:material-clock-fast:{ .lg }`) was stripped during MDX promotion. MDX would otherwise try to acorn-parse `.lg .middle` as JavaScript and crash. Only `{...}` whose tokens are all attr-list shape (with at least one `.class` or `key=value`) are stripped — real JSX expressions like `{user.name}` are left alone.',
+    fix:
+      'Re-attach the desired attributes as JSX props on the preceding component or wrap the content in an Astro component that accepts the equivalent props.',
+  },
+  {
+    id: 'heading-span-anchor-stripped',
+    severity: 'info',
+    description:
+      'A manual heading anchor `<span id="..."> Title` (Material idiom — and sometimes paragraph-level too) was stripped during MDX promotion. MDX rejects unmatched `<span>` openers and Starlight derives heading anchors from the heading text, not from a manual `id`. Each stripped `id` is reported separately so the user sees every dropped cross-page link target.',
+    fix:
+      'If cross-page links target `#anchor`, re-add the anchor inside the heading body as `<a id="anchor"></a>` (the file becomes `.mdx`), or update the linking pages to use Starlight\'s auto-generated heading slug (derived from the heading text).',
+  },
+  {
     id: 'package-managers-tabs-promoted',
     severity: 'info',
     description:
       'A tab group using npm/yarn/pnpm/bun as tab labels was detected and promoted to a `<PackageManagers>` component from the `starlight-package-managers` package.',
     fix:
       'No action required. Verify the `pkg` prop on the emitted `<PackageManagers>` component is correct. Install `starlight-package-managers` (`npm install starlight-package-managers`) and wire it into your Astro config if not already done.',
+    relatedFeatureId: 'package-managers-tabs',
+  },
+  {
+    id: 'package-managers-tabs-fallback',
+    severity: 'warning',
+    description:
+      'A package-manager tab group was detected but the package name could not be extracted from the install command. The converter falls back to a plain `<Tabs>` instead of `<PackageManagers>`, which loses the cross-page tab synchronization users expect.',
+    fix:
+      'Edit the affected file to either (a) make the install command match `<pm> install <package-name>` so the converter can extract the name on the next run, or (b) hand-replace the `<Tabs>` block with `<PackageManagers pkg="your-package">`.',
     relatedFeatureId: 'package-managers-tabs',
   },
   {
@@ -1203,9 +1230,9 @@ const REGISTRY_ENTRIES: ReadonlyArray<DiagnosticEntry> = [
     id: 'extra-analytics-provider-recommended',
     severity: 'info',
     description:
-      'mkdocs.yml `extra.analytics.provider` is set to a non-Google value (e.g. `plausible`, `tag-manager`, or a custom provider). The converter only auto-wires Google Analytics into Starlight `head[]`; other providers need a community plugin or a manual head[] script entry.',
+      'mkdocs.yml `extra.analytics.provider` is set to a known non-Google provider (`plausible`, `tag-manager`, etc.). A community Starlight plugin exists for these — installing it is a clean migration path.',
     fix:
-      'For Plausible: install `starlight-plausible` and pass your domain via plugin options. For GTM: install `starlight-gtm` and pass your container ID. For custom or other providers: add the provider\'s tracking snippet directly to your Starlight `head[]` config.',
+      'For Plausible: install `starlight-plausible` and pass your domain via plugin options. For GTM: install `starlight-gtm` and pass your container ID.',
   },
   {
     id: 'extra-annotate-no-equivalent',
@@ -1261,7 +1288,12 @@ const REGISTRY_ENTRIES: ReadonlyArray<DiagnosticEntry> = [
     description:
       'A converted file failed to parse under the same MDX/Markdown parser Astro/Starlight uses at build time. The file would crash `astro build`.',
     fix:
-      'Inspect the file at the reported line/column and fix the offending syntax. Common causes: an HTML element that needs to be self-closed in MDX, a `{` that MDX is interpreting as a JSX expression, an autolink `<https://…>` MDX rejects, or remark-stringify escaping that produced invalid syntax.',
+      'Inspect the file at the reported line/column. Likely causes, in order of frequency:\n' +
+      '  1. **Source-side HTML imbalance or typo** (MkDocs is permissive, MDX is strict). Look for unbalanced `<div>`/`</div>`, typo\'d tags like `</divr>`, `<span>` not closed before `</div>`, or HTML attributes missing closing quotes. The fix is to repair the source `.md` and re-run conversion.\n' +
+      '  2. **Bare `{` interpreted as JSX expression**. MDX treats `{` as the start of a JS expression. The converter escapes Jinja `{{...}}` / `{%...%}` / `{#...#}` and PyMdown attr_list `{:...}` automatically, but a `{` in arbitrary prose (e.g. pseudo-code `outputMode: OutputMode) extends Sink {` mid-paragraph) still trips the parser. Wrap the offending content in a fenced code block.\n' +
+      '  3. **Autolink `<https://…>` or `<email>`** — MDX wants explicit Markdown links `[https://...](https://...)`.\n' +
+      '  4. **HTML element needing self-close in MDX** (`<br>` → `<br/>`, `<img ...>` → `<img ... />`).\n' +
+      '  5. **Genuine converter bug** — if the file source looks clean and none of the above apply, file an issue with the line/column and the surrounding 3 lines of source.',
   },
   {
     id: 'output-validator-unavailable',
@@ -1270,6 +1302,248 @@ const REGISTRY_ENTRIES: ReadonlyArray<DiagnosticEntry> = [
       'Output syntax validation was skipped because `@mdx-js/mdx` (the parser Astro uses) is not installed in the converter\'s runtime.',
     fix:
       'Install `@mdx-js/mdx` (or run the converter under Node with that package available) to enable post-conversion MDX/Markdown parse validation.',
+  },
+  {
+    id: 'fancylists-promoted',
+    severity: 'info',
+    description:
+      'A `pymdownx.fancylists` Roman numeral or alpha-character ordered list (`i. ii. iii.`, `a. b. c.`, etc.) was promoted to a raw `<ol type="…">` HTML block. remark-parse would otherwise re-number it as decimal, silently losing the list style.',
+    fix:
+      'No action required — the emitted HTML renders identically in Starlight. If you previously customized marker style via CSS targeting `.fancylists-*` classes, port those selectors to target `ol[type="i"]`, `ol[type="a"]`, etc.',
+    relatedFeatureId: 'fancylists',
+  },
+  {
+    id: 'wikilinks-rewritten',
+    severity: 'info',
+    description:
+      'A `[[Page Name]]` Python-Markdown wikilink was rewritten to a standard Markdown link (`[Page Name](/page-name/)`). The slug is derived from the label using lowercase + dash-separated normalization (the Python-Markdown default).',
+    fix:
+      'Verify the resolved URL points at the intended page. For Obsidian-imported sites with `[[name|display]]` pipe forms or non-default `base_url`, install `starlight-obsidian` for full vault-style resolution.',
+    relatedFeatureId: 'wikilinks',
+  },
+  {
+    id: 'smarty-recommend-smartypants',
+    severity: 'info',
+    description:
+      '`mkdocs.yml` enables Python-Markdown\'s `smarty` extension (smart quotes, em/en dashes, ellipsis). remark-parse does not perform these substitutions by default, so prose typography would regress after migration.',
+    fix:
+      'Add `remark-smartypants` to `markdown.remarkPlugins` in `astro.config.mjs`: `import smartypants from \'remark-smartypants\'; ... markdown: { remarkPlugins: [smartypants] }`. The defaults match `smarty`\'s ASCII substitutions one-for-one.',
+    relatedFeatureId: 'smarty',
+  },
+  {
+    id: 'progressbar-promoted',
+    severity: 'info',
+    description:
+      'A `pymdownx.progressbar` syntax (`[=85% "85%"]` or `[=1/2 "Half"]`) was promoted to a raw `<progress>` HTML element. The `.progress-bar` / `.progress-label` Material CSS classes are not preserved.',
+    fix:
+      'No action required for default rendering — Starlight\'s base styles render `<progress>` natively. If you customized the candy-stripe / level-class look via Material CSS, port those styles to target the `<progress>` element directly.',
+    relatedFeatureId: 'progressbar',
+  },
+  {
+    id: 'pymdownx-quotes-callouts-routed',
+    severity: 'info',
+    description:
+      '`mkdocs.yml` enables `pymdownx.quotes` with the `callouts: true` option. The callout syntax (`> [!note]`, `> [!tip] Title`) is identical to GitHub-flavored alerts — already handled by `scan-github-alerts` and the `starlight-github-alerts` plugin (auto-installed when alert syntax is detected).',
+    fix:
+      'No action required — `starlight-github-alerts` renders the callouts as Starlight asides at build time. The lowercase form (`> [!note]`) is supported alongside the GitHub uppercase form (`> [!NOTE]`).',
+    relatedFeatureId: 'quotes-callouts',
+  },
+  {
+    id: 'extension-fancylists-promoted',
+    severity: 'info',
+    description:
+      '`pymdownx.fancylists` extension was detected. Roman/alpha numeral lists are promoted to `<ol type="i|I|a|A">` HTML at the normalize stage so Starlight renders them with the correct numeral style.',
+    fix: 'No action required — emitted HTML renders natively in Starlight.',
+    relatedFeatureId: 'fancylists',
+  },
+  {
+    id: 'extension-quotes-callouts-routed',
+    severity: 'info',
+    description:
+      '`pymdownx.quotes` extension was detected. If `callouts: true` is configured, the callout syntax routes through `scan-github-alerts` and `starlight-github-alerts` (auto-installed when alert markers are present).',
+    fix: 'No action required.',
+    relatedFeatureId: 'quotes-callouts',
+  },
+  {
+    id: 'extension-wikilinks-rewritten',
+    severity: 'info',
+    description:
+      '`wikilinks` extension was detected. The converter rewrites `[[Page Name]]` to `[Page Name](/page-name/)` using lowercase + dash-separated normalization (Python-Markdown default).',
+    fix:
+      'For Obsidian-style sites with `[[name|display]]` pipe forms or non-default `base_url`, install `starlight-obsidian` for full vault-style resolution.',
+    relatedFeatureId: 'wikilinks',
+  },
+  {
+    id: 'extension-smarty-recommend',
+    severity: 'info',
+    description:
+      '`smarty` extension was detected (smart quotes, em/en dashes, ellipsis substitutions). remark-parse does not perform these substitutions by default.',
+    fix:
+      'Add `remark-smartypants` to `markdown.remarkPlugins` in `astro.config.mjs` to preserve typography.',
+    relatedFeatureId: 'smarty',
+  },
+  {
+    id: 'extension-pymdownx-extra-expanded',
+    severity: 'info',
+    description:
+      '`pymdownx.extra` meta-bundle was detected. Aliases `betterem`, `superfences`, `footnotes`, `attr_list`, `def_list`, `tables`, `abbr`, and `md_in_html` — all already covered individually.',
+    fix:
+      'No action required for the bundle. Custom `pymdownx.extra: { footnotes: { BACKLINK_TEXT } }` sub-options are dropped — re-enable specific tweaks via the corresponding individual extensions.',
+    relatedFeatureId: 'pymdownx-extra',
+  },
+  {
+    id: 'extension-betterem-detected',
+    severity: 'info',
+    description:
+      '`pymdownx.betterem` was detected. remark-parse uses CommonMark emphasis rules, which differ subtly from betterem\'s smart-emphasis options.',
+    fix: 'Spot-check prose with intra-word emphasis (`my_var_name`, `mid*word*emph`) for rendering differences.',
+    relatedFeatureId: 'betterem',
+  },
+  {
+    id: 'extension-b64-subsumed',
+    severity: 'info',
+    description:
+      '`pymdownx.b64` was detected — subsumed by Astro\'s asset pipeline.',
+    fix:
+      'No action required. To inline images as `data:` URLs explicitly, import them as Astro assets and use the resolved path.',
+    relatedFeatureId: 'b64',
+  },
+  {
+    id: 'plugin-minify-subsumed',
+    severity: 'info',
+    description:
+      '`mkdocs-minify-plugin` was detected — subsumed by Astro/Vite production minification.',
+    fix: 'No action required.',
+    relatedFeatureId: 'plugin-minify',
+  },
+  {
+    id: 'plugin-glossary-recommend',
+    severity: 'info',
+    description:
+      '`mkdocs-glossary-plugin` was detected (hover-tooltip glossary terms).',
+    fix:
+      'Recreate via the converter\'s `abbr` handling (`*[TERM]: definition`) for plain-text definitions, or build a custom MDX `<Glossary>` component for richer tooltips.',
+    relatedFeatureId: 'plugin-glossary',
+  },
+  {
+    id: 'plugin-video-recommend',
+    severity: 'info',
+    description:
+      '`mkdocs-video` was detected (`![type:video](url)` syntax).',
+    fix:
+      'Replace with native MDX `<video>` elements, or install `starlight-videos` for richer video-guide / course-style components.',
+    relatedFeatureId: 'plugin-video',
+  },
+  {
+    id: 'plugin-puml-recommend',
+    severity: 'info',
+    description:
+      '`mkdocs-puml` or `plantuml-markdown` was detected.',
+    fix:
+      'Install `astro-plantuml` and add to your Astro integrations — the same `@startuml...@enduml` fenced syntax is supported.',
+    relatedFeatureId: 'plugin-puml',
+  },
+  {
+    id: 'plugin-encryptcontent-no-equivalent',
+    severity: 'warning',
+    description:
+      '`mkdocs-encryptcontent-plugin` was detected (per-page password encryption). No Starlight equivalent — Astro outputs static HTML with no client-side decryption layer.',
+    fix:
+      'Either remove protected content from the public site, or wrap the deployed `dist/` directory in a custom auth gate (Cloudflare Access, Netlify password protection, etc.).',
+    relatedFeatureId: 'plugin-encryptcontent',
+  },
+  {
+    id: 'plugin-charts-no-equivalent',
+    severity: 'warning',
+    description:
+      '`mkdocs-charts-plugin` was detected (Vega-Lite block syntax). No first-class Starlight equivalent.',
+    fix:
+      'Recreate via a custom MDX `<VegaChart>` component using vega-embed, or pre-render charts to SVG/PNG ahead of conversion.',
+    relatedFeatureId: 'plugin-charts',
+  },
+  {
+    id: 'plugin-markdownextradata-no-equivalent',
+    severity: 'warning',
+    description:
+      '`mkdocs-markdownextradata-plugin` was detected (`{{ var }}` Jinja-style variable interpolation from `extra.*`). The bare `{{ }}` syntax conflicts with MDX expressions.',
+    fix:
+      'Use Astro\'s `import.meta.env.PUBLIC_*` env variables in MDX (`{import.meta.env.PUBLIC_MY_VAR}`) for the equivalent build-time interpolation.',
+    relatedFeatureId: 'plugin-markdownextradata',
+  },
+  {
+    id: 'inline-admonition-modifier-dropped',
+    severity: 'info',
+    description:
+      'A Material admonition with the `inline` or `inline end` modifier was detected. The modifier creates a floated layout (left/right). The Starlight aside directive does not preserve float positioning — only the type and content survive.',
+    fix:
+      'If the float layout is important, recreate via a custom CSS rule: `:global(.float-left .starlight-aside) { float: left; max-width: 50%; margin-right: 1rem; }` in `customCss` and add the `float-left` class manually via a wrapping `<div>` in MDX.',
+    relatedFeatureId: 'admonition-block',
+  },
+  {
+    id: 'code-fence-copy-flag-stripped',
+    severity: 'info',
+    description:
+      'A code fence carried the Material `.copy` or `.no-copy` attr_list class. Expressive Code (Starlight\'s code highlighter) shows a copy button by default with no per-block toggle. The attr_list was stripped during normalization.',
+    fix:
+      'For `.copy` (default-on) — no action required. For `.no-copy` (suppress copy button) — Expressive Code has no per-block disable; either accept the default (copy button stays) or set `frame="none"` per block (which removes the entire chrome, not just the copy button), or globally disable via `expressiveCode.frames.showCopyToClipboardButton: false` in astro.config.mjs.',
+    relatedFeatureId: 'code-fence-copy-flag',
+  },
+  {
+    id: 'mkdocs-validation-config-dropped',
+    severity: 'info',
+    description:
+      'mkdocs.yml `validation:` block was detected (MkDocs 1.6+ knobs that govern nav/link error severity). The converter has its own diagnostic taxonomy and emits at `warning` by default — stricter than MkDocs\' defaults.',
+    fix:
+      'No action required. The converter\'s diagnostics surface every link/nav issue MkDocs\' validation knobs would have flagged, plus more (e.g., `broken-link`, `nav-missing-target`). Review MIGRATION_NOTES.md after conversion. If you previously set `validation.links.absolute_links: relative_to_docs`, the converter resolves absolute links the same way by default.',
+  },
+  {
+    id: 'duplicate-h1-stripped',
+    severity: 'info',
+    description:
+      'A page\'s body H1 was stripped because it duplicated the frontmatter `title:` value. Material/MkDocs sites conventionally start every page body with `# Title` matching the implicit page title. Starlight auto-renders `title:` as the page H1, so leaving the body H1 produces a visible duplicate (the title appears twice on the rendered page).',
+    fix:
+      'No action required by default — the visible duplicate is gone. Comparison is case-insensitive and whitespace-tolerant; if you want to KEEP the body H1 (because it should differ from the page title in the rendered DOM), change the H1 text to something semantically distinct from the frontmatter `title:` value (e.g., `# Welcome to our docs` vs `title: Welcome`).',
+  },
+  {
+    id: 'slug-conflict-resolved',
+    severity: 'warning',
+    description:
+      'Two source files produced the same Starlight slug — typically `X.md` and `X/index.md` (a Material section-index pattern where the named sibling holds the real content and the directory\'s index.md is a thin snippet shim). The converter dropped the index.md form and kept the named sibling so the build can proceed.',
+    fix:
+      'Verify the surviving file (the named sibling, e.g. `core/metrics.md`) is the one with the substantive content. If the dropped file actually had unique content, rename one of them or move it to a different path so they no longer collide on the same slug.',
+  },
+  {
+    id: 'page-stub-detected',
+    severity: 'warning',
+    description:
+      'A page in the source contained only an H1 heading and no other body content (e.g., literally just `# Solution Structure\\n`). After the converter\'s duplicate-H1 strip, the page body is completely empty. The page was a stub in the original Material site too — Material would have rendered just the heading on its own.',
+    fix:
+      'Three options: (a) add real body content to the source markdown file and re-run the converter; (b) delete the stub from the converted output and remove its sidebar entry; (c) accept that the page renders only the title — both Material and Starlight handle empty bodies the same way (Material draws the heading, Starlight draws the title bar — visually equivalent).',
+  },
+  {
+    id: 'placeholder-page-detected',
+    severity: 'warning',
+    description:
+      'A page in the converted output contains only a multi-repo placeholder stub ("This page is a placeholder for the X repo\'s docs"). Material sites using `mkdocs-monorepo-plugin` or `mkdocs-multirepo-plugin` fetch the real content from another repository at MkDocs build time. The converter does not replicate that fetch.',
+    fix:
+      'Three options: (a) clone the source repository\'s content into the page before re-running the converter (`git clone <repo> docs/projects/<name>/`); (b) delete the placeholder file from the converted output and remove the matching sidebar entry from `astro.config.mjs`; (c) replace the page body with a link to the external repository\'s real docs site (e.g., `[Read the docs](https://hosted.example.com/foo)`).',
+    relatedFeatureId: 'plugin-monorepo',
+  },
+  {
+    id: 'mkdocs-strict-mode-info',
+    severity: 'info',
+    description:
+      'mkdocs.yml `strict: true` detected. The converter has no strict mode that fails on any warning.',
+    fix:
+      'Approximate strict mode post-migration by treating any `warning`-level diagnostic in MIGRATION_NOTES.md as failing, and run `astro check` (via the converter\'s `--check` flag) to surface build-blocking errors before deployment.',
+  },
+  {
+    id: 'slug-incompatible-path',
+    severity: 'warning',
+    description:
+      'A source folder or file basename contains characters that Astro\'s `github-slugger` will strip during slug generation (e.g. `.` in `1.0/`, `+` in `c++-primer.md`, ampersands, parens, etc.). The converter emits sidebar entries using the original path, but Astro registers the file under the slugified path — so the sidebar lookup fails at build with `AstroUserError: The slug "<original>" does not exist.` Common triggers are Mike-versioned doc folders (`1.0/`, `1.1/`) and file basenames borrowed from program identifiers (`c++-primer.md`, `node@18.md`).',
+    fix:
+      'Two ways to fix, pick whichever costs less in your project: (a) rename the offending folder/file on disk to the slug-safe form (`1.0/` → `1-0/` or `v1-0/`; `c++-primer.md` → `cpp-primer.md`) and re-run the converter — internal cross-page links inside your docs that reference the old path need to be updated too; (b) leave the source unchanged and hand-edit `astro.config.mjs` so each affected sidebar entry references the slug Astro actually generates (the diagnostic message includes the computed slug — copy that string verbatim into the sidebar). Option (a) keeps file paths and slugs in sync (recommended); option (b) is faster for small surface areas. The converter cannot pick safely on your behalf because both renaming and slug-substitution have visible side effects (broken inbound links, divergent paths) that depend on your hosting and SEO setup.',
   },
 ];
 

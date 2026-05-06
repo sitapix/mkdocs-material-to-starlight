@@ -1,22 +1,18 @@
 /**
- * Site-level converter — orchestrates conversion of every Markdown file in a
- * MkDocs site into Starlight artifacts.
+ * Site-level converter: orchestrates conversion of every Markdown file in
+ * a MkDocs site into Starlight artifacts.
  *
  * Pipeline:
- *   1. Build the run-wide SlugMap from the discovered source paths
- *   2. For each source file:
- *      a. Read its content via the FileSystem port
- *      b. Run convertFile (per-file orchestrator)
- *      c. Collect per-file diagnostics, tagged with the source path
+ *   1. Build the run-wide SlugMap from discovered source paths.
+ *   2. For each source file: read via FileSystem, run convertFile, collect
+ *      diagnostics tagged with the source path.
  *
- * Snippet expansion is deliberately separate from this composer; callers that
- * want it run `expandSnippets` over each source string before calling this
- * function (or it can be added as a flag in a follow-up).
+ * Snippet expansion is separate; callers run `expandSnippets` first (or
+ * threaded in via a flag in a follow-up).
  *
- * Returns either a Result.ok with `{ files, diagnostics }` or a Result.err
- * for fatal conditions (slug-map conflict, unreadable file). Per-file
- * conversion warnings (broken links, unmapped icons) flow through
- * `diagnostics`, not through the error channel.
+ * Returns `Result.ok { files, diagnostics }` or `Result.err` for fatal
+ * conditions (slug conflict, unreadable file). Per-file warnings flow
+ * through `diagnostics`, not the error channel.
  */
 
 import { ok, err, type Result } from '../../domain/result.js';
@@ -24,6 +20,12 @@ import type { FileSystem } from '../../domain/ports/file-system.js';
 import { createDiagnostic, type Diagnostic } from '../../domain/diagnostics/diagnostic.js';
 import type { RepoContext } from '../../domain/config/repo-context.js';
 import { buildSlugMap, type SlugMap } from '../../domain/starlight/slug-map.js';
+import {
+  expectedAstroSlug,
+  findSlugIncompatibleSegments,
+} from '../../domain/starlight/slug-compat.js';
+import { rewriteReadmePaths } from './rename-readme.js';
+// renameI18nPath is now consumed inside rewriteReadmePaths.
 import { convertFile } from '../convert-file/convert.js';
 import { detectFeatures } from '../detect-features/detect.js';
 import { expandSnippets } from '../expand-snippets/expand.js';
@@ -31,7 +33,6 @@ import type { DetectedFeature } from '../serialize-config/package-json.js';
 import { validateFrontmatter } from '../validate-output/frontmatter.js';
 import { validateJsxComponents } from '../validate-output/jsx-components.js';
 import { validateOutput } from '../validate-output/validate.js';
-import { renameI18nPath } from '../detect-features/i18n-rename.js';
 import { expandIncludeMarkdown } from '../include-markdown/expand.js';
 import { scanMacroOccurrences } from '../detect-macros/scan.js';
 import { scanMacroExpressions } from '../detect-macros/scan-expressions.js';
@@ -39,6 +40,9 @@ import { normalizeTyperSnippetDirectives } from '../normalize/typer-snippet-dire
 import { scanHeadingAnchors } from '../normalize/scan-heading-anchors.js';
 import { scanGithubAlerts } from '../normalize/scan-github-alerts.js';
 import { scanHeadingBadges } from '../normalize/scan-heading-badges.js';
+import { scanInlineAdmonitions } from '../normalize/scan-inline-admonitions.js';
+import { scanCodeFenceFlags } from '../normalize/scan-code-fence-flags.js';
+import { scanPlaceholderPage } from '../normalize/scan-placeholder-pages.js';
 import { scanTabAnchors } from '../normalize/scan-tab-anchors.js';
 import { scanButtonIcons } from '../normalize/scan-button-icons.js';
 import { scanMaterialMarkers } from '../normalize/scan-material-markers.js';
@@ -70,6 +74,14 @@ export interface ConvertSiteInput {
    * `<locale>/...` to match Starlight's directory-based i18n layout.
    */
   readonly i18nLocales?: ReadonlyArray<string>;
+  /**
+   * Material `plugins.blog.blog_dir` (default `blog`) when the blog plugin
+   * is enabled. When set, the source's `<blogDir>/index.md` (or .mdx) is
+   * skipped — `starlight-blog` auto-generates the blog landing page, and
+   * emitting the source's index would either collide or fail the
+   * plugin's date-required validation.
+   */
+  readonly blogDir?: string;
   /**
    * When true, run the `mkdocs-include-markdown-plugin` expander on every
    * source file before per-file conversion. Resolves `{% include %}` and
@@ -131,8 +143,49 @@ export interface ConvertSiteError {
 export async function convertSite(
   input: ConvertSiteInput,
 ): Promise<Result<ConvertSiteOutput, ConvertSiteError>> {
-  const slugMapOptions = input.i18nLocales === undefined ? undefined : { i18nLocales: input.i18nLocales };
-  const slugResult = buildSlugMap(input.sourcePaths, slugMapOptions);
+  // Step 1: rewrite README.md → index.md before slug map / sidebar build.
+  // MkDocs treats `README.md` as the section index; Starlight does not.
+  // Without this rewrite, `path/README.md` would emit at slug `path/README`
+  // and any sidebar entry referencing `path` (the section) would 500.
+  // The on-disk path is preserved in `readmeRename.diskByEmit` so the
+  // read step finds the original file.
+  // Pass i18n locales so the rewrite handles `page.fr.md` → `fr/page.md`
+  // before the dot-slugify step (without this, the locale dot gets eaten
+  // and the file becomes `page-fr.md`).
+  const readmeRename = rewriteReadmePaths(
+    input.sourcePaths,
+    input.i18nLocales ?? [],
+  );
+  // When the blog plugin is enabled, drop `<blogDir>/index.md` from the
+  // emit list. starlight-blog auto-generates the landing page and treats
+  // every page in the blog directory as a post (requiring `date:` and
+  // `authors:` frontmatter) — keeping the source's index.md crashes
+  // `astro build` with "Missing date for blog entry 'blog'." We surface a
+  // single info diagnostic so users know we dropped a file.
+  const blogIndexPaths = input.blogDir !== undefined
+    ? new Set([
+        `${input.blogDir}/index.md`,
+        `${input.blogDir}/index.mdx`,
+      ])
+    : new Set<string>();
+  const emitPaths = readmeRename.paths.filter((p) => !blogIndexPaths.has(p));
+
+  // Build the slug map keyed by ORIGINAL disk paths (so the link rewriter
+  // can look up `[autre](other.fr.md)` against the path the source author
+  // wrote), but with slugs derived from EMIT paths (so the slugs match
+  // what Astro actually produces post-rename — `fr/other`, not
+  // `other.fr`). The `pathTransform` consults the emitByDisk map computed
+  // by `rewriteReadmePaths` so the slug derivation sees the canonical
+  // post-rewrite path.
+  //
+  // Filter out paths that the rewrite dropped (e.g. `X/index.md` losing
+  // to a sibling `X.md` in a section-index conflict) — both would derive
+  // the same slug and cause a false conflict error.
+  const droppedSet = new Set(readmeRename.dropped);
+  const sourcePathsForSlug = input.sourcePaths.filter((p) => !droppedSet.has(p));
+  const slugResult = buildSlugMap(sourcePathsForSlug, {
+    pathTransform: (disk) => readmeRename.emitByDisk.get(disk) ?? null,
+  });
   if (!slugResult.ok) {
     return err({ code: 'slug-conflict', message: slugResult.error.message });
   }
@@ -141,8 +194,63 @@ export async function convertSite(
   const diagnostics: TaggedDiagnostic[] = [];
   const featureUnion = new Set<DetectedFeature>();
 
-  for (const sourcePath of input.sourcePaths) {
-    const fullPath = joinPath(input.docsDir, sourcePath);
+  // Scan emit paths for folder/file basenames that Astro's `github-slugger`
+  // will reshape (e.g. `1.0/` → `10/`, `c++-primer.md` → `c-primer`). Each
+  // surviving path becomes a sidebar entry whose slug must match Astro's
+  // own derivation; when they diverge, the build crashes with
+  // `AstroUserError: The slug "<original>" does not exist.` Surface a
+  // per-path warning ahead of time so the user can rename or hand-edit.
+  for (const emitPath of emitPaths) {
+    const incompatible = findSlugIncompatibleSegments(emitPath);
+    if (incompatible.length === 0) continue;
+    const expected = expectedAstroSlug(emitPath);
+    diagnostics.push({
+      sourcePath: emitPath,
+      diagnostic: createDiagnostic({
+        severity: 'warning',
+        ruleId: 'slug-incompatible-path',
+        source: 'convert-site/slug-compat',
+        message:
+          `Source path \`${emitPath}\` contains segment(s) ` +
+          `Astro's slug normaliser will reshape: ${incompatible.map((s) => `\`${s}\``).join(', ')}. ` +
+          `Astro will register this entry under slug \`${expected}\`, but the converter's emitted ` +
+          `sidebar refers to the original path. Either rename the offending segment(s) on disk ` +
+          `(e.g. \`1.0/\` → \`1-0/\`, \`c++-primer.md\` → \`cpp-primer.md\`) and re-run the converter, ` +
+          `or hand-edit \`astro.config.mjs\` so each affected sidebar entry uses \`${expected}\`.`,
+      }),
+    });
+  }
+
+  // Surface every dropped source path from the rewrite step (slug
+  // conflicts where the converter chose a winner). Without this, a user
+  // who lost `X/index.md` to a sibling `X.md` would see no signal that
+  // one of their files was skipped.
+  for (const droppedPath of readmeRename.dropped) {
+    diagnostics.push({
+      sourcePath: droppedPath,
+      diagnostic: createDiagnostic({
+        severity: 'warning',
+        ruleId: 'slug-conflict-resolved',
+        source: 'convert-site/rewrite-paths',
+        message:
+          `\`${droppedPath}\` was dropped from the conversion because it ` +
+          `produces the same Starlight slug as a sibling file (typically ` +
+          `\`X.md\` and \`X/index.md\` both deriving slug \`X\`). The named ` +
+          `sibling won — it usually holds the substantive content while the ` +
+          `directory's index.md is a thin section-index shim. If this file ` +
+          `was the one with real content, rename the conflicting sibling or ` +
+          `move this file to a different path.`,
+      }),
+    });
+  }
+
+  for (const sourcePath of emitPaths) {
+    // The path on disk may differ from the emit path — README.md was
+    // rewritten to index.md above. Look up the disk location from the
+    // rewrite map; falls back to the emit path for files that weren't
+    // renamed.
+    const diskPath = readmeRename.diskByEmit.get(sourcePath) ?? sourcePath;
+    const fullPath = joinPath(input.docsDir, diskPath);
     const read = await input.fs.readText(fullPath);
     if (!read.ok) {
       return err({
@@ -184,8 +292,36 @@ export async function convertSite(
     // normalizer strips the `{ ... }` blob unconditionally; users with
     // Material heading badges learn here that they need the
     // `starlight-heading-badges` plugin to recover the styling.
-    for (const diagnostic of scanHeadingBadges(read.value)) {
+    const headingBadgeDiagnostics = scanHeadingBadges(read.value);
+    for (const diagnostic of headingBadgeDiagnostics) {
       diagnostics.push({ sourcePath, diagnostic });
+    }
+    if (headingBadgeDiagnostics.length > 0) {
+      // At least one ATX heading carried an attr_list class. Auto-install
+      // `starlight-heading-badges` so the class is preserved as a Badge
+      // next to the heading text — recreating Material's idiom.
+      featureUnion.add('heading-badges');
+    }
+    // Per-occurrence diagnostic for Material's `!!! note inline` / `inline
+    // end` admonition modifier. Starlight's `<Aside>` doesn't honor float
+    // positioning, so these get rendered as standard block-level asides.
+    for (const diagnostic of scanInlineAdmonitions(read.value)) {
+      diagnostics.push({ sourcePath, diagnostic });
+    }
+    // Per-occurrence info diagnostic for Material `.copy` / `.no-copy` fence
+    // flags. The code-block-meta normalizer strips the attr-list silently;
+    // this scanner names each fence so users can audit which blocks relied
+    // on the per-block toggle.
+    for (const diagnostic of scanCodeFenceFlags(read.value)) {
+      diagnostics.push({ sourcePath, diagnostic });
+    }
+    // Single per-file warning for monorepo/multirepo placeholder pages.
+    // The converter still scaffolds the page so the site builds and the
+    // sidebar structure stays intact; users see exactly which pages need
+    // their actual content fetched (or removed).
+    const placeholderDiag = scanPlaceholderPage(read.value);
+    if (placeholderDiag !== null) {
+      diagnostics.push({ sourcePath, diagnostic: placeholderDiag });
     }
     // Single diagnostic per file when content tabs are present, flagging
     // the per-tab anchor-link gap (Material auto-generates `#tab-label`
@@ -316,23 +452,27 @@ export async function convertSite(
       source = pmResult.text;
     }
 
+    // Link resolution happens against the ORIGINAL on-disk path so a
+    // sibling link like `[autre](other.fr.md)` resolves the same way the
+    // source author wrote it. The slug map was built from emit paths, so
+    // by the time `[other.fr.md](resolved)` becomes a slug lookup, the
+    // i18n + readme + dot-slugify rewrites are all applied uniformly.
     const converted = convertFile({
       source,
-      sourcePath,
+      sourcePath: diskPath,
       slugMap: slugResult.value,
       repoContext: input.repoContext ?? null,
       emitMdxTabs: input.emitMdxTabs !== false,
       tabsLinked: input.tabsLinked === true,
     });
-    const i18nRename =
-      input.i18nLocales === undefined
-        ? null
-        : renameI18nPath(sourcePath, input.i18nLocales);
-    const intermediatePath = i18nRename ?? sourcePath;
+    // The rewrite already produced the canonical emit path (READMEs to
+    // index, `page.fr.md` to `fr/page.md`, dots slugified). Honour the
+    // file's MDX promotion by swapping `.md` → `.mdx` if convertFile
+    // detected the file needed JSX components.
     const outputPath =
       converted.extension === 'mdx'
-        ? intermediatePath.replace(/\.md$/, '.mdx')
-        : intermediatePath;
+        ? sourcePath.replace(/\.md$/, '.mdx')
+        : sourcePath;
     files[outputPath] = converted.text;
     for (const diagnostic of converted.diagnostics) {
       diagnostics.push({ sourcePath, diagnostic });
