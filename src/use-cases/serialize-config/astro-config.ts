@@ -14,6 +14,8 @@
 import type { SidebarEntry } from '../../domain/starlight/sidebar.js';
 import { serializeSidebar } from './sidebar.js';
 import type { DetectedFeature } from './package-json.js';
+import { translateBlogOptions } from './blog-options.js';
+import { translateTagsOptions } from './tags-options.js';
 
 export interface AstroConfigInput {
   readonly siteName: string;
@@ -82,6 +84,14 @@ export interface AstroConfigInput {
     readonly attrs?: Readonly<Record<string, string | boolean | number>>;
     readonly content?: string;
   }>;
+  /** Raw `plugins.blog` options from mkdocs.yml. When present, the converter
+   *  translates a curated subset to `starlightBlog({...})` config (see
+   *  `blog-options.ts`). Unrecognized keys are dropped; users hand-port
+   *  via the `plugin-blog-custom-config` diagnostic. */
+  readonly blogOptions?: Readonly<Record<string, unknown>>;
+  /** Raw `plugins.tags` options from mkdocs.yml. Translated to
+   *  `starlightTags({...})` config (see `tags-options.ts`). */
+  readonly tagsOptions?: Readonly<Record<string, unknown>>;
 }
 
 export function serializeAstroConfig(input: AstroConfigInput): string {
@@ -97,15 +107,32 @@ export function serializeAstroConfig(input: AstroConfigInput): string {
   const hasGithubAlerts = features.has('github-alerts');
   const hasAnnouncement = features.has('announcement');
   const hasPageActions = features.has('page-actions');
+  const hasHeadingBadges = features.has('heading-badges');
+
+  // `starlight-llms-txt` requires `site:` in astro.config.mjs (it builds
+  // absolute URLs into the emitted llms.txt index). When the source
+  // mkdocs.yml has no `site_url`, we have nothing to feed it — installing
+  // the plugin in that case is a hard failure at `astro dev` / `astro build`
+  // time. Gate the import + invocation on `siteUrl` so projects without a
+  // declared site URL still convert and build cleanly.
+  //
+  // Real-world (governance/src/mkdocs.yml): `site_url` was set to a Python
+  // YAML tag that decodes to a marker string like `/apply:os.getenv`. That
+  // is truthy but is NOT a parseable URL. We skip emitting `site:` in that
+  // case (see the `site:` block below), and llms-txt depends on a real
+  // `site:` field — so the same validity check gates the plugin.
+  const enableLlmsTxt = input.siteUrl !== null && isValidAbsoluteUrl(input.siteUrl);
 
   const imports: string[] = [
     `import { defineConfig } from 'astro/config';`,
     `import starlight from '@astrojs/starlight';`,
-    // Default-on AI-assistant accessibility plugin — emits llms.txt routes from
-    // Starlight content with no per-site config. Gap-analysis (2026-05-03)
-    // bundles this for every emitted Starlight project.
-    `import starlightLlmsTxt from 'starlight-llms-txt';`,
   ];
+  if (enableLlmsTxt) {
+    // Default-on AI-assistant accessibility plugin — emits llms.txt routes
+    // from Starlight content. Gap-analysis (2026-05-03) bundles this for
+    // every emitted Starlight project that has a declared site URL.
+    imports.push(`import starlightLlmsTxt from 'starlight-llms-txt';`);
+  }
   if (hasMermaid) {
     imports.push(`import mermaid from 'astro-mermaid';`);
   }
@@ -113,7 +140,14 @@ export function serializeAstroConfig(input: AstroConfigInput): string {
     imports.push(`import imageZoom from 'starlight-image-zoom';`);
   }
   if (hasVersions) {
-    imports.push(`import starlightVersions from 'starlight-versions';`);
+    // When `mikeVersions` is undefined, the plugin invocation is emitted as
+    // a TODO comment (see hasVersions block below). Match the import side
+    // so we don't ship a side-effecting import for an inactive plugin.
+    if (input.mikeVersions === undefined) {
+      imports.push(`// TODO: import starlightVersions from 'starlight-versions';`);
+    } else {
+      imports.push(`import starlightVersions from 'starlight-versions';`);
+    }
   }
   if (hasBlog) {
     imports.push(`import starlightBlog from 'starlight-blog';`);
@@ -133,6 +167,9 @@ export function serializeAstroConfig(input: AstroConfigInput): string {
   if (hasPageActions) {
     imports.push(`import starlightPageActions from 'starlight-page-actions';`);
   }
+  if (hasHeadingBadges) {
+    imports.push(`import starlightHeadingBadges from 'starlight-heading-badges';`);
+  }
   if (hasMath) {
     imports.push(`import remarkMath from 'remark-math';`);
     imports.push(`import rehypeKatex from 'rehype-katex';`);
@@ -143,7 +180,17 @@ export function serializeAstroConfig(input: AstroConfigInput): string {
 
   const lines: string[] = [imports.join('\n'), '', 'export default defineConfig({'];
 
-  if (input.siteUrl !== null) {
+  // Astro's `site:` field is run through `new URL(value)` at config-load
+  // time and rejects anything that isn't a parseable absolute URL. Real-
+  // world break (governance/src/mkdocs.yml): the source uses
+  //   `site_url: !!python/object/apply:os.getenv ["PUBLIC_URL"]`
+  // to read the URL from an env var. The YAML loader's tolerant Python
+  // tag handler decodes that to the marker string `/apply:os.getenv`,
+  // which would propagate to `site: '/apply:os.getenv'` and crash the
+  // dev server with "Invalid URL". Skip the field when the value isn't
+  // a valid absolute URL — Astro defaults to no canonical and the user
+  // can re-add it manually.
+  if (input.siteUrl !== null && isValidAbsoluteUrl(input.siteUrl)) {
     lines.push(`  site: ${quote(input.siteUrl)},`);
   }
   if (input.useDirectoryUrls === false) {
@@ -191,14 +238,33 @@ export function serializeAstroConfig(input: AstroConfigInput): string {
   }
   lines.push(`      sidebar: ${indentSidebar(serializeSidebar(input.sidebar))},`);
   const cssEntries = ['./src/styles/mkdocs-migration.css'];
-  for (const e of input.extraCssEntries ?? []) cssEntries.push(e);
+  // KaTeX ships its own stylesheet; rehype-katex emits the right markup but
+  // produces unstyled glyphs without it. Auto-register so users get rendered
+  // formulas without any manual CSS step.
+  if (hasMath) cssEntries.push('katex/dist/katex.min.css');
+  // Starlight's `customCss` is resolved as a Vite import — it accepts npm
+  // package paths and relative file paths only. External URLs crash Astro
+  // build with "Only URLs with a scheme in: file and data are supported".
+  // Real-world: Enveloppe/mkdocs-publisher-template registers FontAwesome
+  // and Obsidian-Publisher CSS via `https://cdn…`. Move external URLs
+  // out of customCss into `<link>` tags in `head:` so they still load.
+  const externalCssUrls: string[] = [];
+  for (const e of input.extraCssEntries ?? []) {
+    if (/^https?:\/\//i.test(e)) externalCssUrls.push(e);
+    else cssEntries.push(e);
+  }
   lines.push(
     `      customCss: [${cssEntries.map(quote).join(', ')}],`,
   );
   const extraJs = input.extraJsEntries ?? [];
   const extraHead = input.extraHeadEntries ?? [];
-  if (extraJs.length > 0 || extraHead.length > 0) {
+  if (extraJs.length > 0 || extraHead.length > 0 || externalCssUrls.length > 0) {
     lines.push('      head: [');
+    for (const href of externalCssUrls) {
+      lines.push(
+        `        { tag: 'link', attrs: { rel: 'stylesheet', href: ${quote(href)} } },`,
+      );
+    }
     for (const js of extraJs) {
       const attrs: string[] = [`src: ${quote(js.src)}`];
       if (js.type !== undefined) attrs.push(`type: ${quote(js.type)}`);
@@ -243,11 +309,16 @@ export function serializeAstroConfig(input: AstroConfigInput): string {
     lines.push('      ],');
   }
   if (input.i18n !== undefined && input.i18n.locales.length > 0) {
-    lines.push(`      defaultLocale: ${quote(input.i18n.defaultLocale)},`);
+    // Starlight requires `defaultLocale` to match a KEY in the `locales`
+    // map. The default locale's key is always `root` (Starlight's
+    // convention for the unprefixed locale directory). Real-world break
+    // (ai-shifu, ultrabug): emitting `defaultLocale: 'en'` while the
+    // map key is `root` crashed config-setup with "Could not determine
+    // the default locale. Please make sure defaultLocale is one of
+    // root, …".
+    lines.push(`      defaultLocale: 'root',`);
     lines.push('      locales: {');
     for (const entry of input.i18n.locales) {
-      // Starlight uses `root` as the key for the default locale's directory
-      // (which has no prefix in the URL tree).
       const key = entry.isDefault ? 'root' : entry.code;
       lines.push(
         `        ${quoteKey(key)}: { label: ${quote(entry.label)}, lang: ${quote(entry.code)} },`,
@@ -256,16 +327,25 @@ export function serializeAstroConfig(input: AstroConfigInput): string {
     lines.push('      },');
   }
   const enableLinksValidator = input.enableLinksValidator === true;
-  // starlight-llms-txt is unconditional — every emitted site gets it (see import block).
   lines.push('      plugins: [');
-  lines.push('        starlightLlmsTxt(),');
+  if (enableLlmsTxt) {
+    lines.push('        starlightLlmsTxt(),');
+  }
   if (hasImageZoom) {
     lines.push('        imageZoom(),');
   }
   if (hasVersions) {
     const versionSlugs = input.mikeVersions;
     if (versionSlugs === undefined) {
-      lines.push('        starlightVersions({ versions: [{ slug: \'2.0\' }] }),');
+      // No concrete versions known: mkdocs.yml only declared
+      // `extra.version.provider: mike` (mike reads versions from git tags
+      // at build time, which the converter cannot reproduce). Emit a
+      // guidance comment so the site still builds — an active
+      // `starlightVersions({ versions: [{ slug: '2.0' }] })` placeholder
+      // breaks `astro:config:setup` because the slug has no matching
+      // docs/<version>/ tree. Re-run with `--mike-versions <slug>`
+      // (repeatable) to enable the plugin.
+      lines.push('        // TODO: starlightVersions({ versions: [{ slug: \'1.0\' }] }) — fill in real version slugs and uncomment.');
     } else if (versionSlugs.length === 0) {
       lines.push('        starlightVersions({ versions: [] }),');
     } else {
@@ -274,10 +354,12 @@ export function serializeAstroConfig(input: AstroConfigInput): string {
     }
   }
   if (hasBlog) {
-    lines.push('        starlightBlog(),');
+    const blogArg = input.blogOptions !== undefined ? translateBlogOptions(input.blogOptions) : '';
+    lines.push(`        starlightBlog(${blogArg}),`);
   }
   if (hasTags) {
-    lines.push('        starlightTags(),');
+    const tagsArg = input.tagsOptions !== undefined ? translateTagsOptions(input.tagsOptions) : '';
+    lines.push(`        starlightTags(${tagsArg}),`);
   }
   if (hasKbd) {
     // starlight-kbd 0.4.0+ requires a `types` array with exactly one
@@ -297,15 +379,22 @@ export function serializeAstroConfig(input: AstroConfigInput): string {
   if (hasPageActions) {
     lines.push('        starlightPageActions(),');
   }
+  if (hasHeadingBadges) {
+    lines.push('        starlightHeadingBadges(),');
+  }
   if (enableLinksValidator) {
-    // Migrated MkDocs sites routinely link to pages that the original
-    // build generated dynamically (`mkdocs-click` produces a CLI reference,
-    // `mkdocstrings` produces autodoc pages, etc.) but the converter
-    // cannot reproduce statically. The plugin's strict defaults make those
-    // links fatal at build time. Soften the policy so the build completes
-    // and surface broken-link information via the converter's own
-    // `broken-link` diagnostic in MIGRATION_NOTES.md instead.
-    lines.push('        starlightLinksValidator({ errorOnRelativeLinks: false, errorOnInvalidHashes: false, errorOnLocalLinks: false }),');
+    // Migrated MkDocs sites routinely link to pages that the original build
+    // generated dynamically (`mkdocs-click` produces a CLI reference,
+    // `mkdocstrings` produces autodoc pages) and to non-content paths
+    // (`/LICENSE`, `/CHANGELOG`, `/CONTRIBUTING`, etc.) that point at
+    // GitLab/GitHub web surfaces or static files. The plugin's defaults
+    // reject all of these at `astro build`. Soften the policy and exclude
+    // common non-content paths so the build completes; the converter's own
+    // `broken-link` diagnostic catches genuine cross-content link issues
+    // during conversion (surfaced in MIGRATION_NOTES.md).
+    lines.push(
+      "        starlightLinksValidator({ errorOnRelativeLinks: false, errorOnInvalidHashes: false, errorOnLocalLinks: false, exclude: ['/LICENSE', '/LICENSE.md', '/LICENSE.txt', '/CHANGELOG', '/CHANGELOG.md', '/CONTRIBUTING', '/CONTRIBUTING.md', '/CODE_OF_CONDUCT', '/CODE_OF_CONDUCT.md', '/SECURITY', '/SECURITY.md', '/COPYING', '/COPYING.md'] }),",
+    );
   }
   lines.push('      ],');
   lines.push('    }),');
@@ -327,14 +416,43 @@ export function serializeAstroConfig(input: AstroConfigInput): string {
   return lines.join('\n');
 }
 
+function isValidAbsoluteUrl(value: string): boolean {
+  try {
+    const u = new URL(value);
+    return u.protocol === 'http:' || u.protocol === 'https:';
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Escape every character that would terminate a JS quoted-string literal or
+ * inject a syntax error if left literal. The order matters: backslash MUST
+ * come first so subsequent insertions of `\n`/`\r`/`\t` aren't double-escaped.
+ *
+ * Real-world break (dokka-material-mkdocs): a YAML block scalar
+ *   `site_description: |
+ *      Embed your Kotlin documentation comments…`
+ * survives as `"Embed…\n"`. Without `\\n` substitution the trailing newline
+ * lands inside `description: '…\n'` in the emitted `astro.config.mjs` and
+ * crashes the dev server with "invalid JS syntax".
+ */
+function escapeForString(value: string): string {
+  return value
+    .replace(/\\/g, '\\\\')
+    .replace(/\n/g, '\\n')
+    .replace(/\r/g, '\\r')
+    .replace(/\t/g, '\\t');
+}
+
 function quote(value: string): string {
-  return `'${value.replace(/\\/g, '\\\\').replace(/'/g, "\\'")}'`;
+  return `'${escapeForString(value).replace(/'/g, "\\'")}'`;
 }
 
 /** Double-quoted string emit, used for values that commonly contain single
  *  quotes (e.g., inline JavaScript snippets that call `gtag('config', ...)`). */
 function quoteDouble(value: string): string {
-  return `"${value.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`;
+  return `"${escapeForString(value).replace(/"/g, '\\"')}"`;
 }
 
 function quoteKey(value: string): string {

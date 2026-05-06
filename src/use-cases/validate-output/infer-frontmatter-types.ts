@@ -110,7 +110,14 @@ function classifyScalar(rawValue: string): Observation {
     const items = (inlineArr[1] ?? '').split(',').map((s) => s.trim()).filter((s) => s.length > 0);
     return items.length === 0 ? 'unknown' : 'array-of-string';
   }
-  if (value === 'true' || value === 'false') return 'boolean';
+  // YAML 1.2 recognises `true|True|TRUE|false|False|FALSE` as boolean —
+  // any of these will be parsed as a JS boolean by the downstream YAML
+  // loader, so we must classify them as `boolean` here even though the
+  // raw text looks like a capitalised string. Real-world (jujimeizuo/note):
+  // sources use `comment: True`, `nostatistics: True` etc.; classifying
+  // those as `string` produced a `z.string()` schema that then rejected
+  // the boolean value at content-load time.
+  if (/^(?:true|True|TRUE|false|False|FALSE)$/.test(value)) return 'boolean';
   if (/^-?\d+(?:\.\d+)?$/.test(value)) return 'number';
   if (ISO_DATE_RE.test(value.replace(/^['"]|['"]$/g, ''))) return 'date';
   return 'string';
@@ -139,7 +146,21 @@ function pickZodType(types: ReadonlySet<Observation>): string {
     if (types.has('date')) return 'z.coerce.date().optional()';
     if (types.has('string')) return 'z.string().optional()';
   }
-  // Mixed scalar types — fall back to string (most permissive).
-  if (types.has('string') || types.has('date')) return 'z.string().optional()';
-  return 'z.unknown().optional()';
+  // Mixed scalar types — date + string collapses to string (date is a
+  // string subset; coercing surprises users who expect raw strings).
+  // Bool/number + string emits a union so each observed shape passes
+  // schema validation. Real-world (jujimeizuo/note): the same field name
+  // (`changelog`, `comment`, `nostatistics`) is used as a boolean toggle
+  // on some pages and as a string elsewhere; a `z.string()` fallback
+  // rejects the boolean pages with "Expected 'string', received 'boolean'".
+  const hasString = types.has('string') || types.has('date');
+  const hasBool = types.has('boolean');
+  const hasNum = types.has('number');
+  const members: string[] = [];
+  if (hasString) members.push('z.string()');
+  if (hasBool) members.push('z.boolean()');
+  if (hasNum) members.push('z.number()');
+  if (members.length === 0) return 'z.unknown().optional()';
+  if (members.length === 1) return `${members[0]}.optional()`;
+  return `z.union([${members.join(', ')}]).optional()`;
 }

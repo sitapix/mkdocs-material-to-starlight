@@ -37,6 +37,18 @@ describe('normalizeLegacySyntax', () => {
       const src = '<span id="x"> some prose\n';
       expect(normalizeLegacySyntax(src)).toBe('some prose\n');
     });
+
+    it('strips a mid-line `</span>` closer when its opener was stripped', () => {
+      // Real-world (jujimeizuo/note/cs/others/regex.md): a list item wraps
+      // a regex sample in a `<span style="…">…</span>` for ligature
+      // disabling. The closer sits mid-line, not at end-of-line, so the
+      // earlier end-anchored regex left an orphan `</span>` that crashed
+      // MDX with "Unexpected closing slash `/`".
+      const src = '- <span style="font-variant-ligatures: none;">(?<=pattern)</span>：text\n';
+      const out = normalizeLegacySyntax(src);
+      expect(out).not.toContain('<span');
+      expect(out).not.toContain('</span>');
+    });
   });
 
   describe('Asciidoc cross-reference <<page#anchor, label>>', () => {

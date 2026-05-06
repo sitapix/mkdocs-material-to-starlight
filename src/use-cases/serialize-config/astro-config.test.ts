@@ -125,6 +125,67 @@ describe('serializeAstroConfig', () => {
     expect(out).toContain(`title: 'It\\'s me'`);
   });
 
+  it('escapes embedded newlines in string values (multi-line YAML scalars)', () => {
+    // Real-world: dokka-material-mkdocs `mkdocs.yml` declares
+    //   site_description: |
+    //     Embed your Kotlin documentation comments into a Material…
+    // The trailing `\n` from the block scalar would otherwise emit a raw
+    // newline inside the single-quoted JS string and crash the Astro
+    // config loader with "invalid JS syntax".
+    const out = serializeAstroConfig({
+      siteName: 'Site',
+      siteDescription: 'Line one\nLine two\n',
+      siteUrl: null,
+      sidebar: [],
+    });
+    expect(out).toContain(`description: 'Line one\\nLine two\\n'`);
+    // The output must not contain a literal newline inside the description
+    // string — verify by reconstructing the description line and asserting
+    // it stays on one line.
+    const descLine = out
+      .split('\n')
+      .find((l) => l.trim().startsWith('description:'));
+    expect(descLine).toBeDefined();
+    expect(descLine).not.toMatch(/\n/);
+  });
+
+  it('skips `site:` when siteUrl is not a parseable absolute URL', () => {
+    // Real-world: governance/src/mkdocs.yml writes
+    //   site_url: !!python/object/apply:os.getenv ["PUBLIC_URL"]
+    // The YAML tolerant-tag handler decodes the Python tag to the marker
+    // string `/apply:os.getenv` — not a URL. Emitting `site: '/apply:os.getenv'`
+    // crashes Astro at config-load with "Invalid URL". Skip the field
+    // entirely; Astro tolerates a missing site.
+    const out = serializeAstroConfig({
+      siteName: 'Site',
+      siteDescription: null,
+      siteUrl: '/apply:os.getenv',
+      sidebar: [],
+    });
+    expect(out).not.toMatch(/^\s*site:\s/m);
+  });
+
+  it('emits `site:` when siteUrl is a real https URL', () => {
+    const out = serializeAstroConfig({
+      siteName: 'Site',
+      siteDescription: null,
+      siteUrl: 'https://example.com/',
+      sidebar: [],
+    });
+    expect(out).toContain(`site: 'https://example.com/'`);
+  });
+
+  it('escapes carriage returns and tabs in string values', () => {
+    const out = serializeAstroConfig({
+      siteName: 'Site\twith\ttabs',
+      siteDescription: 'Line\rwith\rCR',
+      siteUrl: null,
+      sidebar: [],
+    });
+    expect(out).toContain(`'Site\\twith\\ttabs'`);
+    expect(out).toContain(`'Line\\rwith\\rCR'`);
+  });
+
   it('produces output that mentions the integrations array', () => {
     const out = serializeAstroConfig({
       siteName: 'X',
@@ -150,6 +211,30 @@ describe('serializeAstroConfig', () => {
     expect(out).toContain('remarkMath');
     expect(out).toContain('rehypePlugins:');
     expect(out).toContain('rehypeKatex');
+  });
+
+  it('auto-registers katex/dist/katex.min.css when math feature is detected', () => {
+    // Without this, formulas render as raw LaTeX text. We auto-add the CSS
+    // to Starlight's customCss so users have zero manual steps for math.
+    const out = serializeAstroConfig({
+      siteName: 'X',
+      siteDescription: null,
+      siteUrl: null,
+      sidebar: [],
+      detectedFeatures: ['math'],
+    });
+    expect(out).toContain(`'katex/dist/katex.min.css'`);
+  });
+
+  it('does NOT register katex CSS when math is not detected', () => {
+    const out = serializeAstroConfig({
+      siteName: 'X',
+      siteDescription: null,
+      siteUrl: null,
+      sidebar: [],
+      detectedFeatures: [],
+    });
+    expect(out).not.toContain('katex');
   });
 
   it('imports astro-mermaid when mermaid feature is detected', () => {
@@ -241,18 +326,32 @@ describe('serializeAstroConfig', () => {
     expect(out).toContain("id: 'default'");
   });
 
-  it('imports and wires starlight-llms-txt by default for every site', () => {
-    // Tier-3 closure: starlight-llms-txt is a zero-config, zero-cost AI-assistant
-    // accessibility plugin. It runs for every Starlight site so the converter
-    // wires it into every emitted astro.config.mjs.
+  it('imports and wires starlight-llms-txt when site URL is declared', () => {
+    // starlight-llms-txt requires `site:` in astro.config.mjs (it builds
+    // absolute URLs into the emitted llms.txt index). Wire it only when
+    // `siteUrl` is non-null — otherwise the plugin throws on `astro dev`.
+    const out = serializeAstroConfig({
+      siteName: 'X',
+      siteDescription: null,
+      siteUrl: 'https://example.com',
+      sidebar: [],
+    });
+    expect(out).toContain(`import starlightLlmsTxt from 'starlight-llms-txt';`);
+    expect(out).toContain('starlightLlmsTxt()');
+  });
+
+  it('skips starlight-llms-txt when site URL is null (mkdocs.yml had no site_url)', () => {
+    // Real-world case: GMS² and other Material sites omit `site_url`.
+    // Without `site:` in astro.config.mjs, starlight-llms-txt throws at
+    // dev/build time. Skip the plugin in that case so the build is clean.
     const out = serializeAstroConfig({
       siteName: 'X',
       siteDescription: null,
       siteUrl: null,
       sidebar: [],
     });
-    expect(out).toContain(`import starlightLlmsTxt from 'starlight-llms-txt';`);
-    expect(out).toContain('starlightLlmsTxt()');
+    expect(out).not.toContain('starlight-llms-txt');
+    expect(out).not.toContain('starlightLlmsTxt');
   });
 
   it('imports starlight-blog when the blog feature is detected', () => {
@@ -327,7 +426,10 @@ describe('serializeAstroConfig', () => {
         ],
       },
     });
-    expect(out).toContain(`defaultLocale: 'en'`);
+    // Starlight requires `defaultLocale` to match a key in the `locales`
+    // map. Since we always use `root` as the key for the default locale,
+    // `defaultLocale` is always literally 'root'.
+    expect(out).toContain(`defaultLocale: 'root'`);
     expect(out).toContain('locales: {');
     // Default locale gets the `root` key.
     expect(out).toContain(`root: { label: 'English', lang: 'en' }`);
@@ -455,7 +557,15 @@ describe('serializeAstroConfig mikeVersions', () => {
     expect(out).toContain('starlightVersions({ versions: [] })');
   });
 
-  it('uses the placeholder [{ slug: "2.0" }] when mikeVersions is not provided', () => {
+  it('emits a commented-out invocation (not an active placeholder) when mikeVersions is not provided', () => {
+    // Real-world (xyngular/py-xboto): the source mkdocs.yml declared
+    // `extra.version.provider: mike` with no concrete `versions:` array
+    // (mike reads them from git tags at build time). The previous behavior
+    // emitted `starlightVersions({ versions: [{ slug: '2.0' }] })` as a
+    // placeholder, which the plugin then rejected at `astro:config:setup`
+    // because the placeholder slug had no corresponding docs/2.0/ tree —
+    // breaking the entire build. Better to emit a guidance comment so the
+    // site still builds and the user knows to fill in real version slugs.
     const out = serializeAstroConfig({
       siteName: 'X',
       siteDescription: null,
@@ -463,7 +573,11 @@ describe('serializeAstroConfig mikeVersions', () => {
       sidebar: [],
       detectedFeatures: ['versions'],
     });
-    expect(out).toContain("{ slug: '2.0' }");
+    // No active plugin invocation — the placeholder used to read like:
+    //   starlightVersions({ versions: [{ slug: '2.0' }] }),
+    expect(out).not.toMatch(/^\s*starlightVersions\(\{ versions: /m);
+    // Guidance comment present.
+    expect(out).toContain('// TODO: starlightVersions');
   });
 });
 

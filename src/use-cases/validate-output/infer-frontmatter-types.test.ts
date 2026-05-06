@@ -95,4 +95,44 @@ describe('inferFrontmatterTypes', () => {
     );
     expect(out.phantom).toBe('z.unknown().optional()');
   });
+
+  it('emits a string|boolean union when the same field is bool on one page and string on another', () => {
+    // Real-world (jujimeizuo/note): some pages use `comment: true` (Material
+    // Giscus toggle) while others use `comment: "thread-id"`. A z.string()
+    // fallback would reject the boolean pages at content-load time.
+    const out = inferFrontmatterTypes(
+      ['comment'],
+      [
+        { source: '---\ntitle: A\ncomment: true\n---\n' },
+        { source: '---\ntitle: B\ncomment: "see thread"\n---\n' },
+      ],
+    );
+    expect(out.comment).toBe('z.union([z.string(), z.boolean()]).optional()');
+  });
+
+  it('classifies YAML 1.2 capitalised booleans (`True`, `False`, `TRUE`) as boolean', () => {
+    // Real-world (jujimeizuo/note): `comment: True`, `nostatistics: True`.
+    // The YAML loader parses these as booleans; classifying them as string
+    // produced a z.string() schema that then rejected the value at
+    // content-load time.
+    const out = inferFrontmatterTypes(
+      ['flag', 'other'],
+      [
+        { source: '---\ntitle: A\nflag: True\nother: FALSE\n---\n' },
+      ],
+    );
+    expect(out.flag).toBe('z.boolean().optional()');
+    expect(out.other).toBe('z.boolean().optional()');
+  });
+
+  it('emits a string|number union when the same field is number on one page and string on another', () => {
+    const out = inferFrontmatterTypes(
+      ['weight'],
+      [
+        { source: '---\ntitle: A\nweight: 3\n---\n' },
+        { source: '---\ntitle: B\nweight: "high"\n---\n' },
+      ],
+    );
+    expect(out.weight).toBe('z.union([z.string(), z.number()]).optional()');
+  });
 });
