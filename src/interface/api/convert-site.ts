@@ -64,15 +64,7 @@ import {
 } from '../../use-cases/detect-features/i18n-config.js';
 import { detectInsidersFeatures } from '../../use-cases/detect-features/insiders-features.js';
 import { extractRedirects } from '../../use-cases/detect-features/redirects.js';
-import {
-  scanCodeBlockOptOuts,
-  scanCodehiliteLinenumsOccurrences,
-  scanLatexDelimiters,
-  scanMathScripts,
-  scanMetaYmlFiles,
-  scanTabsLinkOccurrences,
-} from '../../use-cases/detect-features/scan-bulk-diagnostics.js';
-import { scanMaterialCodeCssVars } from '../../use-cases/detect-features/scan-code-css-vars.js';
+import { runBulkScans } from '../../use-cases/scan-occurrences/run-bulk-scans.js';
 import { extractSocial } from '../../use-cases/detect-features/social.js';
 import { detectLongtailFeatures } from '../../use-cases/detect-features/theme-features-longtail.js';
 import { extractThemeFonts } from '../../use-cases/detect-features/theme-fonts.js';
@@ -876,98 +868,18 @@ export async function convertSiteFromDisk(
   // Hoisted: needed both by the CSS scanner below and by config serialization.
   const extraAssets = extractExtraAssets(config.value.extras);
 
-  // Per-occurrence scans for the three previously bulk-emitted diagnostics.
-  // Reads source files to find per-file occurrences of the affected patterns.
-  const bulkOccurrenceDiagnostics: Array<{
-    sourcePath: string;
-    diagnostic: ReturnType<typeof createDiagnostic>;
-  }> = [];
-  const hasCodehilite = config.value.markdownExtensions.some(
-    (ext) => (typeof ext === 'string' ? ext : (Object.keys(ext)[0] ?? '')) === 'codehilite',
-  );
-  const hasMetaPlugin = config.value.plugins.some((p) => p.name === 'meta');
-  // Read all source files once. The opt-out / no-copy scan always runs (it
-  // doesn't depend on a plugin flag), so the read is unconditional now.
-  const sourceEntries: Array<readonly [string, string]> = [];
-  for (const relPath of sourceListing.value) {
-    const absPath = join(docsDir, relPath);
-    const readResult = await fs.readText(absPath);
-    if (!readResult.ok) continue;
-    sourceEntries.push([relPath, readResult.value]);
-  }
-  if (hasTabsLink) {
-    for (const d of scanTabsLinkOccurrences(sourceEntries)) {
-      bulkOccurrenceDiagnostics.push(d);
-    }
-  }
-  if (hasCodehilite) {
-    for (const d of scanCodehiliteLinenumsOccurrences(sourceEntries)) {
-      bulkOccurrenceDiagnostics.push(d);
-    }
-  }
-  // Scan for .meta.yml files separately (they're not in sourceListing which only lists .md/.mdx)
-  if (hasMetaPlugin) {
-    const metaEntries: Array<readonly [string, string]> = [];
-    const allDocFiles = await dirReader.list(docsDir, ['.yml', '.yaml']);
-    if (allDocFiles.ok) {
-      for (const relPath of allDocFiles.value) {
-        if (!relPath.endsWith('.meta.yml')) continue;
-        const absPath = join(docsDir, relPath);
-        const readResult = await fs.readText(absPath);
-        if (!readResult.ok) continue;
-        metaEntries.push([relPath, readResult.value]);
-      }
-    }
-    if (metaEntries.length > 0) {
-      for (const d of scanMetaYmlFiles(metaEntries)) {
-        bulkOccurrenceDiagnostics.push(d);
-      }
-    }
-  }
-  // Always scan for `.no-copy` / `.no-select` markers — they're a per-block
-  // opt-out from Material's content.code.copy / content.code.select, but
-  // ExpressiveCode has no per-block toggle. The scanner emits a warning per
-  // file so the silent drop is visible.
-  for (const d of scanCodeBlockOptOuts(sourceEntries)) {
-    bulkOccurrenceDiagnostics.push(d);
-  }
-  // Scan for Material's alternate LaTeX delimiters `\(...\)` / `\[...\]`.
-  // remark-math (the auto-wired math pipeline) only recognizes $/$$, so
-  // these would silently render as literal backslashes. The scanner runs
-  // unconditionally; the diagnostic is informational when math isn't
-  // configured at all and actionable when it is.
-  for (const d of scanLatexDelimiters(sourceEntries)) {
-    bulkOccurrenceDiagnostics.push(d);
-  }
-  // Scan extra_javascript paths for MathJax/KaTeX runtime config scripts.
-  // Astro renders math at build time via rehype-katex; these runtime scripts
-  // are obsolete and may conflict with the rehype output.
-  for (const d of scanMathScripts(extraAssets.js.map((j) => j.src))) {
-    bulkOccurrenceDiagnostics.push(d);
-  }
-  // Scan extra_css files for Material code-block customization that does
-  // not survive the move to ExpressiveCode (Pygments token classes,
-  // --md-code-* CSS variables). The CSS files live in docs_dir / project
-  // root; we resolve relative to docs_dir first, then projectDir.
-  {
-    const cssEntries: Array<readonly [string, string]> = [];
-    for (const cssPath of extraAssets.css) {
-      // Skip absolute URLs (CDN-hosted styles).
-      if (/^[a-z][a-z0-9+\-.]*:\/\//i.test(cssPath)) continue;
-      const trimmed = cssPath.replace(/^\/+/, '');
-      const docsRel = join(docsDir, trimmed);
-      const docsRead = await fs.readText(docsRel);
-      if (docsRead.ok) {
-        cssEntries.push([trimmed, docsRead.value]);
-        continue;
-      }
-      const projectRead = await fs.readText(join(projectDir, trimmed));
-      if (projectRead.ok) cssEntries.push([trimmed, projectRead.value]);
-    }
-    for (const d of scanMaterialCodeCssVars(cssEntries)) {
-      bulkOccurrenceDiagnostics.push(d);
-    }
-  }
+  const bulkOccurrenceDiagnostics = await runBulkScans({
+    docsDir,
+    projectDir,
+    fs,
+    dirReader,
+    sourcePaths: sourceListing.value,
+    plugins: config.value.plugins,
+    markdownExtensions: config.value.markdownExtensions,
+    hasTabsLink,
+    extraCssPaths: extraAssets.css,
+    extraJsPaths: extraAssets.js.map((j) => j.src),
+  });
 
   // Surface diagnostics for `extra:` keys with no Starlight equivalent
   // (consent dialog, lifecycle status dictionary, non-Google analytics
