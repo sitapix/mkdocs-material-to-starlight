@@ -15,7 +15,7 @@
  * `.mdx` branch of `convertFile`.
  */
 
-import { isFenceLine } from '../../domain/syntax/fence.js';
+import { fenceMarker } from '../../domain/syntax/fence.js';
 
 /** HTML void elements per the WHATWG spec. MDX requires explicit self-close. */
 const VOID_ELEMENTS: ReadonlySet<string> = new Set([
@@ -143,15 +143,22 @@ export function stripBareAttrListLines(source: string, report?: SanitizeReport):
   const SHAPE_RE = /(?:^|\s)\.[A-Za-z_][\w-]*|[A-Za-z_][\w-]*\s*=/;
   const lines = source.split('\n');
   const kept: string[] = [];
-  let inFence = false;
+  // Track the opening fence's marker so a 3-tick line inside a 4-tick
+  // fence (CommonMark §4.5) doesn't falsely toggle the state.
+  let openFence: { char: '`' | '~'; length: number } | null = null;
   for (let idx = 0; idx < lines.length; idx += 1) {
     const line = lines[idx] ?? '';
-    if (isFenceLine(line)) {
-      inFence = !inFence;
+    const marker = fenceMarker(line);
+    if (marker !== null) {
+      if (openFence === null) {
+        openFence = marker;
+      } else if (marker.char === openFence.char && marker.length >= openFence.length) {
+        openFence = null;
+      }
       kept.push(line);
       continue;
     }
-    if (inFence) {
+    if (openFence !== null) {
       kept.push(line);
       continue;
     }
@@ -854,7 +861,13 @@ function walkOutsideCode(
 ): string {
   const out: string[] = [];
   let i = 0;
-  let inFence = false;
+  // Track the OPENING fence's marker char + length so we honour
+  // CommonMark §4.5 (close requires same marker, ≥ same length). Real-
+  // world (freya022/BotCommands-Wiki): a 4-backtick fence whose body
+  // contained an inner ```java (3 backticks) was previously toggled
+  // closed by the inner line — escapers then skipped the post-fence
+  // prose and a stray `<--` crashed MDX.
+  let openFence: { char: '`' | '~'; length: number } | null = null;
   let inInlineCode = false;
   let atLineStart = true;
 
@@ -875,8 +888,20 @@ function walkOutsideCode(
       if (!inInlineCode) {
         const eol = source.indexOf('\n', i);
         const line = source.slice(i, eol === -1 ? source.length : eol);
-        if (isFenceLine(line)) {
-          inFence = !inFence;
+        const marker = fenceMarker(line);
+        if (marker !== null) {
+          if (openFence === null) {
+            // Opening a new fence.
+            openFence = marker;
+          } else if (
+            marker.char === openFence.char &&
+            marker.length >= openFence.length
+          ) {
+            // Valid closer: same marker, ≥ length.
+            openFence = null;
+          }
+          // Otherwise: a fence-shaped line that doesn't match the opener —
+          // treat as fence body (no toggle), CommonMark §4.5.
           const consumed = eol === -1 ? source.length - i : eol - i + 1;
           out.push(source.slice(i, i + consumed));
           i += consumed;
@@ -902,7 +927,7 @@ function walkOutsideCode(
       inInlineCode = false;
       continue;
     }
-    if (inFence) {
+    if (openFence !== null) {
       out.push(ch ?? '');
       i += 1;
       continue;

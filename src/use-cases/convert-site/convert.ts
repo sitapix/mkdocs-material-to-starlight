@@ -156,16 +156,25 @@ export async function convertSite(
     input.sourcePaths,
     input.i18nLocales ?? [],
   );
-  // When the blog plugin is enabled, drop `<blogDir>/index.md` from the
-  // emit list. starlight-blog auto-generates the landing page and treats
-  // every page in the blog directory as a post (requiring `date:` and
-  // `authors:` frontmatter) — keeping the source's index.md crashes
-  // `astro build` with "Missing date for blog entry 'blog'." We surface a
-  // single info diagnostic so users know we dropped a file.
+  // When the blog plugin is enabled, drop landing pages that
+  // starlight-blog auto-generates. starlight-blog treats every page in the
+  // blog directory as a post (requiring `date:` and `authors:`
+  // frontmatter); keeping a source `<blogDir>/index.md` (or the
+  // `<blogDir>/tags.md` / `<blogDir>/archive.md` index pages many Material
+  // sites ship) crashes `astro build` with "Missing date for blog entry
+  // '<…>'." starlight-blog renders the equivalents itself.
   const blogIndexPaths = input.blogDir !== undefined
     ? new Set([
         `${input.blogDir}/index.md`,
         `${input.blogDir}/index.mdx`,
+        // Material's blog plugin auto-generates a tags landing page; the
+        // user's source often has a stub `tags.md` (e.g. `# Tags\n[TAGS]`)
+        // that's not a real post.
+        `${input.blogDir}/tags.md`,
+        `${input.blogDir}/tags.mdx`,
+        // Same shape for archive landings.
+        `${input.blogDir}/archive.md`,
+        `${input.blogDir}/archive.mdx`,
       ])
     : new Set<string>();
   const emitPaths = readmeRename.paths.filter((p) => !blogIndexPaths.has(p));

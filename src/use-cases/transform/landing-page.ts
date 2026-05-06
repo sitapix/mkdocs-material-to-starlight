@@ -1,28 +1,20 @@
+import { quoteYamlScalar } from '../../domain/syntax/yaml-scalar.js';
+
 /**
  * Detect and transform a MkDocs landing-style `index.md` into a Starlight
  * `template: splash` page with a structured `hero:` frontmatter block.
  *
- * DETECTION HEURISTIC (conservative — false positives are worse than misses):
- * A page qualifies as a landing page if ALL of these hold:
- *   1. The relative path normalizes to `index.md` (project root).
- *   2. It contains at least ONE of:
- *      a. A top-level image near the start (`![...](...)` or `<img`).
- *      b. An H1 + at least one `[label](url){.md-button}` or
- *         `[label](url)` following it.
- *      c. A `<div class="grid cards">` block with ≥3 list items.
+ * Detection (conservative; false positives are worse than misses): the
+ * relative path is `index.md` AND at least one of —
+ *   a. A top-level image near the start (`![...](...)` or `<img`).
+ *   b. An H1 followed by `[label](url){.md-button}` or `[label](url)`.
+ *   c. A `<div class="grid cards">` block with 3+ list items.
  *
- * OUTPUT:
- *   - Frontmatter gains `template: splash` and a `hero:` block.
- *   - The H1, subtitle, image, and CTA buttons are extracted into `hero:`.
- *   - The remaining body (after extracting hero elements) is preserved, so
- *     the grid-cards block stays in the body where Starlight renders it
- *     below the hero automatically.
+ * Output: frontmatter gains `template: splash` and a `hero:` block holding
+ * the H1, subtitle, image, and CTA buttons. The remaining body is preserved
+ * so the grid-cards block renders below the hero.
  *
- * IDEMPOTENCY:
- *   The transform guards against re-running: if frontmatter already contains
- *   `template: splash`, it is a no-op.
- *
- * Pure function: text × pathRel → { isLanding, result }. No I/O.
+ * Idempotent: pages already carrying `template: splash` pass through. Pure.
  */
 
 export interface HeroFrontmatter {
@@ -231,10 +223,20 @@ function buildSplashPage(
     ...(actions.length > 0 ? { actions } : {}),
   };
 
-  // Build hero YAML block.
+  // Build hero YAML block. Starlight's docs schema rejects an empty `hero:`
+  // key ("Expected type 'object', received 'object'") — when none of title /
+  // tagline / image / actions could be extracted, drop the key entirely
+  // rather than emit a stub. Real-world: PowerTools `index.md` is wrapped
+  // in HTML/Material idioms our extractor can't dissect, so every field
+  // comes back null.
+  const hasAnyHero =
+    heroTitle !== null ||
+    heroTagline !== null ||
+    heroImagePath !== null ||
+    actions.length > 0;
   const heroLines: string[] = ['hero:'];
-  if (heroTitle !== null) heroLines.push(`  title: ${heroTitle}`);
-  if (heroTagline !== null) heroLines.push(`  tagline: ${heroTagline}`);
+  if (heroTitle !== null) heroLines.push(`  title: ${quoteYamlScalar(heroTitle)}`);
+  if (heroTagline !== null) heroLines.push(`  tagline: ${quoteYamlScalar(heroTagline)}`);
   if (heroImagePath !== null) {
     heroLines.push('  image:');
     if (heroImageHtml !== null) {
@@ -252,7 +254,7 @@ function buildSplashPage(
       heroLines.push(`      variant: ${action.variant}`);
     }
   }
-  const heroBlock = heroLines.join('\n');
+  const heroBlock = hasAnyHero ? heroLines.join('\n') : '';
 
   // Build the new frontmatter. Strip any pre-existing `template:` key from
   // the source frontmatter (e.g. Material's `template: welcome.html`)
@@ -263,9 +265,10 @@ function buildSplashPage(
     .split('\n')
     .filter((line) => !/^template\s*:/.test(line))
     .join('\n');
-  const newFm = existingFm.trimEnd().length > 0
-    ? `${existingFm.trimEnd()}\ntemplate: splash\n${heroBlock}`
-    : `template: splash\n${heroBlock}`;
+  const baseFm = existingFm.trimEnd().length > 0
+    ? `${existingFm.trimEnd()}\ntemplate: splash`
+    : `template: splash`;
+  const newFm = heroBlock.length > 0 ? `${baseFm}\n${heroBlock}` : baseFm;
   const fmBlock = `---\n${newFm}\n---\n`;
 
   // The body stays unchanged (hero elements remain in body for reference;

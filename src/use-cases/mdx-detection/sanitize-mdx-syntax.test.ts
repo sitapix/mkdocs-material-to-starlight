@@ -796,6 +796,33 @@ describe('sanitizeMdxSyntax', () => {
       expect(out).toMatch(/&lcub;|&#123;/);
     });
 
+    it('respects fence-length matching: 3-backtick line inside a 4-backtick fence does not close it', () => {
+      // Real-world (freya022/BotCommands-Wiki): a 4-backtick fenced block
+      // wraps a `:::tabs` snippet whose body has a `:::` line followed
+      // by `::::` — every line between the 4-tick opener and closer is
+      // text, but our walker previously toggled `inFence` on the inner
+      // ```java line (3 backticks, not enough to close a 4-tick fence).
+      // After the real 4-tick closer it thought it was BACK inside a
+      // fence → escapers skipped subsequent lines → the next `<--` slipped
+      // through and crashed MDX. Mirrors the actual file shape from the
+      // freya022 fixture.
+      const src = [
+        '````',
+        '::::tabs',
+        ':::tab[Java]',
+        '```java',
+        ':::',
+        '::::',
+        '````',
+        '',
+        'after the fence: 8<-- text',
+        '',
+      ].join('\n');
+      const out = sanitizeMdxSyntax(src);
+      // The `<` after the fence is in prose and must be escaped.
+      expect(out).toContain('8&lt;-- text');
+    });
+
     it('escapes shell-style `${VAR}` interpolation that MDX would read as $+{expr}', () => {
       // Real-world (Colm3na/DocsColmena/ghost.md): an Apache config block
       // contains `ErrorLog ${APACHE_LOG_DIR}/error.log`. MDX reads `$` as
