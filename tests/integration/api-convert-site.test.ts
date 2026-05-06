@@ -67,14 +67,30 @@ describe('interface/api/convertSiteFromDisk', () => {
     expect(indexOut).toContain('Heads up');
     expect(indexOut).toContain('[auth](/api/auth)');
 
+    // Files using icons get promoted to `.mdx` so the JSX `<Icon>` tag
+    // resolves through Starlight's auto-injected import.
     const authOut = readFileSync(
-      join(outputDir, 'src', 'content', 'docs', 'api', 'auth.md'),
+      join(outputDir, 'src', 'content', 'docs', 'api', 'auth.mdx'),
       'utf8',
     );
-    expect(authOut).toContain(':icon[rocket]');
-    expect(authOut).toContain('# Authentication');
+    expect(authOut).toContain('<Icon name="rocket" class="sl-inline-icon" />');
+    // `# Authentication` body H1 was stripped because it duplicates the
+    // synthesized frontmatter title. Starlight renders the title from
+    // frontmatter, so leaving the body H1 produces a visible duplicate.
+    expect(authOut).not.toMatch(/^# Authentication\b/m);
+    expect(authOut).toContain('title: Authentication');
 
-    expect(result.value.diagnostics).toEqual([]);
+    // Only informational diagnostics produced: `mdx-promotion` (auth.md
+    // → .mdx because of the `<Icon>` tag) and `duplicate-h1-stripped`
+    // (the body H1 → frontmatter title dedupe). No actual problems.
+    const informationalIds = new Set([
+      'mdx-promotion',
+      'duplicate-h1-stripped',
+    ]);
+    const nonInformational = result.value.diagnostics.filter(
+      (d) => !informationalIds.has(d.diagnostic.ruleId),
+    );
+    expect(nonInformational).toEqual([]);
     expect(result.value.sidebarSource).toContain(`label: 'Home'`);
     expect(result.value.sidebarSource).toContain(`label: 'API'`);
   });
@@ -85,6 +101,154 @@ describe('interface/api/convertSiteFromDisk', () => {
     expect(result.ok).toBe(false);
     if (!result.ok) {
       expect(result.error.code).toBe('config-not-found');
+    }
+  });
+
+  it('auto-discovers a single nested mkdocs.yml and converts from there', async () => {
+    // Move the project into a wrapper layout: <root>/website/{mkdocs.yml,docs/}
+    rmSync(join(projectDir, 'mkdocs.yml'));
+    const websiteDir = join(projectDir, 'website');
+    mkdirSync(join(websiteDir, 'docs'), { recursive: true });
+    writeFileSync(
+      join(websiteDir, 'mkdocs.yml'),
+      ['site_name: Demo', 'docs_dir: docs', ''].join('\n'),
+    );
+    writeFileSync(join(websiteDir, 'docs', 'index.md'), '# Welcome\n');
+    rmSync(join(projectDir, 'docs'), { recursive: true });
+
+    const result = await convertSiteFromDisk({ projectDir, outputDir });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+
+    // Output is written under the user's chosen outputDir, with the site
+    // resolved against the discovered website/ subdir.
+    expect(
+      existsSync(join(outputDir, 'src', 'content', 'docs', 'index.md')),
+    ).toBe(true);
+
+    // The redirect is surfaced as an info diagnostic.
+    const redirect = result.value.diagnostics.find(
+      (d) => d.diagnostic.ruleId === 'mkdocs-config-auto-discovered',
+    );
+    expect(redirect).toBeDefined();
+    expect(redirect?.diagnostic.message).toContain('website/mkdocs.yml');
+  });
+
+  it('returns config-ambiguous with candidates when multiple mkdocs.yml are found', async () => {
+    rmSync(join(projectDir, 'mkdocs.yml'));
+    rmSync(join(projectDir, 'docs'), { recursive: true });
+    for (const sub of ['website', 'docs-site', 'examples/foo']) {
+      const dir = join(projectDir, sub);
+      mkdirSync(join(dir, 'docs'), { recursive: true });
+      writeFileSync(
+        join(dir, 'mkdocs.yml'),
+        ['site_name: Demo', 'docs_dir: docs', ''].join('\n'),
+      );
+      writeFileSync(join(dir, 'docs', 'index.md'), '# Welcome\n');
+    }
+
+    const result = await convertSiteFromDisk({ projectDir, outputDir });
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.error.code).toBe('config-ambiguous');
+    const sortedCandidates = [...(result.error.candidates ?? [])].sort();
+    expect(sortedCandidates).toEqual([
+      'docs-site/mkdocs.yml',
+      'examples/foo/mkdocs.yml',
+      'website/mkdocs.yml',
+    ]);
+    expect(result.error.message).toContain('docs-site/mkdocs.yml');
+    expect(result.error.message).toContain('Re-run pointing at');
+  });
+
+  it('returns a typed error when docs/ is missing (vanilla mkdocs.yml)', async () => {
+    rmSync(join(projectDir, 'docs'), { recursive: true });
+    const result = await convertSiteFromDisk({ projectDir, outputDir });
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error.code).toBe('directory-read-failed');
+      // No generator plugin in this config → don't recommend running one.
+      expect(result.error.message.toLowerCase()).not.toContain('gen-files');
+    }
+  });
+
+  it('hints to run gen-files first when docs/ is missing and the plugin is configured', async () => {
+    // Reproduces the ethereum/consensus-specs scenario: mkdocs.yml uses
+    // mkdocs-gen-files to materialise docs/ from Python at build time, so
+    // the converter sees no docs/ on disk. Explain the situation instead of
+    // emitting a bare "directory not found".
+    rmSync(join(projectDir, 'docs'), { recursive: true });
+    writeFileSync(
+      join(projectDir, 'mkdocs.yml'),
+      [
+        'site_name: Demo',
+        'docs_dir: docs',
+        'plugins:',
+        '  - search',
+        '  - gen-files:',
+        '      scripts:',
+        '        - scripts/build_docs.py',
+        '',
+      ].join('\n'),
+    );
+    const result = await convertSiteFromDisk({ projectDir, outputDir });
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error.code).toBe('directory-read-failed');
+      expect(result.error.message).toContain('gen-files');
+      // Should give actionable next-step language, not just name the plugin.
+      expect(result.error.message.toLowerCase()).toMatch(/build|generate|run/);
+    }
+  });
+
+  it('scaffolds biome.json + Biome devDep + format scripts so users can run `npm run format` after install', async () => {
+    const result = await convertSiteFromDisk({ projectDir, outputDir });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+
+    // biome.json lands at the project root.
+    const biomeJsonPath = join(outputDir, 'biome.json');
+    expect(existsSync(biomeJsonPath)).toBe(true);
+    const biomeJson = JSON.parse(readFileSync(biomeJsonPath, 'utf8')) as {
+      $schema?: string;
+      files?: { includes?: string[] };
+    };
+    expect(biomeJson.$schema).toMatch(/biomejs\.dev/);
+    // .md / .mdx are intentionally excluded — Biome has no Markdown parser
+    // and the converter's remark-stringify output is the canonical form.
+    expect(biomeJson.files?.includes ?? []).toContain('!**/*.md');
+    expect(biomeJson.files?.includes ?? []).toContain('!**/*.mdx');
+
+    // package.json carries Biome as a devDep + the `format`/`lint` scripts.
+    const pkg = JSON.parse(
+      readFileSync(join(outputDir, 'package.json'), 'utf8'),
+    ) as {
+      scripts?: Record<string, string>;
+      devDependencies?: Record<string, string>;
+    };
+    expect(pkg.devDependencies?.['@biomejs/biome']).toMatch(/^\^?\d/);
+    expect(pkg.scripts?.format).toContain('biome format');
+    expect(pkg.scripts?.lint).toContain('biome lint');
+    expect(pkg.scripts?.['format:check']).toContain('biome format');
+  });
+
+  it('hints when monorepo plugin is configured and docs/ is missing', async () => {
+    rmSync(join(projectDir, 'docs'), { recursive: true });
+    writeFileSync(
+      join(projectDir, 'mkdocs.yml'),
+      [
+        'site_name: Demo',
+        'docs_dir: docs',
+        'plugins:',
+        '  - monorepo',
+        '',
+      ].join('\n'),
+    );
+    const result = await convertSiteFromDisk({ projectDir, outputDir });
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error.code).toBe('directory-read-failed');
+      expect(result.error.message).toContain('monorepo');
     }
   });
 
@@ -117,8 +281,10 @@ describe('interface/api/convertSiteFromDisk', () => {
     const result = await convertSiteFromDisk({ projectDir, outputDir });
     expect(result.ok).toBe(true);
     expect(existsSync(join(outputDir, 'src', 'content', 'docs', 'index.md'))).toBe(true);
+    // auth.md uses `:material-rocket:` which now emits a JSX `<Icon>` and
+    // therefore promotes the file to `.mdx`.
     expect(
-      existsSync(join(outputDir, 'src', 'content', 'docs', 'api', 'auth.md')),
+      existsSync(join(outputDir, 'src', 'content', 'docs', 'api', 'auth.mdx')),
     ).toBe(true);
   });
 
@@ -793,7 +959,7 @@ describe('interface/api/convertSiteFromDisk', () => {
     const result = await convertSiteFromDisk({ projectDir, outputDir });
     expect(result.ok).toBe(true);
     const cfg = readFileSync(join(outputDir, 'astro.config.mjs'), 'utf8');
-    expect(cfg).toContain("defaultLocale: 'de'");
+    expect(cfg).toContain("defaultLocale: 'root'");
     expect(cfg).toContain("root: { label: 'Deutsch', lang: 'de' }");
 
     const notes = readFileSync(join(outputDir, 'MIGRATION_NOTES.md'), 'utf8');
@@ -849,7 +1015,7 @@ describe('interface/api/convertSiteFromDisk', () => {
     expect(result.ok).toBe(true);
     const cfg = readFileSync(join(outputDir, 'astro.config.mjs'), 'utf8');
     // i18n plugin's `en` is the default, not theme.language's `de`
-    expect(cfg).toContain("defaultLocale: 'en'");
+    expect(cfg).toContain("defaultLocale: 'root'");
     expect(cfg).not.toContain('Deutsch');
   });
 
@@ -972,13 +1138,34 @@ describe('interface/api/convertSiteFromDisk', () => {
     expect(cfg).not.toContain('googletagmanager');
   });
 
-  it('always registers starlight-links-validator plugin in generated config', async () => {
+  it('does not register starlight-links-validator by default (opt-in only)', async () => {
+    // 2026-05-05: validator is now opt-in. Real-world Material sites link
+    // to non-content paths (`/LICENSE`, `/CHANGELOG`) and dynamically-
+    // generated pages (mkdocs-click, mkdocstrings). The plugin's defaults
+    // reject all of these at build time. The converter's own `broken-link`
+    // diagnostic catches genuine cross-content link issues during
+    // conversion. See `enableLinksValidator` rationale in convert-site.ts.
     writeFileSync(join(projectDir, 'docs', 'index.md'), '# Home\n');
     const result = await convertSiteFromDisk({ projectDir, outputDir });
     expect(result.ok).toBe(true);
     const cfg = readFileSync(join(outputDir, 'astro.config.mjs'), 'utf8');
-    expect(cfg).toContain('starlight-links-validator');
+    expect(cfg).not.toContain('starlight-links-validator');
+  });
+
+  it('registers starlight-links-validator with safe excludes when opted in', async () => {
+    writeFileSync(join(projectDir, 'docs', 'index.md'), '# Home\n');
+    const result = await convertSiteFromDisk({
+      projectDir,
+      outputDir,
+      linksValidator: true,
+    });
+    expect(result.ok).toBe(true);
+    const cfg = readFileSync(join(outputDir, 'astro.config.mjs'), 'utf8');
     expect(cfg).toContain('starlightLinksValidator({');
+    // Safe excludes for common non-content paths so the build does not
+    // fail on `[License](/LICENSE)`-style links to repository-root files.
+    expect(cfg).toContain("'/LICENSE'");
+    expect(cfg).toContain("'/CHANGELOG'");
   });
 
   it('strips PyYAML !!python/... tags before YAML decode', async () => {
@@ -1294,7 +1481,7 @@ describe('interface/api/convertSiteFromDisk', () => {
     const result = await convertSiteFromDisk({ projectDir, outputDir });
     expect(result.ok).toBe(true);
     const cfg = readFileSync(join(outputDir, 'astro.config.mjs'), 'utf8');
-    expect(cfg).toContain(`defaultLocale: 'en'`);
+    expect(cfg).toContain(`defaultLocale: 'root'`);
     expect(cfg).toContain('locales: {');
     expect(cfg).toContain(`root: { label: 'English'`);
     expect(cfg).toContain(`fr: { label: 'Français'`);

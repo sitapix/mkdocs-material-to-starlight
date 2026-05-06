@@ -1,152 +1,44 @@
 /**
- * Translate the most common Twemoji `:shortcode:` patterns into actual
- * emoji glyphs.
+ * Translate GitHub-flavored `:shortcode:` emoji into Unicode glyphs.
  *
- * Material's `pymdownx.emoji` extension can resolve hundreds of shortcodes
- * at build time. The Astro/Markdown pipeline has no equivalent, so the
- * shortcode renders as literal text. This normalizer covers the top ~100
- * shortcodes the docs typically use, mapped to their canonical Unicode
- * codepoint.
+ * Material's `pymdownx.emoji` resolves shortcodes at build time; Astro has
+ * no equivalent so the shortcode renders as literal text. Uses `gemoji`
+ * (1900+ entries, the data behind GitHub's renderer) so coverage matches
+ * `api.github.com/emojis`.
  *
- * Shortcodes prefixed with `material-`, `fontawesome-`, `octicons-`,
- * `simple-`, `lucide-` are explicitly preserved — they're icon directives
- * handled elsewhere by the icons transform.
+ * Icon-set prefixes (`material-`, `fontawesome-`, `octicons-`, `simple-`,
+ * `lucide-`) are preserved for the icons transform.
  *
- * Pure: text → text. Skips fenced code blocks and inline code spans so
- * documentation about the shortcodes themselves doesn't get rewritten.
+ * Pure, fence-shielded, inline-code-shielded. The matcher accepts `_` and
+ * `\_` so shortcodes survive remark-stringify table escaping.
+ *
+ * GitHub-custom emojis without Unicode (`:octocat:`, `:shipit:`, ...) pass
+ * through; users can hand-port to `<img>` if needed.
  */
+
+import { nameToEmoji } from 'gemoji';
+import { STARLIGHT_ICON_NAMES } from '../transform/icon-mappings.js';
 
 const FENCED_CODE_PATTERN = /(```[\s\S]*?```)/g;
 const INLINE_CODE_PATTERN = /(`[^`\n]*`)/g;
-const SHORTCODE_PATTERN = /:([a-z0-9_+\-]+):/g;
+// Match `:name:` where name contains letters, digits, plus/hyphen, and either
+// raw `_` or backslash-escaped `\_`. The escaped form appears after
+// remark-stringify processes a markdown table cell or other context where
+// underscores are CommonMark-significant. Without this tolerance, shortcodes
+// that survived remark-stringify with escapes (`:red\_circle:`) would fail
+// to match here and render as literal text in the final output.
+const SHORTCODE_PATTERN = /:((?:[a-z0-9+\-]|_|\\_)+):/g;
 const ICON_PREFIX_PATTERN = /^(material|fontawesome|octicons|simple|lucide|fa)-/;
 
-const EMOJI_TABLE: ReadonlyMap<string, string> = new Map(
+// Manual overrides for shortcodes that `gemoji` doesn't ship under the
+// alias real-world docs use. `gemoji` IS the canonical GitHub data, so the
+// override list is now tiny — only Material-specific aliases that gemoji
+// genuinely doesn't recognize. Manual entries win over the library lookup.
+const EMOJI_OVERRIDES: ReadonlyMap<string, string> = new Map(
   Object.entries({
-    smile: '😄',
-    smiley: '😃',
-    grin: '😁',
-    laughing: '😆',
-    sweat_smile: '😅',
-    joy: '😂',
-    rofl: '🤣',
-    blush: '😊',
-    wink: '😉',
-    heart_eyes: '😍',
-    sob: '😭',
-    cry: '😢',
-    thinking: '🤔',
-    sunglasses: '😎',
-    sleepy: '😴',
-    nerd: '🤓',
-    hugs: '🤗',
-    raised_eyebrow: '🤨',
-    skull: '💀',
-    ghost: '👻',
-    alien: '👽',
-    robot: '🤖',
-    poop: '💩',
-    fire: '🔥',
-    sparkles: '✨',
-    star: '⭐',
-    boom: '💥',
-    rocket: '🚀',
-    tada: '🎉',
-    confetti_ball: '🎊',
-    balloon: '🎈',
-    gift: '🎁',
-    medal: '🏅',
-    trophy: '🏆',
-    crown: '👑',
-    rainbow: '🌈',
-    sun: '☀️',
-    cloud: '☁️',
-    umbrella: '☂️',
-    snowflake: '❄️',
-    snowman: '⛄',
-    zap: '⚡',
-    bug: '🐛',
-    ant: '🐜',
-    bee: '🐝',
-    spider: '🕷️',
-    snake: '🐍',
-    panda_face: '🐼',
-    cat: '🐱',
-    dog: '🐶',
-    fox_face: '🦊',
-    unicorn: '🦄',
-    apple: '🍎',
-    banana: '🍌',
-    cherries: '🍒',
-    grapes: '🍇',
-    coffee: '☕',
-    tea: '🍵',
-    beer: '🍺',
-    wine_glass: '🍷',
-    pizza: '🍕',
-    cookie: '🍪',
-    cake: '🍰',
-    earth_americas: '🌎',
-    earth_africa: '🌍',
-    earth_asia: '🌏',
-    moon: '🌙',
-    new_moon: '🌑',
-    full_moon: '🌕',
-    house: '🏠',
-    school: '🏫',
-    office: '🏢',
-    hospital: '🏥',
-    car: '🚗',
-    bus: '🚌',
-    plane: '✈️',
-    book: '📖',
-    books: '📚',
-    pencil: '✏️',
-    memo: '📝',
-    page_facing_up: '📄',
-    pushpin: '📌',
-    paperclip: '📎',
-    scissors: '✂️',
-    lock: '🔒',
-    unlock: '🔓',
-    key: '🔑',
-    bell: '🔔',
-    no_entry: '⛔',
-    warning: '⚠️',
-    no_entry_sign: '🚫',
-    construction: '🚧',
-    white_check_mark: '✅',
-    heavy_check_mark: '✔️',
-    x: '❌',
-    heavy_multiplication_x: '✖️',
-    question: '❓',
-    grey_question: '❔',
-    exclamation: '❗',
-    grey_exclamation: '❕',
-    heart: '❤️',
-    yellow_heart: '💛',
-    green_heart: '💚',
-    blue_heart: '💙',
-    purple_heart: '💜',
-    broken_heart: '💔',
-    thumbsup: '👍',
-    thumbsdown: '👎',
-    '+1': '👍',
-    '-1': '👎',
-    ok_hand: '👌',
-    raised_hands: '🙌',
-    clap: '👏',
-    pray: '🙏',
-    muscle: '💪',
-    eyes: '👀',
-    speech_balloon: '💬',
-    bulb: '💡',
-    hammer_and_wrench: '🛠️',
-    wrench: '🔧',
-    hammer: '🔨',
-    gear: '⚙️',
-    package: '📦',
-    truck: '🚚',
+    // Material themes occasionally use these aliases that aren't in gemoji:
+    rocket_emoji: '🚀', // some Material themes prefer this over plain `:rocket:`
+    mouse_two: '🖱️', // disambiguates from `:mouse:` (animal)
   }),
 );
 
@@ -162,10 +54,37 @@ export function normalizeStandardEmoji(source: string): string {
 }
 
 function replaceInPart(part: string): string {
-  return part.replace(SHORTCODE_PATTERN, (match, name: string) => {
+  return part.replace(SHORTCODE_PATTERN, (match, rawName: string) => {
+    // Normalize the captured name: strip backslash escapes that
+    // remark-stringify inserts before underscores (`red\_circle` → `red_circle`).
+    // Lookups always use the canonical raw form.
+    const name = rawName.replace(/\\_/g, '_');
     if (ICON_PREFIX_PATTERN.test(name)) return match;
-    const glyph = EMOJI_TABLE.get(name);
-    return glyph ?? match;
+    // Resolution order:
+    //   1. Manual overrides (small set of forced mappings)
+    //   2. gemoji (canonical GitHub emoji data, ~1900 entries)
+    //   3. Starlight icon set — emit `<Icon name="..." />` JSX. When the
+    //      bare shortcode happens to match a Starlight icon name (e.g.
+    //      `:bitbucket:`, `:cloud-download:`, `:mastodon:`, `:discord:`),
+    //      this gives users a real rendered icon instead of literal text.
+    //      The mdx-detection step sees the `<Icon>` tag, promotes the
+    //      file to .mdx, and auto-injects the Icon import.
+    //   4. Pass through verbatim — for GitHub-custom emojis (`:octocat:`,
+    //      `:trollface:`, `:shipit:`) and genuinely unknown shortcodes.
+    const override = EMOJI_OVERRIDES.get(name);
+    if (override !== undefined) return override;
+    const fromLibrary = nameToEmoji[name];
+    if (fromLibrary !== undefined) return fromLibrary;
+    if (STARLIGHT_ICON_NAMES.has(name)) {
+      // Tag with `sl-inline-icon` so the converter's CSS shim keeps the
+      // icon inline. Starlight's markdown.css applies `display: block` to
+      // every `<svg>` inside `.sl-markdown-content`; the shim CSS rule
+      // restores inline-block via higher-specificity / unlayered cascade.
+      // See `transform/ast/icons.ts:makeIconHtml` and the shim in
+      // `serialize-config/styles.ts` for the matching CSS.
+      return `<Icon name="${name}" class="sl-inline-icon" />`;
+    }
+    return match;
   });
 }
 

@@ -87,10 +87,32 @@ export function createJsYamlDecoder(): YamlDecoder {
         const value = load(source, { schema: PYTHON_TOLERANT_SCHEMA });
         return ok(value === undefined ? null : value);
       } catch (cause) {
+        // PyYAML (and therefore MkDocs) silently accepts duplicate mapping
+        // keys with last-key-wins semantics. js-yaml is strict by default.
+        // On *only* the duplicate-key error, retry in JSON-compatible mode
+        // so the converter can run on any config MkDocs would build.
+        if (isDuplicateKeyError(cause)) {
+          try {
+            const value = load(source, {
+              schema: PYTHON_TOLERANT_SCHEMA,
+              json: true,
+            });
+            return ok(value === undefined ? null : value);
+          } catch (retryCause) {
+            return err(translateError(retryCause));
+          }
+        }
         return err(translateError(cause));
       }
     },
   };
+}
+
+function isDuplicateKeyError(cause: unknown): boolean {
+  return (
+    cause instanceof YAMLException &&
+    cause.reason.includes('duplicated mapping key')
+  );
 }
 
 function translateError(cause: unknown): YamlDecodeError {

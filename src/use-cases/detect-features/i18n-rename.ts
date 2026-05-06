@@ -2,25 +2,13 @@
  * Translate a `mkdocs-static-i18n` filename into Starlight's directory-based
  * i18n layout.
  *
- * MkDocs `mkdocs-static-i18n` uses filename suffixes:
+ * MkDocs filename suffixes (`page.fr.md`, `page.zh-CN.md`,
+ * `guides/intro.de.md`) become Starlight directory prefixes (`fr/page.md`,
+ * `zh-CN/page.md`, `de/guides/intro.md`). Default-locale files
+ * (no suffix) pass through.
  *
- *   page.md           — default locale
- *   page.fr.md        — French
- *   page.zh-CN.md     — Chinese (Simplified)
- *   guides/intro.de.md — nested with locale
- *
- * Starlight's i18n model uses directory prefixes:
- *
- *   page.md
- *   fr/page.md
- *   zh-CN/page.md
- *   de/guides/intro.md
- *
- * Returns the rewritten path when the input ends in `.<locale>.md` for one of
- * the configured locales, or `null` if no rewrite applies (default-locale
- * file, unknown locale code, or non-`.md` extension).
- *
- * Pure: a path string and a locale list in, an optional path string out.
+ * Returns `null` when no rewrite applies (default locale, unknown locale,
+ * or non-`.md` extension). Pure.
  */
 
 export function renameI18nPath(

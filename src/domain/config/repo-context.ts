@@ -16,7 +16,7 @@
  * unrecognized inputs simply skip the autolinking pass.
  */
 
-export type RepoProvider = 'github' | 'gitlab' | 'bitbucket';
+type RepoProvider = 'github' | 'gitlab' | 'bitbucket';
 
 export interface RepoContext {
   readonly provider: RepoProvider;

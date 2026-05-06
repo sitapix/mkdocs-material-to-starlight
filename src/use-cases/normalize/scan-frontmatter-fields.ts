@@ -1,25 +1,19 @@
 /**
  * Scanner: detect Material-specific frontmatter fields that don't translate
- * 1:1 to Starlight conventions and surface a per-occurrence diagnostic so
- * users see them in MIGRATION_NOTES.md.
+ * 1:1 to Starlight, and surface per-occurrence diagnostics for
+ * MIGRATION_NOTES.md.
  *
- * Covers two clusters of fields:
+ * Two clusters:
+ *   1. Search controls (`search.boost`, `search.exclude`). Material's Lunr
+ *      index supports per-page boosting and exclusion; Pagefind has analogous
+ *      primitives (`pagefind: false`, ranking weight) but no 1:1 mapping.
+ *   2. Blog post fields `starlight-blog` does not honor as-is (`categories`,
+ *      `pin`, `links`). It natively supports `tags`, `authors`, `date`,
+ *      `draft`, `excerpt`, `cover`; the rest need rename, drop, or manual
+ *      reimplementation.
  *
- *   1. **Search controls** (`search.boost`, `search.exclude`) — Material's
- *      Lunr index supports per-page boosting and exclusion. Pagefind has
- *      analogous primitives (`pagefind: false`, ranking weight) but the
- *      conversion is not 1:1, so the converter prefers an explicit
- *      diagnostic over silent translation.
- *
- *   2. **Blog post fields** that `starlight-blog` does not honor as-is
- *      (`categories`, `pin`, `links`). Material's blog plugin treats these
- *      as first-class; `starlight-blog` only natively supports `tags`,
- *      `authors`, `date`, `draft`, `excerpt`, and `cover`. The diagnostics
- *      tell users which fields they need to either rename, drop, or
- *      reproduce manually.
- *
- * Pure read (no text mutation). Operates only on the leading `---`-delimited
- * YAML block; later occurrences of these keys (in body prose) do not fire.
+ * Pure read, no mutation. Operates only on the leading `---` YAML block;
+ * later occurrences in body prose pass through.
  */
 
 import { createDiagnostic, type Diagnostic } from '../../domain/diagnostics/diagnostic.js';

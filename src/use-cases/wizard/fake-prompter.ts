@@ -27,17 +27,24 @@ export interface ScriptedAnswers {
   autocompleteMultiselect?: ReadonlyArray<ReadonlyArray<string> | null>;
 }
 
-export interface RecordedCall {
+interface RecordedCall {
   readonly kind: string;
   readonly message: string;
+  readonly options?: ReadonlyArray<unknown>;
+  readonly initialValue?: unknown;
 }
 
-export interface RecordedLog {
+interface RecordedLog {
   readonly level: 'info' | 'success' | 'step' | 'warn' | 'error';
   readonly message: string;
 }
 
-export interface RecordedSpinner {
+interface RecordedNote {
+  readonly title: string | undefined;
+  readonly body: string;
+}
+
+interface RecordedSpinner {
   readonly initialMessage: string;
   readonly messages: ReadonlyArray<string>;
   readonly stoppedWith: string | null;
@@ -47,12 +54,14 @@ export interface RecordedSpinner {
 export interface FakePrompter extends Prompter {
   readonly calls: ReadonlyArray<RecordedCall>;
   readonly logs: ReadonlyArray<RecordedLog>;
+  readonly notes: ReadonlyArray<RecordedNote>;
   readonly spinners: ReadonlyArray<RecordedSpinner>;
 }
 
 export function createFakePrompter(script: ScriptedAnswers = {}): FakePrompter {
   const calls: Array<RecordedCall> = [];
   const logs: Array<RecordedLog> = [];
+  const notes: Array<RecordedNote> = [];
   const spinnersImpl: Array<{
     initialMessage: string;
     messages: string[];
@@ -108,30 +117,47 @@ export function createFakePrompter(script: ScriptedAnswers = {}): FakePrompter {
     intro: () => {},
     outro: () => {},
     cancel: () => {},
-    note: () => {},
+    note: (body: string, title?: string) => {
+      notes.push({ title, body });
+    },
     log,
     text: async (o: TextOptions) => {
-      calls.push({ kind: 'text', message: o.message });
+      calls.push({ kind: 'text', message: o.message, initialValue: o.initialValue });
       return next<string | null>('text', o.initialValue ?? '');
     },
     path: async (o: PathOptions) => {
-      calls.push({ kind: 'path', message: o.message });
+      calls.push({ kind: 'path', message: o.message, initialValue: o.initialValue });
       return next<string | null>('path', o.initialValue ?? '');
     },
     confirm: async (o: ConfirmOptions) => {
-      calls.push({ kind: 'confirm', message: o.message });
+      calls.push({ kind: 'confirm', message: o.message, initialValue: o.initialValue });
       return next<boolean | null>('confirm', o.initialValue ?? true);
     },
     select: async <V extends string>(o: SelectOptions<V>) => {
-      calls.push({ kind: 'select', message: o.message });
+      calls.push({
+        kind: 'select',
+        message: o.message,
+        options: o.options,
+        initialValue: o.initialValue,
+      });
       return next<V | null>('select', o.initialValue ?? o.options[0]!.value);
     },
     selectKey: async <V extends string>(o: SelectKeyOptions<V>) => {
-      calls.push({ kind: 'selectKey', message: o.message });
+      calls.push({
+        kind: 'selectKey',
+        message: o.message,
+        options: o.options,
+        initialValue: o.initialValue,
+      });
       return next<V | null>('selectKey', o.initialValue ?? o.options[0]!.value);
     },
     multiselect: async <V extends string>(o: MultiselectOptions<V>) => {
-      calls.push({ kind: 'multiselect', message: o.message });
+      calls.push({
+        kind: 'multiselect',
+        message: o.message,
+        options: o.options,
+        initialValue: o.initialValues,
+      });
       return next<ReadonlyArray<V> | null>(
         'multiselect',
         (o.initialValues ?? []) as ReadonlyArray<V>,
@@ -140,7 +166,12 @@ export function createFakePrompter(script: ScriptedAnswers = {}): FakePrompter {
     autocompleteMultiselect: async <V extends string>(
       o: AutocompleteMultiselectOptions<V>,
     ) => {
-      calls.push({ kind: 'autocompleteMultiselect', message: o.message });
+      calls.push({
+        kind: 'autocompleteMultiselect',
+        message: o.message,
+        options: o.options,
+        initialValue: o.initialValues,
+      });
       return next<ReadonlyArray<V> | null>(
         'autocompleteMultiselect',
         (o.initialValues ?? []) as ReadonlyArray<V>,
@@ -171,6 +202,9 @@ export function createFakePrompter(script: ScriptedAnswers = {}): FakePrompter {
     },
     get logs() {
       return logs;
+    },
+    get notes() {
+      return notes;
     },
     get spinners() {
       return spinnersImpl as ReadonlyArray<RecordedSpinner>;

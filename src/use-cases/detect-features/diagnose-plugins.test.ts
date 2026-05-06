@@ -125,18 +125,25 @@ describe('diagnosePlugins', () => {
       return names.map((name) => ({ name }));
     }
 
-    it('emits a warning for pymdownx.arithmatex recommending rehype-katex', () => {
+    it('emits an info confirming math is auto-wired (severity downgraded — no manual action)', () => {
+      // Previously the converter only flagged arithmatex and asked the user
+      // to install + wire rehype-katex themselves. The pipeline now auto-
+      // detects `$$...$$` content, adds remark-math + rehype-katex + katex
+      // to package.json, registers `katex/dist/katex.min.css` in customCss,
+      // and wires the plugins into astro.config. So this is informational.
       const out = diagnosePlugins([], exts('pymdownx.arithmatex'));
       expect(out).toHaveLength(1);
       expect(out[0]?.ruleId).toBe('extension-arithmatex-detected');
-      expect(out[0]?.severity).toBe('warning');
-      expect(out[0]?.message).toMatch(/rehype-katex|rehype-mathjax/);
+      expect(out[0]?.severity).toBe('info');
+      expect(out[0]?.message).toMatch(/auto-?wired|automatically/i);
     });
 
-    it('emits a warning for pymdownx.progressbar (no Starlight equivalent)', () => {
+    it('emits an info for pymdownx.progressbar (transform now promotes to <progress>)', () => {
       const out = diagnosePlugins([], exts('pymdownx.progressbar'));
       expect(out[0]?.ruleId).toBe('extension-progressbar-no-equivalent');
-      expect(out[0]?.severity).toBe('warning');
+      // Severity downgraded from warning to info now that the converter has
+      // a transform that promotes [=N%] to native <progress> HTML.
+      expect(out[0]?.severity).toBe('info');
     });
 
     it('emits an info for pymdownx.striphtml (subsumed by Astro pipeline)', () => {
@@ -190,6 +197,40 @@ describe('diagnosePlugins', () => {
         ),
       );
       expect(out).toHaveLength(8);
+    });
+  });
+
+  describe('Zensical Tier 1/2 parity additions', () => {
+    it('emits a warning for mkdocs-autorefs (no Starlight equivalent)', () => {
+      const out = diagnosePlugins(plugins('autorefs'));
+      expect(out).toHaveLength(1);
+      expect(out[0]?.ruleId).toBe('plugin-autorefs-no-equivalent');
+      expect(out[0]?.severity).toBe('warning');
+    });
+
+    it('emits an info for mkdocs-audio recommending HTML5 <audio>', () => {
+      const out = diagnosePlugins(plugins('audio'));
+      expect(out).toHaveLength(1);
+      expect(out[0]?.ruleId).toBe('plugin-audio-recommend');
+      expect(out[0]?.severity).toBe('info');
+      expect(out[0]?.message.toLowerCase()).toContain('<audio');
+    });
+
+    it('emits an info for awesome-nav (legacy .pages still recognized)', () => {
+      const out = diagnosePlugins(plugins('awesome-nav'));
+      expect(out).toHaveLength(1);
+      expect(out[0]?.ruleId).toBe('plugin-awesome-nav-recognized');
+      expect(out[0]?.severity).toBe('info');
+      expect(out[0]?.message).toContain('.pages');
+    });
+
+    it('git-authors and git-committers both share the contributor-list mapped diagnostic', () => {
+      const a = diagnosePlugins(plugins('git-authors'));
+      const c = diagnosePlugins(plugins('git-committers'));
+      expect(a[0]?.ruleId).toBe('plugin-git-authors-mapped');
+      expect(c[0]?.ruleId).toBe('plugin-git-authors-mapped');
+      expect(a[0]?.message).toContain('starlight-contributor-list');
+      expect(c[0]?.message).toContain('starlight-contributor-list');
     });
   });
 });

@@ -35,9 +35,16 @@ describe('serializeSidebar', () => {
     );
   });
 
-  it('serializes an empty-slug entry without a label as a bare link to "/"', () => {
+  it('serializes an empty-slug entry without a label using the "Overview" default label', () => {
+    // Starlight's link-entry schema requires a label. When the source nav
+    // omits one (`- index.md` with no inline label), default to 'Overview'
+    // so the config validates rather than crashing the dev server with
+    // "sidebar.0.items.0: Did not match union" — real-world: PowerTools
+    // `mkdocs.yml` declares `Homepage: [index.md, …]` with no inline label.
     const withoutLabel: ReadonlyArray<SidebarEntry> = [{ kind: 'slug', slug: '' }];
-    expect(serializeSidebar(withoutLabel)).toBe(`[\n  { link: '/' },\n]`);
+    expect(serializeSidebar(withoutLabel)).toBe(
+      `[\n  { label: 'Overview', link: '/' },\n]`,
+    );
   });
 
   it('serializes a link entry as { label, link }', () => {

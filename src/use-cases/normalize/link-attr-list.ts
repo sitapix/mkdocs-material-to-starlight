@@ -1,35 +1,25 @@
 /**
- * Pre-parse normalizer: strip Markdown attr_list syntax following inline links.
- *
- * Material for MkDocs and Python-Markdown's `attr_list` extension allow
- * attaching HTML attributes to inline links:
+ * Pre-parse normalizer: strip `attr_list` blobs following inline links.
  *
  *   [text](url){.internal-link target=_blank}
  *   [text](url){target="_blank" rel="noopener"}
  *
- * Starlight's MDX renderer has no equivalent syntax. Without stripping, the
- * literal `{.internal-link target=_blank}` text appears in the rendered page
- * because remark sees `{` as text content.
+ * Starlight's MDX renderer has no equivalent. Without stripping, the brace
+ * blob renders as literal text because remark treats `{` as content.
  *
- * This normalizer strips any `{...}` attribute list that immediately follows
- * a `](url)` or `][ref]` inline link (no whitespace between the link and the
- * brace). One info-severity `link-attr-list-stripped` diagnostic is emitted
- * per occurrence so users can add desired attributes (e.g. target="_blank")
- * manually to an MDX <a> element.
+ * Strips any `{...}` immediately following `](url)` or `][ref]` (no space
+ * between). Each occurrence emits one info `link-attr-list-stripped`
+ * diagnostic so users can re-add attributes manually on an MDX `<a>`.
  *
- * Scope: only link-trailing attribute lists are handled. Attribute lists on
- * headings, images, or block elements are handled by separate normalizers.
- *
- * Idempotency: stripped output contains `](url)` without a trailing `{`, so
- * a second pass finds nothing to rewrite.
+ * Scope: link-trailing attribute lists only. Heading, image, and block
+ * attribute lists live in their own normalizers. Idempotent.
  */
 
 import {
   createDiagnostic,
   type Diagnostic,
 } from '../../domain/diagnostics/diagnostic.js';
-
-const FENCE = /^ {0,3}(```|~~~)/;
+import { isFenceLine } from '../../domain/syntax/fence.js';
 // Matches a link followed by an optional space and a {attrs} block. The link
 // itself is matched broadly (up to the closing `)` or `]`). Group 1 = the
 // full link, group 2 = the attr list body (inside the braces).
@@ -55,7 +45,7 @@ export function normalizeLinkAttrLists(
 
   for (const line of lines) {
     lineNumber += 1;
-    if (FENCE.test(line)) {
+    if (isFenceLine(line)) {
       out.push(line);
       inFence = !inFence;
       continue;
@@ -70,15 +60,20 @@ export function normalizeLinkAttrLists(
     let hadMatch = false;
     for (const match of line.matchAll(LINK_ATTR_RE)) {
       const attrBody = match[2] ?? '';
-      // Skip Material button classes — normalizeButtons handles them inside
-      // the convertFile pipeline (which runs after this normalizer).
-      if (MD_BUTTON_ONLY_RE.test(attrBody.trim())) {
+      // Skip Material button classes ONLY when the link is inline
+      // (`[label](url)`) — `normalizeButtons` handles those by emitting a
+      // `<LinkButton>` component. Reference-style links (`[label][ref]`)
+      // can't be handed to `normalizeButtons` (it has no inline URL to
+      // wire into the component), so we MUST strip the `{ .md-button }`
+      // here or it survives as visible literal text in the output.
+      const linkText = match[1] ?? '';
+      const isReferenceStyle = !linkText.endsWith(')');
+      if (!isReferenceStyle && MD_BUTTON_ONLY_RE.test(attrBody.trim())) {
         continue;
       }
       hadMatch = true;
       const start = match.index ?? 0;
       transformed += line.slice(lastIndex, start);
-      const linkText = match[1] ?? '';
       transformed += linkText;
       lastIndex = start + match[0].length;
       diagnostics.push(

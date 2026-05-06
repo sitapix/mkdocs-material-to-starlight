@@ -4,26 +4,19 @@
  *   *[HTML]: Hyper Text Markup Language
  *   *[CSS]: Cascading Style Sheets
  *
- *   The HTML specification is maintained by the W3C.
+ * Python-Markdown collects each `*[TERM]: definition` line, drops the
+ * definitions from the output, and wraps later case-sensitive whole-word
+ * occurrences in `<abbr title="...">`.
  *
- * Material/Python-Markdown collects every `*[TERM]: definition` line, removes
- * the definitions from the rendered output, and wraps every later occurrence
- * of `TERM` (case-sensitive whole-word match) with `<abbr title="definition">`.
+ * `remark-abbr` is pinned to the pre-micromark-3 zmarkdown chain, so this
+ * rewrites to inline `<abbr title="...">TERM</abbr>` HTML.
  *
- * No maintained remark plugin handles this — `remark-abbr` is locked to the
- * pre-micromark-3 zmarkdown chain (see library_audit_20260501.md). We rewrite
- * to inline `<abbr title="...">TERM</abbr>` HTML so the output works in plain
- * `.md`.
- *
- * Idempotency: HTML output contains no `*[TERM]:` definition markers, and
- * `<abbr>` wrappers around an already-wrapped TERM would not match the
- * whole-word boundary, so a second pass is a no-op.
- *
- * Fenced-code safety: lines inside ` ``` ` are passed through verbatim.
- * Backtick-shielded inline code is also untouched, mirroring `inline-marks`.
+ * Idempotent (output has no `*[TERM]:` markers; the whole-word boundary
+ * skips already-wrapped terms). Fence-shielded and backtick-shielded.
  */
 
-const FENCE = /^ {0,3}(```|~~~)/;
+import { isFenceLine } from '../../domain/syntax/fence.js';
+
 const DEFINITION = /^ {0,3}\*\[(?<term>[^\]\n]+)\]:[ \t]+(?<title>.+?)[ \t]*$/;
 
 export function normalizeAbbreviations(source: string): string {
@@ -33,7 +26,7 @@ export function normalizeAbbreviations(source: string): string {
   let inFence = false;
 
   for (const line of lines) {
-    if (FENCE.test(line)) {
+    if (isFenceLine(line)) {
       kept.push(line);
       inFence = !inFence;
       continue;
@@ -70,7 +63,7 @@ function rewriteOccurrences(
   let inFence = false;
 
   for (const line of lines) {
-    if (FENCE.test(line)) {
+    if (isFenceLine(line)) {
       output.push(line);
       inFence = !inFence;
       continue;

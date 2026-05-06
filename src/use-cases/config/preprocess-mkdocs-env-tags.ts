@@ -1,32 +1,22 @@
 /**
- * Pre-decode normalizer: substitute mkdocs's `!ENV` tag with its default
- * value (sequence form) or the bare var name as a string (scalar form),
- * before the YAML decoder ever sees the source.
+ * Pre-decode normalizer: substitute mkdocs's `!ENV` tag before the YAML
+ * decoder sees the source.
  *
- * mkdocs uses `!ENV` to read environment variables in config:
- *
+ * mkdocs uses `!ENV` for env-var lookups:
  *   docs_dir: !ENV [BUILD_DOCS_DIR, "docs"]
  *   site_url: !ENV SITE_URL
  *   - !ENV [NAV_HOME, "Home"]: "index.md"      # !ENV as mapping key
  *
- * js-yaml accepts a custom Type for the sequence/scalar value forms but has
- * a long-standing limitation around explicit tags on complex mapping keys —
- * it produces "bad indentation of a sequence entry" on the third example
- * above. Pre-substituting the tag eliminates the parser ambiguity entirely.
+ * js-yaml's custom-Type support breaks on explicit tags as complex mapping
+ * keys ("bad indentation of a sequence entry"). Pre-substituting the tag
+ * sidesteps the parser ambiguity.
  *
- * Substitution rules (matching mkdocs's runtime semantics):
- *   - `!ENV [VAR1, ..., default]`  → emit `default` literally  (last element)
- *   - `!ENV VAR`                   → emit `"VAR"` (quoted opaque marker)
+ * Substitution (matching mkdocs runtime semantics):
+ *   - `!ENV [VAR1, ..., default]` becomes `default` literally
+ *   - `!ENV VAR`                  becomes `"VAR"` (quoted opaque marker)
  *
- * The transformation is line-based and skips:
- *   - Lines that are pure YAML comments (`# ...`)
- *   - `!ENV` tokens whose starting position lies inside a YAML string literal
- *     (single- or double-quoted span on the same line).
- *
- * Idempotency: substituted output contains no `!ENV` tokens, so a second
- * pass is a no-op.
- *
- * Pure: text → text. No I/O, no external state.
+ * Line-based; skips pure YAML comments and `!ENV` tokens inside a YAML
+ * string literal on the same line. Idempotent and pure.
  */
 
 export function preprocessMkdocsEnvTags(source: string): string {

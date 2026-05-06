@@ -22,7 +22,8 @@ import {
 import { readIndentedBlock } from '../../domain/syntax/indented-block.js';
 import { parseBlocksLine } from '../../domain/syntax/blocks-line.js';
 
-const FENCE = /^ {0,3}(```|~~~)/;
+import { isFenceLine } from '../../domain/syntax/fence.js';
+
 const BODY_INDENT = 4;
 
 /**
@@ -71,7 +72,7 @@ function normalizeBlock(lines: ReadonlyArray<string>): NormalizedBlock {
   while (i < lines.length) {
     const line = lines[i] ?? '';
 
-    if (FENCE.test(line)) {
+    if (isFenceLine(line)) {
       output.push(line);
       inFence = !inFence;
       i += 1;
@@ -150,7 +151,7 @@ function projectedBlockDepth(lines: ReadonlyArray<string>): number {
   let stackDepth = 0;
   let maxNesting = 0;
   for (const line of lines) {
-    if (FENCE.test(line)) {
+    if (isFenceLine(line)) {
       inFenceLocal = !inFenceLocal;
       continue;
     }

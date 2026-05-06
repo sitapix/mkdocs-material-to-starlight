@@ -90,4 +90,31 @@ describe('detectMdxNeeds', () => {
     const src = '```html\n<MyComponent />\n```\n';
     expect(detectMdxNeeds(src).extension).toBe('md');
   });
+
+  it('does not treat hyphenated placeholders like <EXTERNAL-IP> as JSX components', () => {
+    // Real regression from khomesh24/docs Minikube article — kubectl-style
+    // angle-bracket placeholders. They're not valid JSX (hyphens aren't
+    // legal in component identifiers), and promoting the file to .mdx
+    // produces an unparseable output.
+    const src = '# Title\n\nYour deployment is at <EXTERNAL-IP>:8080\n';
+    const out = detectMdxNeeds(src);
+    expect(out.extension).toBe('md');
+    expect(out.usedComponents).toEqual([]);
+  });
+
+  it('does not flag bare uppercase words inside angle brackets used as prose', () => {
+    // <NAME>, <EMAIL>, <URL> — common documentation placeholders.
+    const src = '# Title\n\nReplace <NAME> with your name.\n';
+    expect(detectMdxNeeds(src).extension).toBe('md');
+  });
+
+  it('still detects a self-closing JSX component', () => {
+    const src = '# Title\n\n<MyHero/>\n';
+    expect(detectMdxNeeds(src).extension).toBe('mdx');
+  });
+
+  it('still detects a JSX component with attributes', () => {
+    const src = '# Title\n\n<MyHero className="x" />\n';
+    expect(detectMdxNeeds(src).extension).toBe('mdx');
+  });
 });

@@ -80,4 +80,48 @@ describe('normalizeContentTabs', () => {
     const once = normalizeContentTabs(src);
     expect(normalizeContentTabs(once)).toBe(once);
   });
+
+  it('recurses into tab bodies to convert nested tab groups (hatch regression)', () => {
+    // Real Hatch regression: `docs/install.md` has nested `=== "..."` tabs
+    // inside an outer `=== "macOS"` body. The inner tab markers must convert
+    // too; otherwise they survive as literal `\=== "..."` text after
+    // remark-stringify escapes them. The body coordinate system starts at
+    // indent 0 (after readIndentedBlock dedents), so recursing the same
+    // normalizer over the body picks them up naturally.
+    const src = [
+      '=== "macOS"',
+      '    === "GUI"',
+      '        gui body',
+      '',
+      '    === "CLI"',
+      '        cli body',
+      '',
+      '=== "Windows"',
+      '    win body',
+      '',
+    ].join('\n');
+    const out = normalizeContentTabs(src);
+    // Outer group: ::::tabs / :::tab[macOS] / :::tab[Windows] / ::::
+    expect(out).toMatch(/^::::tabs/m);
+    expect(out).toMatch(/^:::tab\[macOS\]/m);
+    expect(out).toMatch(/^:::tab\[Windows\]/m);
+    // Inner group must be present (indented one level inside the outer body).
+    expect(out).toMatch(/::::tabs[\s\S]*::::tabs/);
+    expect(out).toMatch(/:::tab\[GUI\]/);
+    expect(out).toMatch(/:::tab\[CLI\]/);
+    // No leftover `=== "..."` source markers.
+    expect(out).not.toMatch(/^=== "/m);
+    expect(out).not.toMatch(/^\s+=== "/m);
+  });
+
+  it('is idempotent for nested tab groups', () => {
+    const src = [
+      '=== "Outer"',
+      '    === "Inner"',
+      '        body',
+      '',
+    ].join('\n');
+    const once = normalizeContentTabs(src);
+    expect(normalizeContentTabs(once)).toBe(once);
+  });
 });

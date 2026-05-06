@@ -5,8 +5,12 @@
  * Tiers are split into separate modules (`run-tier0.ts`, `run-tier1.ts`,
  * `run-tier2.ts`) to keep each function under the size cap.
  *
- * `projectDir` is an INPUT (the caller chose it before loading mkdocs.yml to
- * build the ConversionPlan). The wizard does not re-prompt for it.
+ * `projectDir` is an INPUT, not a prompt — the interface layer
+ * (`wizard-runner.ts`) already resolved and validated it via
+ * `readProjectDirInteractively` before building the `ConversionPlan`. By the
+ * time we get here, the dir is known-good (mkdocs.yml parsed) and the user
+ * has confirmed any monorepo redirect. Re-prompting would either duplicate
+ * validation or risk reverting a confirmed redirect.
  *
  * UX note: the "advanced options?" gate is asked exactly once, after Tier 1.
  * If the user picks "Show advanced options" we run Tier 2 and then convert
@@ -27,6 +31,7 @@ import { type Result, err, ok } from '../../domain/result.js';
 import { runTier0 } from './run-tier0.js';
 import { runTier1 } from './run-tier1.js';
 import { runTier2 } from './run-tier2.js';
+import { formatRecap } from './format-recap.js';
 
 export interface RunWizardInput {
   readonly projectDir: string;
@@ -45,6 +50,15 @@ export async function runWizard(
 
   const tier1 = await runTier1(prompter, plan, defaults);
   if (!tier1.ok) return tier1;
+
+  // Recap: standard CLI-init pattern. Show the user exactly what they're
+  // about to commit to before the destructive write happens. Lines are
+  // emitted only for decisions the user actually answered, so the recap
+  // reflects what was asked rather than dumping the full answer set.
+  prompter.note(
+    formatRecap({ projectDir, tier0: tier0.value, tier1: tier1.value }),
+    'About to convert — review your choices',
+  );
 
   // Single gate: convert with current answers, or open advanced options.
   // Cancel is always Ctrl+C / Esc — we don't surface it as a third option to
@@ -69,34 +83,17 @@ export async function runWizard(
     tier2 = t2.value;
   }
 
-  return ok({
+  // Layered merge: defaults provide the baseline for every field, then each
+  // tier's answers override only the fields it actually collected (the tier
+  // accumulators are Partial<WizardAnswers>, so untouched fields aren't
+  // spread). Adding a new wizard field means only updating the type and the
+  // tier that asks — no per-field plumbing here.
+  const answers: WizardAnswers = {
+    ...defaults,
     projectDir,
-    outputDir: tier0.value.outputDir,
-    packageManager: tier0.value.packageManager,
-    check: tier0.value.check,
-    tabs: tier1.value.tabs ?? defaults.tabs,
-    sidebarTopics: tier1.value.sidebarTopics ?? defaults.sidebarTopics,
-    rss: tier1.value.rss ?? defaults.rss,
-    mikeVersions: tier1.value.mikeVersions ?? defaults.mikeVersions,
-    palette: tier1.value.palette ?? defaults.palette,
-    extraAssets: tier1.value.extraAssets ?? defaults.extraAssets,
-    locales: tier1.value.locales ?? defaults.locales,
-    snippetBasePaths: tier1.value.snippetBasePaths ?? defaults.snippetBasePaths,
-    snippetMaxDepth: tier2.snippetMaxDepth ?? defaults.snippetMaxDepth,
-    snippetDedentSubsections: tier2.snippetDedentSubsections ?? defaults.snippetDedentSubsections,
-    linksValidator: tier2.linksValidator ?? defaults.linksValidator,
-    expressiveCodeTheme: tier2.expressiveCodeTheme ?? defaults.expressiveCodeTheme,
-    cards: tier2.cards ?? defaults.cards,
-    mdxMode: tier2.mdxMode ?? defaults.mdxMode,
-    logoReplacesTitle: tier2.logoReplacesTitle ?? defaults.logoReplacesTitle,
-    admonitionMapPath: tier2.admonitionMapPath ?? defaults.admonitionMapPath,
-    keepExplicitHeadingIds: tier2.keepExplicitHeadingIds ?? defaults.keepExplicitHeadingIds,
-    smartSymbols: tier2.smartSymbols ?? defaults.smartSymbols,
-    emojiShortcodes: tier2.emojiShortcodes ?? defaults.emojiShortcodes,
-    inlineMarks: tier2.inlineMarks ?? defaults.inlineMarks,
-    autoAppend: tier2.autoAppend ?? defaults.autoAppend,
-    suppressRules: tier2.suppressRules ?? defaults.suppressRules,
-    configFormat: tier2.configFormat ?? defaults.configFormat,
-    packageName: tier2.packageName ?? defaults.packageName,
-  });
+    ...tier0.value,
+    ...tier1.value,
+    ...tier2,
+  };
+  return ok(answers);
 }

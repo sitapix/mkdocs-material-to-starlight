@@ -1,35 +1,27 @@
 /**
- * Translate Material's `extra.analytics` block into a list of Starlight
- * `head[]` entries plus a list of sub-features the converter cannot honor.
- *
- * Material exposes a single declarative analytics block:
+ * Translate Material's `extra.analytics` block into Starlight `head[]`
+ * entries plus a list of sub-features the converter cannot honor.
  *
  *   extra:
  *     analytics:
  *       provider: google
  *       property: G-XXXXXXXX
- *       feedback:
- *         title: Was this page helpful?
- *         ratings: [...]
  *
- * Starlight has no first-class analytics integration — the canonical pattern
- * is two `<script>` tags injected via the `head` config. This function
- * produces both: the loader script (`<script async src="…/gtag/js?id=…">`)
- * and the inline initializer that calls `gtag('config', ...)` with the user's
- * property ID.
+ * Starlight has no first-class analytics integration; the canonical pattern
+ * is two `<script>` tags injected via `head`. This produces the loader
+ * (`<script async src="…/gtag/js?id=…">`) and the inline `gtag('config', ...)`
+ * initializer.
  *
- * The optional `feedback` widget (Was-this-page-helpful thumbs-up/down) has
- * no Starlight equivalent — it is reported as an unsupported sub-feature so
- * the caller can emit a follow-up diagnostic.
+ * The optional `feedback` widget (was-this-page-helpful) has no Starlight
+ * equivalent and is reported as an unsupported sub-feature for the caller
+ * to surface as a diagnostic.
  *
- * Pure: takes parsed `extras`, returns the converter shape (or null when no
- * usable analytics block is present). Only the `google` provider is
- * supported today; matomo, plausible, and custom providers fall through to
- * null with no diagnostic so the caller can surface a generic
- * "no equivalent" warning.
+ * Pure. Only the `google` provider is supported; matomo, plausible, and
+ * custom providers return null for the caller's generic "no equivalent"
+ * warning path.
  */
 
-export interface HeadEntry {
+interface HeadEntry {
   readonly tag: 'script' | 'link' | 'meta';
   readonly attrs?: Readonly<Record<string, string | boolean | number>>;
   readonly content?: string;

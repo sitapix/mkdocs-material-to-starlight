@@ -4,6 +4,6 @@
  * Reference: https://starlight.astro.build/components/asides/
  */
 
-export const STARLIGHT_ASIDE_TYPES = ['note', 'tip', 'caution', 'danger'] as const;
+const STARLIGHT_ASIDE_TYPES = ['note', 'tip', 'caution', 'danger'] as const;
 
 export type StarlightAsideType = (typeof STARLIGHT_ASIDE_TYPES)[number];

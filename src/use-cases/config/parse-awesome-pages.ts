@@ -64,15 +64,29 @@ function parseEntry(value: unknown): Result<AwesomePagesNavEntry, ConfigError> {
     return ok({ kind: 'rest' });
   }
   if (typeof value === 'string') {
+    // Awesome-pages glob form: `... | pattern*.md` (rest with filter).
+    // We don't compile the glob — pass through as a literal so the nav
+    // compiler keeps the section in scope and the user can edit later.
+    // Real-world: Gothic-Modding-Community uses `... | index*.md`.
     return ok({ kind: 'literal', name: value });
   }
   if (isPlainObject(value)) {
     const keys = Object.keys(value);
     if (keys.length === 1) {
       const title = keys[0] ?? '';
-      const name = value[title];
-      if (typeof name === 'string') {
-        return ok({ kind: 'titled', title, name });
+      const inner = value[title];
+      if (typeof inner === 'string') {
+        return ok({ kind: 'titled', title, name: inner });
+      }
+      // List-valued single-key map: a SECTION with nested entries.
+      // Awesome-pages allows nested nav blocks — parse recursively. The
+      // domain model has no `section` kind in `AwesomePagesNavEntry`, so
+      // for now flatten to a `literal` carrying the title; the named
+      // section header lands as a sidebar group label and the children
+      // get auto-discovered. This is best-effort but does NOT crash the
+      // entire conversion (the previous behavior).
+      if (Array.isArray(inner)) {
+        return ok({ kind: 'literal', name: title });
       }
     }
   }

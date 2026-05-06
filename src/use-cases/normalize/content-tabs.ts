@@ -1,14 +1,12 @@
 /**
- * Pre-parse normalizer: rewrite Material for MkDocs content-tab blocks into
- * remark-directive container syntax.
+ * Pre-parse normalizer: rewrite Material content-tab blocks into
+ * remark-directive containers.
  *
- * A tab group is a maximal run of `=== "Title"` (or `===!`) openings, separated
- * only by blank lines. Anything else (a paragraph, a heading, an admonition)
- * terminates the group. The exclusive marker on any opening promotes the whole
- * group to exclusive.
+ * A tab group is a maximal run of `=== "Title"` (or `===!`) openings,
+ * separated only by blank lines; any other content ends the group. A
+ * `===!` marker anywhere in the group promotes the whole group to exclusive.
  *
- * Each group emits:
- *
+ * Output:
  *   :::tabs              (or :::tabs{exclusive})
  *   :::tab[Title 1]
  *   body 1
@@ -18,14 +16,12 @@
  *   :::
  *   :::
  *
- * Idempotent — already-normalized output is left alone because the source
- * marker `===` does not appear in the output.
+ * Idempotent: emitted output has no `===` markers.
  */
 
 import { parseTabLine, type TabOpening } from '../../domain/syntax/tab-line.js';
 import { readIndentedBlock } from '../../domain/syntax/indented-block.js';
-
-const FENCE = /^ {0,3}(```|~~~)/;
+import { isFenceLine } from '../../domain/syntax/fence.js';
 const BODY_INDENT = 4;
 
 interface CollectedTab {
@@ -49,7 +45,7 @@ export function normalizeContentTabs(source: string): string {
   while (i < lines.length) {
     const line = lines[i] ?? '';
 
-    if (FENCE.test(line)) {
+    if (isFenceLine(line)) {
       output.push(line);
       inFence = !inFence;
       i += 1;
@@ -115,7 +111,21 @@ function renderGroup(group: TabGroup): ReadonlyArray<string> {
 
   for (const tab of group.tabs) {
     out.push(`${indent}:::tab[${tab.opening.title}]`);
-    for (const bodyLine of tab.body) {
+    // Recurse into the body so nested `=== "..."` tab groups also convert.
+    // The body is dedented by `readIndentedBlock`, so any nested tabs sit at
+    // indent 0 in their own coordinate system — exactly what the recursive
+    // pass expects. Real-world Hatch regression: `docs/install.md` nests
+    // GUI/CLI tabs inside outer macOS/Windows/Linux tabs; without recursion
+    // the inner markers survived as literal `\=== "..."` text.
+    const recursedBody = normalizeContentTabs(tab.body.join('\n')).split('\n');
+    // The recursive pass appends a trailing blank after each emitted group
+    // (see the trailing `''` in `out.push('')` below). Drop one trailing
+    // blank if present, so we don't accumulate runaway whitespace when
+    // nesting.
+    if (recursedBody.length > 0 && recursedBody[recursedBody.length - 1] === '') {
+      recursedBody.pop();
+    }
+    for (const bodyLine of recursedBody) {
       out.push(group.indent === 0 ? bodyLine : indent + bodyLine);
     }
     out.push(`${indent}:::`);

@@ -1,32 +1,29 @@
 /**
  * AST-level icon transformer (remark plugin).
  *
- * Walks `text` nodes and splits them on Material/FontAwesome/Octicons icon
- * shortcodes (`:material-rocket:`, `:fontawesome-brands-github:`, …). Each
- * shortcode is replaced by a `textDirective` whose `name` is `icon` and
- * whose `[label]` carries the resolved Starlight icon name.
+ * Splits `text` nodes on Material / FontAwesome / Octicons shortcodes
+ * (`:material-rocket:`, `:fontawesome-brands-github:`, ...) and replaces
+ * each with a raw-HTML mdast node holding `<Icon name="rocket" />`.
+ * Starlight's built-in `Icon` renders the SVG; files with at least one
+ * icon get promoted to `.mdx` and `Icon` is added to auto-imports.
  *
- * The output directive `:icon[rocket]` is consumed by the downstream
- * compiler (or Starlight itself in MDX mode) to render `<Icon name="rocket"/>`.
- * Unmapped icons fall through to a `local:<set>:<name>` label so the asset
- * copier can place the original SVG in `src/icons/` and the Icon component
- * picks it up via the local-icon convention.
+ * The `:icon[name]` directive form has no Starlight remark plugin, so it
+ * renders as plain text. Emitting JSX directly bypasses that gap and
+ * matches the intent in `domain/conversion-mapping/table.ts`.
+ *
+ * Unmapped icons fall through to `<Icon name="local:<set>:<name>" />` and
+ * fire the `icon-unmapped` diagnostic.
  *
  * Plugin contract:
- *   - Owns the `(text, *)` cell *for shortcode-shaped substrings only*. Plain
- *     text is left alone.
- *   - Skips text inside `code` and `inlineCode` nodes (visit doesn't descend
- *     into their children, but we also avoid splitting on shortcode-shaped
- *     fragments inside them by virtue of their type).
- *   - Idempotent: the output is `:icon[...]` directives, which are not
- *     shortcode-shaped, so the second pass finds nothing to convert.
- *   - Diagnostic-first: unrecognized icon-set prefixes emit `icon-unmapped`
- *     but still leave the original shortcode in place.
+ *   - Acts on shortcode-shaped substrings only; other text is left alone.
+ *   - Skips `code` and `inlineCode` nodes.
+ *   - Idempotent: emitted JSX is not shortcode-shaped.
+ *   - Unknown icon-set prefixes emit `icon-unmapped`.
  */
 
 import { visit, SKIP } from 'unist-util-visit';
 import type { Plugin } from 'unified';
-import type { PhrasingContent, Root, Text } from 'mdast';
+import type { Html, PhrasingContent, Root, Text } from 'mdast';
 import { resolveIcon, type IconDescriptor } from '../resolve-icon.js';
 import { createDiagnostic, type Diagnostic } from '../../../domain/diagnostics/diagnostic.js';
 
@@ -43,12 +40,8 @@ const SHORTCODE_RE = /:[a-z][a-z0-9-]*[a-z0-9]:/g;
 const TITLE_ATTR_RE = /\btitle\s*=\s*"([^"]*)"/;
 const SOURCE = 'mkdocs-material-to-starlight';
 
-interface TextDirectiveLike {
-  readonly type: 'textDirective';
-  readonly name: 'icon';
-  readonly attributes: Record<string, string>;
-  readonly children: ReadonlyArray<{ type: 'text'; value: string }>;
-}
+// Replaced legacy `TextDirectiveLike` shape with raw-HTML mdast nodes — see
+// the file-level comment for why directives don't render in Starlight.
 
 export const transformIcons: Plugin<[IconTransformOptions], Root> = (options) => {
   return (tree) => {
@@ -71,7 +64,7 @@ export const transformIcons: Plugin<[IconTransformOptions], Root> = (options) =>
   };
 };
 
-type SplitNode = Text | TextDirectiveLike;
+type SplitNode = Text | Html;
 
 function splitTextNode(
   node: Text,
@@ -104,7 +97,7 @@ function splitTextNode(
     pushIfNonEmpty(out, value.slice(cursor, start));
     const afterShortcode = start + shortcode.length;
     const trailing = consumeTrailingAttrs(value, afterShortcode);
-    out.push(toDirective(descriptor, trailing.label));
+    out.push(toIconHtml(descriptor, trailing.label));
     cursor = trailing.consumedTo;
     didReplaceAny = true;
   }
@@ -130,30 +123,44 @@ function pushIfNonEmpty(out: SplitNode[], value: string): void {
   out.push({ type: 'text', value });
 }
 
-function toDirective(
-  descriptor: IconDescriptor,
-  label: string | null,
-): TextDirectiveLike {
+function toIconHtml(descriptor: IconDescriptor, label: string | null): Html {
   if (descriptor.kind === 'starlight-builtin') {
-    return makeIconDirective(descriptor.name, label);
+    return makeIconHtml(descriptor.name, label);
   }
   if (descriptor.kind === 'local-svg') {
-    return makeIconDirective(
+    return makeIconHtml(
       `local:${descriptor.iconSet}:${descriptor.iconName}`,
       label,
     );
   }
   // placeholder is handled in the caller; this branch is unreachable.
-  return makeIconDirective(descriptor.original, label);
+  return makeIconHtml(descriptor.original, label);
 }
 
-function makeIconDirective(name: string, label: string | null): TextDirectiveLike {
+function makeIconHtml(name: string, label: string | null): Html {
+  // Self-closing JSX so `detectMdxNeeds`' tag scanner counts it without
+  // requiring a closing tag, and Starlight's MDX renderer resolves it via
+  // the auto-injected `Icon` import.
+  //
+  // Add `class="sl-inline-icon"` so the icon stays inline with surrounding
+  // text. Starlight's `markdown.css` applies `display: block` to every
+  // `<svg>` inside `.sl-markdown-content`, breaking phrases like "this icon
+  // ✏️ appears here." onto multiple lines. The converter ships a CSS rule
+  // in `mkdocs-migration.css` that targets `.sl-inline-icon` with higher
+  // specificity (and via the unlayered `customCss` cascade beating
+  // Starlight's layered rule) to restore inline-block behaviour. We avoid
+  // wrapping in `<span class="not-content">` because MDX block-parsing
+  // sometimes treats `<span>` at the start of a serialized HTML node as
+  // block-level, breaking the surrounding paragraph.
+  const labelAttr = label === null ? '' : ` aria-label="${escapeAttr(label)}"`;
   return {
-    type: 'textDirective',
-    name: 'icon',
-    attributes: label === null ? {} : { label },
-    children: [{ type: 'text', value: name }],
+    type: 'html',
+    value: `<Icon name="${escapeAttr(name)}" class="sl-inline-icon"${labelAttr} />`,
   };
+}
+
+function escapeAttr(value: string): string {
+  return value.replace(/&/g, '&amp;').replace(/"/g, '&quot;');
 }
 
 interface TrailingAttrs {
@@ -180,11 +187,48 @@ function consumeTrailingAttrs(value: string, afterShortcode: number): TrailingAt
   }
   const blob = value.slice(i + 1, closeIndex);
   const titleMatch = blob.match(TITLE_ATTR_RE);
-  if (titleMatch === null) {
-    return { label: null, consumedTo: afterShortcode };
+  // Promote `title="..."` to a Starlight-compatible label if present.
+  if (titleMatch !== null) {
+    const label = titleMatch[1] ?? '';
+    return { label, consumedTo: closeIndex + 1 };
   }
-  const label = titleMatch[1] ?? '';
-  return { label, consumedTo: closeIndex + 1 };
+  // No title attr — but if the blob is pure PyMdown attr_list shape
+  // (`.class`, `#id`, `key=value` tokens only), consume and discard it.
+  // Otherwise the `{ .mdx-heart .mdx-insiders }` decoration would survive
+  // as visible text after the icon. Real mkdocs-material regression in
+  // `blog/posts/transforming-material-for-mkdocs.md`.
+  if (isPureAttrList(blob)) {
+    return { label: null, consumedTo: closeIndex + 1 };
+  }
+  return { label: null, consumedTo: afterShortcode };
+}
+
+const ATTR_TOKEN_RE =
+  /^(?:\.[\w-]+|#[\w-]+|[\w-]+\s*=\s*(?:"[^"]*"|'[^']*'|[\w-]+))$/;
+
+function isPureAttrList(blob: string): boolean {
+  const trimmed = blob.trim();
+  if (trimmed.length === 0) return false;
+  // Tokenize on whitespace (quoted values stay intact).
+  const tokens: string[] = [];
+  let j = 0;
+  while (j < trimmed.length) {
+    while (j < trimmed.length && /\s/.test(trimmed[j] ?? '')) j += 1;
+    if (j >= trimmed.length) break;
+    const start = j;
+    while (j < trimmed.length && !/\s/.test(trimmed[j] ?? '')) {
+      const ch = trimmed[j];
+      if (ch === '"' || ch === "'") {
+        const close = trimmed.indexOf(ch, j + 1);
+        if (close === -1) return false;
+        j = close + 1;
+        continue;
+      }
+      j += 1;
+    }
+    tokens.push(trimmed.slice(start, j));
+  }
+  return tokens.length > 0 && tokens.every((t) => ATTR_TOKEN_RE.test(t));
 }
 
 function unmappedDiagnostic(descriptor: { original: string }): Diagnostic {

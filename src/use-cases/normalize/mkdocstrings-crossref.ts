@@ -1,35 +1,28 @@
 /**
  * Pre-parse normalizer: reduce mkdocstrings cross-references to inline code.
  *
- * mkdocstrings uses a special link shorthand for Python API cross-references:
+ *   [`bool`][]                          → `bool`
+ *   [`bool`][builtins.bool]             → `bool`
+ *   [`StrictBool`][pydantic.types...]   → `StrictBool`
  *
- *   [`bool`][]             -- shorthand for the `bool` type
- *   [`bool`][builtins.bool] -- explicit path to `bool` in the builtins module
- *   [`StrictBool`][pydantic.types.StrictBool]
+ * mkdocstrings rewrites these to API links at build time. The converter
+ * cannot resolve Python autodoc targets in Starlight, so it drops the link
+ * decoration and keeps the inline code.
  *
- * In the rendered MkDocs site, mkdocstrings turns these into links to the
- * relevant API page. The converter cannot resolve Python autodoc targets in
- * Starlight, so the link decoration is stripped and only the inline code
- * portion is kept.
+ * Without this pass, remark-stringify escapes `[` and `]` to `\[` and `\]`
+ * and the output reads as literal noise.
  *
- * Before this normalizer runs, remark-stringify would escape the `[` and `]`
- * characters to `\[` and `\]`, producing visible literal noise in the output.
- * This normalizer replaces the full `[`X`][...]` form with just `` `X` ``
- * before remark sees it.
+ * Scope: backtick-quoted cross-refs only; plain `[foo][bar]` is the
+ * link-rewrite stage's job.
  *
- * Scope: only backtick-quoted cross-references are handled. Plain text refs
- * like `[foo][bar]` are left to the link-rewrite stage.
- *
- * Idempotency: the output `` `X` `` does not contain `][`, so a second pass
- * finds nothing to rewrite.
+ * Idempotent: output `` `X` `` contains no `][`.
  */
 
 import {
   createDiagnostic,
   type Diagnostic,
 } from '../../domain/diagnostics/diagnostic.js';
-
-const FENCE = /^ {0,3}(```|~~~)/;
+import { isFenceLine } from '../../domain/syntax/fence.js';
 // Matches [`X`][] or [`X`][target] where X is the content of the backtick
 // and target is an optional fully-qualified Python path.
 // Captures group 1 = the inner code text (without backticks).
@@ -51,7 +44,7 @@ export function normalizeMkdocstringsCrossRefs(
 
   for (const line of lines) {
     lineNumber += 1;
-    if (FENCE.test(line)) {
+    if (isFenceLine(line)) {
       out.push(line);
       inFence = !inFence;
       continue;

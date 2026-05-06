@@ -230,4 +230,35 @@ describe('detectLandingPage', () => {
       expect(result.isLanding).toBe(false);
     });
   });
+
+  describe('empty hero suppression', () => {
+    it('omits the `hero:` key entirely when no hero fields could be extracted', () => {
+      // Real-world: PowerTools `index.md` is a landing-style page wrapped
+      // in HTML/Material idioms our extractor cannot dissect — every hero
+      // field comes back null. Emitting an empty `hero:` key crashes Astro
+      // with `data does not match collection schema. hero: Expected type
+      // 'object', received 'object'`. Drop the key when nothing was found
+      // and let the page render with just `template: splash`.
+      const minimal = [
+        '---',
+        'title: Homepage',
+        '---',
+        '',
+        '<div class="grid cards" markdown>',
+        '',
+        '- Card A',
+        '- Card B',
+        '- Card C',
+        '- Card D',
+        '',
+        '</div>',
+        '',
+      ].join('\n');
+      const result = detectLandingPage(minimal, 'index.md');
+      if (!result.isLanding) throw new Error('expected landing page');
+      expect(result.text).toContain('template: splash');
+      // Critical: no bare `hero:` key (which would be an empty object).
+      expect(result.text).not.toMatch(/^hero:\s*$/m);
+    });
+  });
 });

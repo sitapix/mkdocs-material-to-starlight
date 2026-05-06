@@ -21,16 +21,20 @@ import remarkParse from 'remark-parse';
 import remarkGfm from 'remark-gfm';
 import remarkFrontmatter from 'remark-frontmatter';
 import remarkDirective from 'remark-directive';
+import remarkMath from 'remark-math';
 import type {
   OutputValidator,
   OutputValidationResult,
 } from '../../domain/ports/output-validator.js';
 
+interface MdxCompileOptions {
+  readonly jsx?: boolean;
+  readonly format?: 'mdx' | 'md';
+  readonly remarkPlugins?: ReadonlyArray<unknown>;
+}
+
 interface MdxModule {
-  readonly compile: (
-    text: string,
-    options?: Readonly<Record<string, unknown>>,
-  ) => Promise<unknown>;
+  readonly compile: (text: string, options?: MdxCompileOptions) => Promise<unknown>;
 }
 
 interface ParserError {
@@ -47,7 +51,21 @@ const mdProcessor = unified()
   .use(remarkParse)
   .use(remarkFrontmatter, ['yaml'])
   .use(remarkGfm)
-  .use(remarkDirective);
+  .use(remarkDirective)
+  .use(remarkMath);
+
+// Mirror Starlight's MDX pipeline so the validator doesn't false-positive
+// on syntax Starlight accepts at build time. Without these, plain
+// `mdx.compile()` rejects `:::note[label]{key="val"}` (directive attrs as
+// JS expression), `:icon[name]{...}` (text directive), and `$$ \frac{a}{b} $$`
+// (acorn parses LaTeX braces as JSX expressions). With them, each is parsed
+// as a structured node before the JSX expression rules apply.
+const MDX_REMARK_PLUGINS: ReadonlyArray<unknown> = [
+  remarkFrontmatter,
+  remarkGfm,
+  remarkDirective,
+  remarkMath,
+];
 
 export function createMdxOutputValidator(): OutputValidator {
   let mdxPromise: Promise<MdxModule | null> | null = null;
@@ -67,7 +85,11 @@ export function createMdxOutputValidator(): OutputValidator {
           return { kind: 'driver-missing', hint: INSTALL_HINT };
         }
         try {
-          await mdx.compile(text, { jsx: true, format: 'mdx' });
+          await mdx.compile(text, {
+            jsx: true,
+            format: 'mdx',
+            remarkPlugins: MDX_REMARK_PLUGINS,
+          });
           return { kind: 'ok' };
         } catch (cause) {
           return { kind: 'failure', errors: [normalizeError(cause)] };

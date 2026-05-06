@@ -1,27 +1,20 @@
 /**
  * Pre-parse normalizer for `pymdownx.smartsymbols`.
  *
- * Material's smart-symbols extension converts ASCII shortcuts into the
- * corresponding Unicode glyphs:
- *
- *   (c)   → ©    (r)   → ®    (tm)  → ™
- *   c/o   → ℅    +/-   → ±    =/=   → ≠
- *   -->   → →    <--   → ←    <-->  → ↔
+ *   (c) → ©   (r) → ®   (tm) → ™
+ *   c/o → ℅   +/- → ±   =/=  → ≠
+ *   --> → →   <-- → ←   <--> → ↔
  *   1/2 1/4 3/4 1/3 2/3 1/8 3/8 5/8 7/8 → ½ ¼ ¾ ⅓ ⅔ ⅛ ⅜ ⅝ ⅞
  *
- * No remark/rehype plugin ships with Astro for this, so we expand the
- * shortcuts at the text-normalization stage. Substitutions are unambiguous
- * (none of the shortcuts overlap with CommonMark syntax) and are applied
- * line-by-line in a single pass.
+ * No remark/rehype plugin ships with Astro for this, so the shortcuts
+ * expand at the text stage. Substitutions don't overlap with CommonMark
+ * syntax; line-by-line in a single pass.
  *
- * Idempotency: substitutions output Unicode glyphs that no longer match the
- * source patterns, so a second pass finds nothing to rewrite.
- *
- * Fenced-code safety: lines inside ` ``` ` are passed through verbatim;
- * inline backtick spans are also shielded so `\`(c)\`` stays literal.
+ * Idempotent (output Unicode glyphs do not match source patterns) and
+ * fence/backtick-shielded.
  */
 
-const FENCE = /^ {0,3}(```|~~~)/;
+import { isFenceLine } from '../../domain/syntax/fence.js';
 
 interface Substitution {
   readonly pattern: RegExp;
@@ -66,7 +59,7 @@ export function normalizeSmartSymbols(source: string): string {
   let inHtmlComment = false;
 
   for (const line of lines) {
-    if (FENCE.test(line)) {
+    if (isFenceLine(line)) {
       output.push(line);
       inFence = !inFence;
       continue;

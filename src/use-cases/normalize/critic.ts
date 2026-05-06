@@ -1,30 +1,23 @@
 /**
- * Pre-parse normalizer for Critic Markup (the `pymdownx.critic` extension).
+ * Pre-parse normalizer for Critic Markup (`pymdownx.critic`).
  *
- *   {++ added text ++}            → <ins> added text </ins>
- *   {-- deleted text --}          → <del> deleted text </del>
- *   {~~ old ~> new ~~}            → <del>old</del><ins>new</ins>
- *   {== highlighted text ==}      → <mark> highlighted text </mark>
- *   {>> reviewer comment <<}      → <span class="critic-comment"> reviewer comment </span>
+ *   {++ added text ++}        → <ins> added text </ins>
+ *   {-- deleted text --}      → <del> deleted text </del>
+ *   {~~ old ~> new ~~}        → <del>old</del><ins>new</ins>
+ *   {== highlighted text ==}  → <mark> highlighted text </mark>
+ *   {>> comment <<}           → <span class="critic-comment"> comment </span>
  *
- * No remark plugin handles Critic Markup with mdast integration (the standalone
- * `critic-markup` package is a string renderer only — see
- * library_audit_20260501.md). We rewrite at the text level so the output
- * works in plain `.md`.
+ * No remark plugin handles Critic Markup at the mdast level, so this rewrites
+ * at the text level for plain `.md` output.
  *
- * **Ordering note.** Critic's `{== ==}` highlight token nests inside curly
- * braces, while PyMdown's `pymdownx.mark` extension uses bare `==text==`.
- * The composed pipeline must run this normalizer BEFORE `inline-marks` so
- * `inline-marks`' `==` matcher does not accidentally consume the inner `==`
- * pair of `{==…==}`. The composition in `normalize.ts` enforces this order.
+ * Ordering: must run before `inline-marks`. `{==text==}` nests an inner
+ * `==text==` pair that `inline-marks`' `==` matcher would otherwise consume.
+ * `normalize.ts` enforces the order.
  *
- * Idempotency: HTML output contains no `{++` / `{--` / `{~~` / `{==` / `{>>`
- * source markers, so `normalize(normalize(x)) === normalize(x)`.
- *
- * Fenced-code safety: lines inside ` ``` ` are passed through verbatim.
+ * Idempotent (output has no `{++ {-- {~~ {== {>>` markers) and fence-shielded.
  */
 
-const FENCE = /^ {0,3}(```|~~~)/;
+import { isFenceLine } from '../../domain/syntax/fence.js';
 
 const SUBSTITUTION_RE = /\{~~([\s\S]+?)~>([\s\S]+?)~~\}/g;
 const INSERT_RE = /\{\+\+([\s\S]+?)\+\+\}/g;
@@ -32,24 +25,49 @@ const DELETE_RE = /\{--([\s\S]+?)--\}/g;
 const HIGHLIGHT_RE = /\{==([\s\S]+?)==\}/g;
 const COMMENT_RE = /\{>>([\s\S]+?)<<\}/g;
 
+/**
+ * Group consecutive non-fence lines into "blocks" and apply Critic regexes
+ * to each block as a single string. This is what makes multi-paragraph
+ * spans work — a line-by-line approach cannot match `{==\n\nbody\n\n==}`
+ * because the regex never sees both delimiters at once. Real-world:
+ * crafty-documentation/macos.md uses Critic to highlight a 3-paragraph
+ * note; the opening `{==` survives to MDX as `{` + `==`, which acorn
+ * rejects as "Could not parse expression."
+ *
+ * Fenced code stays untouched — the per-block strategy preserves fence
+ * shielding because the regex callbacks never see fence content.
+ */
 export function normalizeCriticMarkup(source: string): string {
   const lines = source.split('\n');
   const output: string[] = [];
   let inFence = false;
+  let buffer: string[] = [];
+
+  const flush = (): void => {
+    if (buffer.length === 0) return;
+    output.push(rewriteBlock(buffer.join('\n')));
+    buffer = [];
+  };
 
   for (const line of lines) {
-    if (FENCE.test(line)) {
+    if (isFenceLine(line)) {
+      flush();
       output.push(line);
       inFence = !inFence;
       continue;
     }
-    output.push(inFence ? line : rewriteLine(line));
+    if (inFence) {
+      output.push(line);
+      continue;
+    }
+    buffer.push(line);
   }
+  flush();
 
   return output.join('\n');
 }
 
-function rewriteLine(line: string): string {
+function rewriteBlock(line: string): string {
   let out = line;
   out = out.replace(SUBSTITUTION_RE, (_match, oldText: string, newText: string) =>
     `<del>${oldText}</del><ins>${newText}</ins>`,

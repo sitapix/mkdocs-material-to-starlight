@@ -66,7 +66,7 @@ function parseEntry(
   if (typeof child === 'string') {
     return ok(
       isExternalUrl(child)
-        ? { kind: 'external', title, href: child }
+        ? { kind: 'external', title, href: sanitizeExternalUrl(child) }
         : { kind: 'file', title, path: child },
     );
   }
@@ -86,6 +86,20 @@ function parseEntry(
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+/**
+ * Strip trailing junk from a YAML-supplied external URL. Real-world Material
+ * sites occasionally embed HTML attributes directly in nav values (e.g.
+ * `https://example.com/page" target="_blank` from PowerTools) because YAML
+ * does not require quoting and the author's editor auto-completed the link.
+ * The resulting "URL" pollutes the rendered sidebar and breaks any URL
+ * validator. Truncate at the first whitespace or `"` since neither is a
+ * valid URL character per RFC 3986.
+ */
+function sanitizeExternalUrl(href: string): string {
+  const m = href.match(/^[^\s"'<>]+/);
+  return m === null ? href : m[0];
 }
 
 function isExternalUrl(value: string): boolean {

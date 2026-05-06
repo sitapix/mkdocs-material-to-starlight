@@ -1,23 +1,17 @@
 /**
- * Detect `theme.features` flags in the long-tail — flags that are NOT
- * already handled by the primary classifier in
- * `domain/starlight/theme-feature-catalog.ts` — and return per-flag
- * recommendation entries.
+ * Detect long-tail `theme.features` flags not covered by the primary
+ * classifier in `domain/starlight/theme-feature-catalog.ts` and return
+ * per-flag recommendation entries.
  *
- * The returned entries drive per-flag `info` diagnostics emitted in the
- * interface shell (`interface/api/convert-site.ts`). Each entry carries
- * the Starlight approximation text so the diagnostic message is actionable.
+ * Drives per-flag `info` diagnostics in `interface/api/convert-site.ts`.
+ * Each entry carries Starlight approximation text so the message is
+ * actionable. Pure.
  *
- * Pure function: takes the features array from theme.options, returns readonly
- * entries. No I/O, no side effects.
- *
- * DESIGN: The primary classifier in `domain/starlight/theme-feature-catalog.ts`
- * handles the well-known flags (navigation.tabs, content.code.copy, etc.) with
- * generic `theme-feature-replaced` / `theme-feature-unsupported` diagnostics.
- * This detector covers ADDITIONAL long-tail flags that (a) are not in the
- * primary catalog, or (b) are in the catalog but we provide richer
- * recommendation text here. The runtime skip (via `classifyThemeFeature`)
- * prevents double-emit for flags already handled by the primary classifier.
+ * The primary classifier handles well-known flags with generic
+ * `theme-feature-replaced` / `theme-feature-unsupported` diagnostics. This
+ * detector covers (a) flags missing from that catalog, or (b) flags that
+ * benefit from richer remediation text. `classifyThemeFeature` prevents
+ * double-emit for the overlap.
  */
 
 import { classifyThemeFeature } from '../../domain/starlight/theme-feature-catalog.js';
@@ -96,10 +90,9 @@ const LONGTAIL: ReadonlyMap<string, string> = new Map([
     'content.tooltips',
     'No first-class Starlight equivalent. Add custom CSS on `<a title>` links and use Markdown attribute lists for hover tooltips.',
   ],
-  [
-    'content.footnote.tooltips',
-    'No first-class Starlight equivalent. Add a small client-side script for footnote hover preview, or use a third-party tooltip library.',
-  ],
+  // `content.footnote.tooltips` is intentionally NOT listed here — the
+  // primary theme-feature-catalog has a richer note for it, and
+  // classifyThemeFeature filters primary-catalog flags out of this set.
   [
     'content.code.select',
     'Starlight uses Expressive Code which supports full-block copy; selection-aware copy is not a first-class feature. The default copy button covers the common case.',

@@ -21,9 +21,9 @@ import {
   createDiagnostic,
   type Diagnostic,
 } from '../../domain/diagnostics/diagnostic.js';
+import { isFenceLine } from '../../domain/syntax/fence.js';
 
 const SOURCE = 'detect-macros/scan-expressions';
-const FENCE_RE = /^ {0,3}(```|~~~)/;
 const VARIABLE_RE = /\{\{[^}]+\}\}/g;
 
 export function scanMacroExpressions(
@@ -36,7 +36,7 @@ export function scanMacroExpressions(
 
   for (const line of lines) {
     lineNumber += 1;
-    if (FENCE_RE.test(line)) {
+    if (isFenceLine(line)) {
       inFence = !inFence;
       continue;
     }

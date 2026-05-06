@@ -1,0 +1,88 @@
+import { describe, it, expect } from 'vitest';
+import { confirmOverwriteIfNeeded } from './confirm-overwrite.js';
+import { createFakePrompter } from './fake-prompter.js';
+import type {
+  DirInspector,
+  DirState,
+} from '../../domain/wizard/ports/dir-inspector.js';
+
+function fakeInspector(state: DirState): DirInspector {
+  return { inspect: async () => state };
+}
+
+describe('confirmOverwriteIfNeeded', () => {
+  it('returns "no-need" when the target directory is missing — no prompt fires', async () => {
+    const prompter = createFakePrompter();
+    const result = await confirmOverwriteIfNeeded(
+      prompter,
+      fakeInspector('missing'),
+      '/does/not/exist',
+    );
+    expect(result).toBe('no-need');
+    expect(prompter.calls.length).toBe(0);
+    expect(prompter.logs.length).toBe(0);
+  });
+
+  it('returns "no-need" when the target directory is empty — no prompt fires', async () => {
+    const prompter = createFakePrompter();
+    const result = await confirmOverwriteIfNeeded(
+      prompter,
+      fakeInspector('empty'),
+      '/empty',
+    );
+    expect(result).toBe('no-need');
+    expect(prompter.calls.length).toBe(0);
+  });
+
+  it('warns and confirms when target is non-empty; returns "confirmed" when user accepts', async () => {
+    const prompter = createFakePrompter({ confirm: [true] });
+    const result = await confirmOverwriteIfNeeded(
+      prompter,
+      fakeInspector('non-empty'),
+      '/already/here',
+    );
+    expect(result).toBe('confirmed');
+    // The prompter must have surfaced a warning message that mentions the path
+    // (so the user knows exactly what they're agreeing to overwrite) before
+    // the confirmation prompt fired.
+    expect(
+      prompter.logs.some(
+        (l) => l.level === 'warn' && l.message.includes('/already/here'),
+      ),
+    ).toBe(true);
+    expect(prompter.calls.find((c) => c.kind === 'confirm')).toBeDefined();
+  });
+
+  it('returns "cancelled" when the user declines overwrite', async () => {
+    const prompter = createFakePrompter({ confirm: [false] });
+    const result = await confirmOverwriteIfNeeded(
+      prompter,
+      fakeInspector('non-empty'),
+      '/here',
+    );
+    expect(result).toBe('cancelled');
+  });
+
+  it('returns "cancelled" when the user hits Ctrl+C at the confirm prompt', async () => {
+    const prompter = createFakePrompter({ confirm: [null] });
+    const result = await confirmOverwriteIfNeeded(
+      prompter,
+      fakeInspector('non-empty'),
+      '/here',
+    );
+    expect(result).toBe('cancelled');
+  });
+
+  it('confirm prompt defaults to NO so an inattentive Enter does not destroy data', async () => {
+    let observed: { initialValue?: boolean } | undefined;
+    const wrapped = createFakePrompter({ confirm: [false] });
+    const realConfirm = wrapped.confirm.bind(wrapped);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (wrapped as any).confirm = async (o: any) => {
+      observed = o;
+      return realConfirm(o);
+    };
+    await confirmOverwriteIfNeeded(wrapped, fakeInspector('non-empty'), '/x');
+    expect(observed?.initialValue).toBe(false);
+  });
+});

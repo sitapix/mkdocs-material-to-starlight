@@ -92,27 +92,19 @@ function renderTabsContainerMdx(
   // would impose synchronization the author didn't ask for. When set, it is
   // derived from the cleaned (icon-stripped) labels so two tab groups that
   // differ only in icon shortcodes still synchronise correctly.
-  const openTag = tabsLinked
-    ? buildLinkedTabsOpenTag(directive, iconOverrides)
-    : '<Tabs>';
-  const out: unknown[] = [{ type: 'html', value: openTag }];
+  const attributes: unknown[] = [];
+  if (tabsLinked) {
+    const syncKey = deriveSyncKey(collectChildLabels(directive, iconOverrides));
+    if (syncKey !== null) {
+      attributes.push({ type: 'mdxJsxAttribute', name: 'syncKey', value: syncKey });
+    }
+  }
+  const children: unknown[] = [];
   for (const child of directive.children) {
     if (isDirectiveLabel(child)) continue;
-    out.push(child);
+    children.push(child);
   }
-  out.push({ type: 'html', value: '</Tabs>' });
-  return out;
-}
-
-function buildLinkedTabsOpenTag(
-  directive: ContainerDirectiveLike,
-  iconOverrides: Readonly<Record<string, string>> | undefined,
-): string {
-  const labels = collectChildLabels(directive, iconOverrides);
-  const syncKey = deriveSyncKey(labels);
-  return syncKey === null
-    ? '<Tabs>'
-    : `<Tabs syncKey="${escapeAttr(syncKey)}">`;
+  return [{ type: 'mdxJsxFlowElement', name: 'Tabs', attributes, children }];
 }
 
 function renderTabMdx(
@@ -120,32 +112,34 @@ function renderTabMdx(
   iconOverrides: Readonly<Record<string, string>> | undefined,
 ): ReadonlyArray<unknown> {
   const rawLabel = readDirectiveLabel(directive);
-  const openTag = rawLabel === null
-    ? '<TabItem label="Tab">'
-    : buildTabItemOpenTag(rawLabel, iconOverrides);
-  const out: unknown[] = [{ type: 'html', value: openTag }];
+  const attributes = buildTabItemAttributes(rawLabel, iconOverrides);
+  const children: unknown[] = [];
   for (const child of directive.children) {
     if (isDirectiveLabel(child)) continue;
-    out.push(child);
+    children.push(child);
   }
-  out.push({ type: 'html', value: '</TabItem>' });
-  return out;
+  return [{ type: 'mdxJsxFlowElement', name: 'TabItem', attributes, children }];
 }
 
-function buildTabItemOpenTag(
-  rawLabel: string,
+function buildTabItemAttributes(
+  rawLabel: string | null,
   iconOverrides: Readonly<Record<string, string>> | undefined,
-): string {
+): ReadonlyArray<unknown> {
+  if (rawLabel === null) {
+    return [{ type: 'mdxJsxAttribute', name: 'label', value: 'Tab' }];
+  }
   const { iconName, label } = extractLabelIcon(
     iconOverrides === undefined
       ? { rawLabel }
       : { rawLabel, overrides: iconOverrides },
   );
   const safeLabel = label.length > 0 ? label : 'Tab';
-  if (iconName === null) {
-    return `<TabItem label="${escapeAttr(safeLabel)}">`;
+  const attributes: unknown[] = [];
+  if (iconName !== null) {
+    attributes.push({ type: 'mdxJsxAttribute', name: 'icon', value: iconName });
   }
-  return `<TabItem icon="${escapeAttr(iconName)}" label="${escapeAttr(safeLabel)}">`;
+  attributes.push({ type: 'mdxJsxAttribute', name: 'label', value: safeLabel });
+  return attributes;
 }
 
 function collectChildLabels(

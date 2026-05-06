@@ -1,37 +1,29 @@
 /**
- * Pre-parse normalizer for Material's annotations feature.
+ * Pre-parse normalizer for Material annotations.
  *
  *   Lorem ipsum dolor sit amet (1) consectetur adipiscing elit.
  *   { .annotate }
  *
  *   1.  I'm an annotation!
- *   2.  I'm an annotation as well!
  *
- * Material renders annotations as inline popovers; Starlight has no native
- * popover component, and per `library_audit_20260501.md` no remark plugin
- * implements the positional `(N)` ↔ Nth-list-item binding. The cleanest
- * downgrade that preserves the SEMANTIC link between marker and content is
- * to rewrite annotations as Markdown footnotes, which `remark-gfm` already
- * renders correctly:
+ * Starlight has no popover and no remark plugin handles the positional
+ * `(N)` to Nth-list-item binding. Downgrade to Markdown footnotes, which
+ * `remark-gfm` renders, preserving the semantic link:
  *
  *   Lorem ipsum dolor sit amet[^anno-N-1] consectetur adipiscing elit.
- *
  *   [^anno-N-1]: I'm an annotation!
- *   [^anno-N-2]: I'm an annotation as well!
  *
- * The footnote ID prefix (`anno-`) plus a per-block counter (`N`) keeps the
- * IDs unique across multiple annotated blocks in the same document.
+ * The `anno-` ID prefix plus a per-block counter keeps IDs unique across
+ * multiple annotated blocks.
  *
- * Code-block annotations (the `(N)!` form inside fenced code) are NOT
- * handled here yet — they require language-aware comment stripping and live
- * in a Phase-3 milestone.
+ * Code-block annotations (`(N)!` inside fenced code) are out of scope here
+ * and live in a Phase-3 milestone (language-aware comment stripping).
  *
- * Idempotency: footnote refs/defs are not recognized as annotation markers,
- * so a second pass finds nothing to rewrite. Fence-safe via the standard
- * shielding pattern.
+ * Idempotent (footnote refs/defs are not annotation markers) and fence-safe.
  */
 
-const FENCE = /^ {0,3}(```|~~~)/;
+import { isFenceLine } from '../../domain/syntax/fence.js';
+
 const ANNOTATE_CLASS = /^[ \t]*\{[ \t]*\.annotate[ \t]*\}[ \t]*$/;
 const LIST_ITEM = /^(\d+)\.[ \t]+(.+)$/;
 const MARKER = /\((\d+)\)/g;
@@ -46,7 +38,7 @@ export function normalizeAnnotations(source: string): string {
   while (i < lines.length) {
     const line = lines[i] ?? '';
 
-    if (FENCE.test(line)) {
+    if (isFenceLine(line)) {
       output.push(line);
       inFence = !inFence;
       i += 1;

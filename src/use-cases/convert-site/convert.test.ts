@@ -15,6 +15,9 @@ function makeFs(files: Record<string, string>): FileSystem {
     async exists(path) {
       return Object.prototype.hasOwnProperty.call(files, path);
     },
+    async realpath(path) {
+      return ok(path);
+    },
   };
 }
 
@@ -78,8 +81,12 @@ describe('convertSite', () => {
         'api/auth.md',
         'index.md',
       ]);
-      expect(result.value.files['index.md']).toContain('# Welcome');
-      expect(result.value.files['api/auth.md']).toContain('# Auth');
+      // Body H1 stripped (matches synthesized title); title preserved in
+      // frontmatter so Starlight still renders it.
+      expect(result.value.files['index.md']).toContain('title: Welcome');
+      expect(result.value.files['index.md']).not.toMatch(/^# Welcome\b/m);
+      expect(result.value.files['api/auth.md']).toContain('title: Auth');
+      expect(result.value.files['api/auth.md']).not.toMatch(/^# Auth\b/m);
     }
   });
 
@@ -132,19 +139,31 @@ describe('convertSite', () => {
     }
   });
 
-  it('returns a typed error when the slug map cannot be built', async () => {
+  it('resolves an X.md / X/index.md slug conflict by dropping the index.md sibling', async () => {
+    // Pre-existing test re-purpose: the named .md vs directory-index.md
+    // collision is a real Material section-index pattern (PowerTools, etc.)
+    // where the directory's index is a thin snippet shim. The converter
+    // drops the index.md and surfaces a warning so the build proceeds.
     const fs = makeFs({
-      'docs/api.md': '',
-      'docs/api/index.md': '',
+      'docs/api.md': 'API content\n',
+      'docs/api/index.md': '--8<-- "docs/api.md"\n',
     });
     const result = await convertSite({
       docsDir: 'docs',
       sourcePaths: ['api.md', 'api/index.md'],
       fs,
     });
-    expect(result.ok).toBe(false);
-    if (!result.ok) {
-      expect(result.error.message).toMatch(/conflict/i);
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      // The named sibling won — emitted at api.md, dropped sibling
+      // emits a slug-conflict-resolved warning.
+      expect(result.value.files['api.md']).toBeDefined();
+      expect(result.value.files['api/index.md']).toBeUndefined();
+      const warn = result.value.diagnostics.find(
+        (d) => d.diagnostic.ruleId === 'slug-conflict-resolved',
+      );
+      expect(warn).toBeDefined();
+      expect(warn?.sourcePath).toBe('api/index.md');
     }
   });
 

@@ -1,24 +1,19 @@
 /**
- * Pre-decode normalizer: strip PyYAML "unsafe" tags (`!!python/name:...`,
- * `!!python/object/apply:...`) so the YAML decoder doesn't choke on them.
+ * Pre-decode normalizer: strip PyYAML unsafe tags (`!!python/name:...`,
+ * `!!python/object/apply:...`) so the YAML decoder accepts the file.
  *
- * MkDocs Material configs commonly carry these tags, e.g.:
+ * MkDocs Material configs carry these:
  *   emoji_index: !!python/name:material.extensions.emoji.twemoji
- *   format: !!python/name:pymdownx.superfences.fence_code_format
- *   slugify: !!python/object/apply:pymdownx.slugs.slugify
- *     kwds:
- *       case: lower
+ *   format:      !!python/name:pymdownx.superfences.fence_code_format
+ *   slugify:     !!python/object/apply:pymdownx.slugs.slugify
+ *     kwds: { case: lower }
  *
- * The semantic value (a Python callable) cannot be reproduced in JS, but
- * the consumer (the converter) only needs to know that the user *had*
- * configured one. We replace the tag and value with a quoted opaque string
- * so the decoder produces a benign string node, and we return a list of
- * stripped tag bodies so the caller can emit a diagnostic.
+ * The Python callable cannot be reproduced; the converter only needs to
+ * know the user configured one. Replace the tag with a quoted opaque
+ * string so the decoder yields a benign string node, and return the
+ * stripped bodies for the caller's diagnostic.
  *
- * Pure: text → { source, stripped }. No I/O, no external state.
- *
- * Idempotency: substituted output contains no `!!python/` tokens, so a
- * second pass is a no-op (returns empty `stripped` list).
+ * Pure and idempotent (output has no `!!python/` tokens).
  */
 
 // Trailing `''` or `""` is YAML's scalar-presence marker — MkDocs Material

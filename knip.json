@@ -1,0 +1,16 @@
+{
+  "$schema": "https://unpkg.com/knip@5/schema.json",
+  "entry": [
+    "src/interface/api/index.ts",
+    "src/interface/cli/bin.ts"
+  ],
+  "project": ["src/**/*.{ts,mts,mjs}"],
+  "ignoreDependencies": [
+    "@mdx-js/mdx",
+    "fast-check"
+  ],
+  "ignoreExportsUsedInFile": {
+    "interface": true,
+    "type": true
+  }
+}

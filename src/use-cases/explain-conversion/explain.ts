@@ -18,11 +18,16 @@ import {
   getAllMappingRows,
   type MappingRow,
 } from '../../domain/conversion-mapping/table.js';
+import { expandMetaBundles } from '../config/expand-meta-bundles.js';
 
 export function explainConversion(
   config: MkdocsConfig,
 ): ReadonlyArray<MappingRow> {
-  const enabled = new Set(config.markdownExtensions.map((ext) => ext.name));
+  // Expand meta-bundles (`pymdownx.extra`, `extra`) so a row gated on a
+  // component extension (e.g. `attr_list`) fires when the user shortcut
+  // via the bundle.
+  const expanded = expandMetaBundles(config.markdownExtensions);
+  const enabled = new Set(expanded.map((ext) => ext.name));
   return getAllMappingRows().filter((row) =>
     row.requiredExtensions.every((required) => enabled.has(required)),
   );

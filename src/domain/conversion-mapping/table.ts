@@ -19,13 +19,33 @@
  * they will produce.
  */
 
-export type FileExtension = 'md' | 'mdx' | 'mdoc';
-export type ConversionType =
+type FileExtension = 'md' | 'mdx' | 'mdoc';
+type ConversionType =
   | 'passthrough'
   | 'text-pre-parse'
   | 'ast-transform'
   | 'recommended-dep';
-export type Risk = 'low' | 'medium' | 'high';
+type Risk = 'low' | 'medium' | 'high';
+
+/**
+ * How completely the converter translates this feature.
+ *
+ *   `full`         — semantic equivalent emitted; user sees the same UX.
+ *   `lossy-named`  — emitted with documented losses (e.g., float layout
+ *                    dropped on inline admonitions). Diagnostic names the
+ *                    loss; user can opt into manual remediation.
+ *   `passthrough`  — no emit needed; CommonMark / Astro / Starlight defaults
+ *                    already handle it.
+ *   `recommend-dep` — auto-installs a Starlight community plugin or Astro
+ *                    integration; UX is equivalent post-install.
+ *   `manual`       — flagged via diagnostic only; user must hand-port.
+ */
+export type TranslationDepth =
+  | 'full'
+  | 'lossy-named'
+  | 'passthrough'
+  | 'recommend-dep'
+  | 'manual';
 
 export interface MappingRow {
   /** Stable identifier; used as ruleId for diagnostics and as filter key. */
@@ -42,6 +62,24 @@ export interface MappingRow {
   readonly conversionType: ConversionType;
   /** Migration risk when this row fires. */
   readonly risk: Risk;
+  /**
+   * Depth of translation this row provides. Optional for back-compat with
+   * existing rows; new rows should specify it. When absent, callers default
+   * to deriving depth from `conversionType` (`recommended-dep` →
+   * 'recommend-dep'; `passthrough` → 'passthrough'; rest → 'full').
+   */
+  readonly translationDepth?: TranslationDepth;
+}
+
+/**
+ * Derive a TranslationDepth for any row, using the explicit `translationDepth`
+ * field when set and falling back to a sensible default per `conversionType`.
+ */
+export function getTranslationDepth(row: MappingRow): TranslationDepth {
+  if (row.translationDepth !== undefined) return row.translationDepth;
+  if (row.conversionType === 'recommended-dep') return 'recommend-dep';
+  if (row.conversionType === 'passthrough') return 'passthrough';
+  return 'full';
 }
 
 export function getMappingRow(featureId: string): MappingRow | null {
@@ -201,10 +239,11 @@ const TABLE: ReadonlyArray<MappingRow> = [
     featureId: 'keys',
     materialInput: '++ctrl+alt+del++ — PyMdown keyboard chord',
     requiredExtensions: ['pymdownx.keys'],
-    starlightOutput: '<kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>Del</kbd> per-key splitting',
+    starlightOutput: '<kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>Del</kbd> per-key splitting; `key_map` (custom key index) and `camel_case` PyMdown options are dropped',
     fileExt: 'md',
     conversionType: 'text-pre-parse',
     risk: 'medium',
+    translationDepth: 'lossy-named',
   },
   {
     featureId: 'critic-markup',
@@ -228,10 +267,11 @@ const TABLE: ReadonlyArray<MappingRow> = [
     featureId: 'icons',
     materialInput: ':material-foo: / :fontawesome-...: / :octicons-...: / :simple-...: shortcodes',
     requiredExtensions: ['pymdownx.emoji', 'attr_list'],
-    starlightOutput: '<Icon name="..."> with fallback chain → npm-package SVG → diagnostic placeholder',
+    starlightOutput: '<Icon name="..."> with fallback chain → npm-package SVG → diagnostic placeholder. Material has 10K+ icons; Starlight\'s built-in set is ~250 — unmapped icons emit `icon-unmapped` diagnostic',
     fileExt: 'mdx',
     conversionType: 'ast-transform',
     risk: 'high',
+    translationDepth: 'lossy-named',
   },
   {
     featureId: 'links-internal',
@@ -277,6 +317,7 @@ const TABLE: ReadonlyArray<MappingRow> = [
     fileExt: 'md',
     conversionType: 'recommended-dep',
     risk: 'medium',
+    translationDepth: 'lossy-named',
   },
   {
     featureId: 'annotations',
@@ -286,6 +327,7 @@ const TABLE: ReadonlyArray<MappingRow> = [
     fileExt: 'md',
     conversionType: 'text-pre-parse',
     risk: 'high',
+    translationDepth: 'lossy-named',
   },
   {
     featureId: 'code-annotations',
@@ -296,6 +338,7 @@ const TABLE: ReadonlyArray<MappingRow> = [
     fileExt: 'md',
     conversionType: 'text-pre-parse',
     risk: 'high',
+    translationDepth: 'lossy-named',
   },
   {
     featureId: 'magiclink',
@@ -333,10 +376,11 @@ const TABLE: ReadonlyArray<MappingRow> = [
       '![alt](url){ align=left|right width="N" loading=lazy } and #only-light/#only-dark URL fragments',
     requiredExtensions: ['attr_list'],
     starlightOutput:
-      'raw <img> HTML preserving align (as md-align-* class), width, loading; #only-light/dark hash promoted to class for CSS-driven theme swap',
+      'raw <img> HTML preserving align (as md-align-* class), width, loading; #only-light/dark hash promoted to class for CSS-driven theme swap (Astro\'s image-pipeline optimization is bypassed for the swap variants)',
     fileExt: 'md',
     conversionType: 'text-pre-parse',
     risk: 'medium',
+    translationDepth: 'lossy-named',
   },
   {
     featureId: 'smartsymbols',
@@ -484,6 +528,7 @@ const TABLE: ReadonlyArray<MappingRow> = [
     fileExt: 'md',
     conversionType: 'recommended-dep',
     risk: 'medium',
+    translationDepth: 'lossy-named',
   },
   {
     featureId: 'plugin-privacy',
@@ -495,6 +540,7 @@ const TABLE: ReadonlyArray<MappingRow> = [
     fileExt: 'md',
     conversionType: 'recommended-dep',
     risk: 'high',
+    translationDepth: 'manual',
   },
   {
     featureId: 'theme-features',
@@ -506,6 +552,7 @@ const TABLE: ReadonlyArray<MappingRow> = [
     fileExt: 'md',
     conversionType: 'recommended-dep',
     risk: 'medium',
+    translationDepth: 'lossy-named',
   },
   {
     featureId: 'plugin-search',
@@ -527,6 +574,7 @@ const TABLE: ReadonlyArray<MappingRow> = [
     fileExt: 'md',
     conversionType: 'recommended-dep',
     risk: 'medium',
+    translationDepth: 'lossy-named',
   },
   {
     featureId: 'plugin-social',
@@ -549,6 +597,7 @@ const TABLE: ReadonlyArray<MappingRow> = [
     fileExt: 'md',
     conversionType: 'recommended-dep',
     risk: 'medium',
+    translationDepth: 'lossy-named',
   },
   {
     featureId: 'theme-footer',
@@ -560,6 +609,7 @@ const TABLE: ReadonlyArray<MappingRow> = [
     fileExt: 'md',
     conversionType: 'recommended-dep',
     risk: 'medium',
+    translationDepth: 'lossy-named',
   },
   {
     featureId: 'comment-system',
@@ -571,6 +621,7 @@ const TABLE: ReadonlyArray<MappingRow> = [
     fileExt: 'md',
     conversionType: 'recommended-dep',
     risk: 'high',
+    translationDepth: 'manual',
   },
   {
     featureId: 'plugin-optimize',
@@ -592,6 +643,7 @@ const TABLE: ReadonlyArray<MappingRow> = [
     fileExt: 'md',
     conversionType: 'recommended-dep',
     risk: 'high',
+    translationDepth: 'manual',
   },
   {
     featureId: 'expressive-code-theme',
@@ -625,6 +677,7 @@ const TABLE: ReadonlyArray<MappingRow> = [
     fileExt: 'md',
     conversionType: 'recommended-dep',
     risk: 'high',
+    translationDepth: 'lossy-named',
   },
   {
     featureId: 'code-fence-filetree',
@@ -669,5 +722,222 @@ const TABLE: ReadonlyArray<MappingRow> = [
     fileExt: 'md',
     conversionType: 'text-pre-parse',
     risk: 'high',
+  },
+  {
+    featureId: 'fancylists',
+    materialInput:
+      'Roman (`i. ii. iii.`, `I. II.`) and alpha (`a. b.`, `A.  B.`) ordered list markers from `pymdownx.fancylists`',
+    requiredExtensions: ['pymdownx.fancylists'],
+    starlightOutput:
+      'raw `<ol type="i|I|a|A">` HTML block with `<li>` items; remark-parse would otherwise re-number every marker as decimal',
+    fileExt: 'md',
+    conversionType: 'text-pre-parse',
+    risk: 'low',
+  },
+  {
+    featureId: 'wikilinks',
+    materialInput: '`[[Page Name]]` Python-Markdown wikilink syntax',
+    requiredExtensions: ['wikilinks'],
+    starlightOutput:
+      'rewritten to `[Page Name](/page-name/)` with slug derived from lowercase + dash-separated label normalization',
+    fileExt: 'md',
+    conversionType: 'text-pre-parse',
+    risk: 'medium',
+  },
+  {
+    featureId: 'smarty',
+    materialInput:
+      'Python-Markdown `smarty` extension (ASCII smart quotes, em/en dashes, ellipsis)',
+    requiredExtensions: ['smarty'],
+    starlightOutput:
+      'recommend `remark-smartypants` in `markdown.remarkPlugins` of `astro.config.mjs`; defaults match `smarty` substitutions',
+    fileExt: 'md',
+    conversionType: 'recommended-dep',
+    risk: 'low',
+  },
+  {
+    featureId: 'progressbar',
+    materialInput:
+      '`[=85% "85%"]` / `[=1/2 "Half"]` syntax from `pymdownx.progressbar`',
+    requiredExtensions: ['pymdownx.progressbar'],
+    starlightOutput:
+      'raw `<progress value="N" max="100">label</progress>` HTML element; Material `.progress-bar` / `.progress-label` CSS classes are not preserved',
+    fileExt: 'md',
+    conversionType: 'text-pre-parse',
+    risk: 'medium',
+  },
+  {
+    featureId: 'quotes-callouts',
+    materialInput:
+      '`pymdownx.quotes` with `callouts: true` — `> [!note]`, `> [!tip] Title`, `> [!danger]-` (collapsible) syntax',
+    requiredExtensions: ['pymdownx.quotes'],
+    starlightOutput:
+      'routed through `scan-github-alerts` (case-insensitive); `starlight-github-alerts` plugin auto-installed and renders the callouts as Starlight asides at build time',
+    fileExt: 'md',
+    conversionType: 'recommended-dep',
+    risk: 'low',
+  },
+  {
+    featureId: 'pymdownx-extra',
+    materialInput:
+      '`pymdownx.extra` meta-bundle (aliases betterem, superfences, footnotes, attr_list, def_list, tables, abbr, md_in_html)',
+    requiredExtensions: ['pymdownx.extra'],
+    starlightOutput:
+      'no-op — every component extension is already covered individually. Bespoke nested options (`pymdownx.extra: { footnotes: { BACKLINK_TEXT } }`) are dropped',
+    fileExt: 'md',
+    conversionType: 'passthrough',
+    risk: 'low',
+  },
+  {
+    featureId: 'betterem',
+    materialInput:
+      '`pymdownx.betterem` (smart-emphasis: `smart_enable: all`/`asterisk`/`underscore`/`none`)',
+    requiredExtensions: ['pymdownx.betterem'],
+    starlightOutput:
+      'no-op — remark-parse uses CommonMark emphasis rules; intra-word emphasis is parsed differently. Spot-check prose with `_underscore_` mid-word.',
+    fileExt: 'md',
+    conversionType: 'passthrough',
+    risk: 'low',
+  },
+  {
+    featureId: 'b64',
+    materialInput: '`pymdownx.b64` — base64-inline image references',
+    requiredExtensions: ['pymdownx.b64'],
+    starlightOutput:
+      'no-op — Astro\'s asset pipeline (`astro:assets`) handles image bundling via the build graph rather than data: URLs',
+    fileExt: 'md',
+    conversionType: 'passthrough',
+    risk: 'low',
+  },
+  {
+    featureId: 'plugin-minify',
+    materialInput: '`mkdocs-minify-plugin` (HTML/CSS/JS minification at build)',
+    requiredExtensions: [],
+    starlightOutput:
+      'no-op — Astro/Vite minify HTML/CSS/JS by default in production builds. Plugin\'s `minify_html_options` etc. are dropped',
+    fileExt: 'md',
+    conversionType: 'passthrough',
+    risk: 'low',
+  },
+  {
+    featureId: 'plugin-glossary',
+    materialInput: '`mkdocs-glossary-plugin` (hover-tooltip glossary terms)',
+    requiredExtensions: [],
+    starlightOutput:
+      'recommend the converter\'s `abbr` handling (`*[TERM]: definition`) for plain-text definitions, or a custom MDX `<Glossary>` component for richer tooltips',
+    fileExt: 'md',
+    conversionType: 'recommended-dep',
+    risk: 'medium',
+  },
+  {
+    featureId: 'plugin-video',
+    materialInput: '`mkdocs-video` (`![type:video](url)` syntax)',
+    requiredExtensions: [],
+    starlightOutput:
+      'recommend native MDX `<video>` elements or `starlight-videos` plugin (course-style video components)',
+    fileExt: 'mdx',
+    conversionType: 'recommended-dep',
+    risk: 'medium',
+  },
+  {
+    featureId: 'plugin-puml',
+    materialInput: '`mkdocs-puml` / `plantuml-markdown` (PlantUML diagrams via `@startuml...@enduml`)',
+    requiredExtensions: [],
+    starlightOutput:
+      'recommend `astro-plantuml` integration; the same `@startuml...@enduml` fenced syntax is supported',
+    fileExt: 'md',
+    conversionType: 'recommended-dep',
+    risk: 'low',
+  },
+  {
+    featureId: 'plugin-encryptcontent',
+    materialInput: '`mkdocs-encryptcontent-plugin` (per-page password encryption)',
+    requiredExtensions: [],
+    starlightOutput:
+      'no automatic conversion — Astro outputs static HTML with no client-side decryption layer. Recommend a deployment-level auth gate (Cloudflare Access, Netlify password) or removing protected content from the public site',
+    fileExt: 'md',
+    conversionType: 'recommended-dep',
+    risk: 'high',
+    translationDepth: 'manual',
+  },
+  {
+    featureId: 'plugin-charts',
+    materialInput: '`mkdocs-charts-plugin` (Vega-Lite block syntax)',
+    requiredExtensions: [],
+    starlightOutput:
+      'no first-class equivalent — recommend a custom MDX `<VegaChart>` component using vega-embed, or pre-render charts to SVG/PNG ahead of conversion',
+    fileExt: 'mdx',
+    conversionType: 'recommended-dep',
+    risk: 'high',
+    translationDepth: 'manual',
+  },
+  {
+    featureId: 'plugin-monorepo',
+    materialInput:
+      '`mkdocs-monorepo-plugin` (multiple sub-docs trees stitched into one site at MkDocs build time)',
+    requiredExtensions: [],
+    starlightOutput:
+      'no automatic conversion — the plugin\'s build-time fetch is not replicated. Source-side placeholder pages render with their stub text only. Recommended migration: clone external content locally before conversion, OR replace placeholder pages with links to the external docs sites, OR use Astro content collections + a custom loader',
+    fileExt: 'md',
+    conversionType: 'recommended-dep',
+    risk: 'high',
+    translationDepth: 'manual',
+  },
+  {
+    featureId: 'plugin-multirepo',
+    materialInput:
+      '`mkdocs-multirepo-plugin` (similar to monorepo but with arbitrary repo→subdir mappings)',
+    requiredExtensions: [],
+    starlightOutput:
+      'same as `plugin-monorepo` — no automatic conversion; placeholder pages must be fetched, removed, or replaced manually',
+    fileExt: 'md',
+    conversionType: 'recommended-dep',
+    risk: 'high',
+    translationDepth: 'manual',
+  },
+  {
+    featureId: 'plugin-markdownextradata',
+    materialInput:
+      '`mkdocs-markdownextradata-plugin` (`{{ var }}` Jinja-style variable interpolation from `extra.*`)',
+    requiredExtensions: [],
+    starlightOutput:
+      'no automatic conversion — bare `{{ }}` conflicts with MDX expressions. Recommend Astro `import.meta.env.PUBLIC_*` env vars in MDX',
+    fileExt: 'mdx',
+    conversionType: 'recommended-dep',
+    risk: 'high',
+    translationDepth: 'manual',
+  },
+  {
+    featureId: 'badge-component',
+    materialInput:
+      'Material `.md-tag` chips, blog/tags tag pills, or any inline label rendered with a colored chip-style background',
+    requiredExtensions: ['attr_list'],
+    starlightOutput:
+      '`<Badge text="..." variant="note|tip|caution|danger|success|default" size="small|medium|large" />` Starlight built-in component; file promoted to `.mdx`',
+    fileExt: 'mdx',
+    conversionType: 'ast-transform',
+    risk: 'medium',
+  },
+  {
+    featureId: 'heading-badges',
+    materialInput:
+      'ATX heading with attr_list class flagged as a badge marker (e.g., `## Title { .badge }`, `### Beta { .new }`) — detected by `scan-heading-badges`',
+    requiredExtensions: ['attr_list'],
+    starlightOutput:
+      '`starlight-heading-badges` community plugin auto-wired in astro.config.mjs; the heading\'s `{ .class }` is preserved as a badge marker the plugin renders into a `<Badge>` next to the heading text',
+    fileExt: 'md',
+    conversionType: 'recommended-dep',
+    risk: 'low',
+  },
+  {
+    featureId: 'code-fence-copy-flag',
+    materialInput:
+      '` ```python { .python .copy } ` / ` ```python { .python .no-copy } ` — Material per-block copy-button toggle',
+    requiredExtensions: ['attr_list', 'pymdownx.highlight', 'pymdownx.superfences'],
+    starlightOutput:
+      'attr_list stripped during normalization; Expressive Code shows a copy button by default (no per-block disable). For `.no-copy`, recommend `frame="none"` per-block or `expressiveCode.frames.showCopyToClipboardButton: false` globally',
+    fileExt: 'md',
+    conversionType: 'text-pre-parse',
+    risk: 'low',
   },
 ];

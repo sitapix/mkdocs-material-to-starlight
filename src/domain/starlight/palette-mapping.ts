@@ -18,6 +18,14 @@
  * specified `primary: custom` so callers can emit a diagnostic.
  */
 
+/**
+ * How the wizard answer maps to palette emission:
+ *   - 'translate' — derive Starlight accent from Material palette
+ *   - 'skip'      — emit no accent override
+ *   - 'custom'    — user supplies their own palette CSS
+ */
+export type PaletteStrategy = 'translate' | 'skip' | 'custom';
+
 export interface StarlightPalette {
   /** OKLCH hue (degrees). Used for --sl-color-accent-* derivations. */
   readonly accentHue: number;

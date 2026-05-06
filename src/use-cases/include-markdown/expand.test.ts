@@ -15,6 +15,9 @@ function memFs(files: Record<string, string>): FileSystem {
     async exists(path) {
       return Object.prototype.hasOwnProperty.call(files, path);
     },
+    async realpath(path) {
+      return ok(path);
+    },
   };
 }
 

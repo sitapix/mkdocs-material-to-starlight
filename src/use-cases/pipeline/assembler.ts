@@ -21,7 +21,7 @@ import {
 } from '../../domain/transform/plugin-contract.js';
 import { ok, err, type Result } from '../../domain/result.js';
 
-export interface AssemblyError {
+interface AssemblyError {
   readonly message: string;
 }
 

@@ -412,6 +412,31 @@ describe('serializeAstroConfig', () => {
     expect(out).toContain('lastUpdated: true');
   });
 
+  it('emits the contributor-list import + integration with placeholder list when feature is detected', () => {
+    const out = serializeAstroConfig({
+      siteName: 'X',
+      siteDescription: null,
+      siteUrl: null,
+      sidebar: [],
+      detectedFeatures: ['contributor-list'],
+    });
+    expect(out).toContain("import starlightContributorList from 'starlight-contributor-list';");
+    expect(out).toContain('starlightContributorList({ list: [] })');
+    // TODO comment must precede the call so users see it in the diff.
+    expect(out).toMatch(/TODO[^\n]*contributors[\s\S]*starlightContributorList/);
+  });
+
+  it('does NOT emit the contributor-list integration when the feature is absent', () => {
+    const out = serializeAstroConfig({
+      siteName: 'X',
+      siteDescription: null,
+      siteUrl: null,
+      sidebar: [],
+    });
+    expect(out).not.toContain('starlight-contributor-list');
+    expect(out).not.toContain('starlightContributorList');
+  });
+
   it('emits defaultLocale and locales when i18n config is provided', () => {
     const out = serializeAstroConfig({
       siteName: 'X',

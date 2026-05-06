@@ -1,22 +1,18 @@
 /**
- * Pre-parse normalizer: detect ASCII directory tree code fences and
- * promote them to Starlight's <FileTree> MDX component.
+ * Pre-parse normalizer: detect ASCII directory-tree code fences and promote
+ * them to Starlight's `<FileTree>` MDX component.
  *
- * DETECTION (conservative):
- *   1. Fenced code block with no language OR language "text" or "tree".
- *   2. >= 3 content lines.
- *   3. >= 2 content lines contain box-drawing chars (├/└/│).
- *   4. First content line is a directory name (ends with "/" or has no
- *      extension and no slashes mid-name, i.e. looks like "my-project/").
+ * Detection (conservative):
+ *   1. Fenced code block with no language or language `text` / `tree`.
+ *   2. >= 3 content lines, >= 2 of them with box-drawing chars (├ └ │).
+ *   3. First content line is a directory name (`my-project/` or no
+ *      extension/slashes mid-name).
  *
- * CONVERSION:
- *   The ASCII tree is parsed into a depth-based nested unordered Markdown
- *   list which <FileTree> renders as a visual directory tree.
+ * Conversion: parse the ASCII tree into a depth-based nested unordered
+ * Markdown list, which `<FileTree>` renders as a directory tree.
  *
- * Idempotent: if <FileTree> already appears in the source, skip.
- * Fence-shielded for nested code fences.
- *
- * Pure function: text -> { text, promoted, diagnostics }. No I/O.
+ * Idempotent (skips when `<FileTree>` already appears) and fence-shielded
+ * for nested fences. Pure.
  */
 
 import { createDiagnostic, type Diagnostic } from '../../domain/diagnostics/diagnostic.js';
@@ -189,11 +185,26 @@ export function normalizeFileTrees(source: string): FileTreeResult {
 
     if (isAsciiTreeBlock(fence.contentLines)) {
       const listLines = asciiTreeToList(fence.contentLines);
-      const replacement = [
-        '<FileTree>',
-        ...listLines,
-        '</FileTree>',
-      ];
+      // MDX treats `<FileTree>` as inline JSX when it lands inside a paragraph
+      // context. Real-world break (pyodide-mkdocs-theme): file-tree fences
+      // are wrapped in Jinja `{% raw %}` markers without blank-line padding,
+      // so after we promote the fence the `<FileTree>` opener sits adjacent
+      // to inline-coded Jinja text. MDX then expects a closing tag inside the
+      // paragraph and raises "Expected a closing tag for <FileTree> before
+      // end of paragraph". Pad with blank lines when the immediately
+      // adjacent source line is non-blank — this forces the JSX into a
+      // block context. We do not add a blank when one already exists, so the
+      // result remains idempotent.
+      const before = lines[fence.start - 1];
+      const after = lines[fence.end + 1];
+      const padBefore = fence.start > 0 && before !== undefined && before !== '';
+      const padAfter = after !== undefined && after !== '';
+      const replacement: string[] = [];
+      if (padBefore) replacement.push('');
+      replacement.push('<FileTree>');
+      replacement.push(...listLines);
+      replacement.push('</FileTree>');
+      if (padAfter) replacement.push('');
       replacements.push({ start: fence.start, end: fence.end, lines: replacement });
       diagnostics.push(
         createDiagnostic({

@@ -97,4 +97,19 @@ describe('parseNavTree', () => {
       }
     }
   });
+
+  it('truncates a polluted external URL at the first whitespace or quote', () => {
+    // Real-world: PowerTools `mkdocs.yml` has the unquoted YAML value
+    // `https://s12d.com/...workshop" target="_blank` because the author
+    // expected MkDocs to treat the trailing fragment as HTML attributes.
+    // The result is a "URL" containing `"` which is invalid per RFC 3986
+    // and would otherwise pollute the rendered sidebar.
+    const result = parseNavTree([
+      { Workshop: 'https://example.com/path" target="_blank' },
+    ]);
+    expect(result.ok).toBe(true);
+    if (result.ok && result.value[0]?.kind === 'external') {
+      expect(result.value[0].href).toBe('https://example.com/path');
+    }
+  });
 });

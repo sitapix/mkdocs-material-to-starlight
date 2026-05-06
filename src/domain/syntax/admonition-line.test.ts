@@ -119,4 +119,34 @@ describe('parseAdmonitionLine', () => {
     // Title is the full text between the first and last quote
     expect(out?.title).toBe('on the "jsonable" nature of JSON schema');
   });
+
+  it('parses `???warning "Title"` with no space between marker and type', () => {
+    // Real DDEV regression: `developers/building-contributing.md` line 98 uses
+    // `???warning "macOS and Unsigned Binaries (click me)"` — the compact
+    // no-space form. Material's parser tolerates it; ours must too.
+    const out = parseAdmonitionLine('???warning "macOS and Unsigned Binaries"');
+    expect(out).not.toBeNull();
+    expect(out?.marker).toBe('???');
+    expect(out?.type).toBe('warning');
+    expect(out?.title).toBe('macOS and Unsigned Binaries');
+  });
+
+  it('parses typeless `??? "Title"` (Material default-type collapsible)', () => {
+    // Real DDEV regression: `users/install/ddev-installation.md` uses
+    // `??? "Need a specific version?"` with no type. Material defaults the
+    // type when omitted; we fall back to `note` so the block still converts.
+    const out = parseAdmonitionLine('??? "Need a specific version?"');
+    expect(out).not.toBeNull();
+    expect(out?.marker).toBe('???');
+    expect(out?.type).toBe('note');
+    expect(out?.title).toBe('Need a specific version?');
+  });
+
+  it('parses typeless `???+ "Title"` (default-type, open by default)', () => {
+    const out = parseAdmonitionLine('???+ "Manual Installation"');
+    expect(out).not.toBeNull();
+    expect(out?.marker).toBe('???+');
+    expect(out?.type).toBe('note');
+    expect(out?.title).toBe('Manual Installation');
+  });
 });

@@ -12,21 +12,22 @@
  * layer is the only consumer that observes it and translates to exit 130.
  */
 
+import type { PaletteStrategy } from '../starlight/palette-mapping.js';
+
 export type PackageManager = 'npm' | 'pnpm' | 'yarn' | 'bun';
-export type TabsStrategy = 'mdx' | 'html';
-export type PaletteStrategy = 'translate' | 'skip' | 'custom';
-export type CardsStrategy = 'mdx' | 'html' | 'skip';
-export type MdxMode = 'auto' | 'always' | 'never';
-export type ConfigFormat = 'mjs' | 'ts';
+type TabsStrategy = 'mdx' | 'html';
+type CardsStrategy = 'mdx' | 'html' | 'skip';
+type MdxMode = 'auto' | 'always' | 'never';
+type ConfigFormat = 'mjs' | 'ts';
 
 export interface WizardAnswers {
-  // Tier 0 (positional/required)
+  // Tier 0 — positional/required (always asked).
   readonly projectDir: string;
   readonly outputDir: string;
-  // Tier 0 (always asked)
+  // Tier 0 — always asked.
   readonly packageManager: PackageManager;
   readonly check: boolean;
-  // Tier 1 (conditional on detected features)
+  // Tier 1 — asked when the related feature is detected in mkdocs.yml.
   readonly tabs: TabsStrategy;
   readonly sidebarTopics: boolean;
   readonly rss: boolean;
@@ -35,13 +36,19 @@ export interface WizardAnswers {
   readonly extraAssets: ReadonlyArray<string>;
   readonly locales: ReadonlyArray<string>;
   readonly snippetBasePaths: ReadonlyArray<string>;
-  readonly snippetMaxDepth: number;
-  readonly snippetDedentSubsections: boolean;
-  // Tier 2 (advanced)
+  // Tier 2 — asked when the user opts into "advanced options" at the gate.
   readonly linksValidator: boolean;
-  readonly expressiveCodeTheme: string | null;
   readonly cards: CardsStrategy;
   readonly mdxMode: MdxMode;
+  readonly configFormat: ConfigFormat;
+  // CLI-flag-only — NOT prompted by the wizard. Defaults come from
+  // `deriveDefaults`; reach via flags (`--snippet-max-depth`, etc.) or
+  // a direct programmatic call. Listed here because the converter accepts
+  // them in the same answers shape; the wizard simply doesn't surface UI
+  // for them to keep the prompt count manageable.
+  readonly snippetMaxDepth: number;
+  readonly snippetDedentSubsections: boolean;
+  readonly expressiveCodeTheme: string | null;
   readonly logoReplacesTitle: boolean;
   readonly admonitionMapPath: string | null;
   readonly keepExplicitHeadingIds: boolean;
@@ -50,7 +57,6 @@ export interface WizardAnswers {
   readonly inlineMarks: boolean;
   readonly autoAppend: boolean;
   readonly suppressRules: ReadonlyArray<string>;
-  readonly configFormat: ConfigFormat;
   readonly packageName: string | null;
 }
 

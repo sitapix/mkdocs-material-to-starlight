@@ -1,23 +1,17 @@
 /**
- * Detect features from a parsed `mkdocs.yml` plugin list AND markdown
+ * Detect features from a parsed `mkdocs.yml` plugin list and Markdown
  * extension list.
  *
- * Some Starlight integrations are driven by plugin presence in the source
- * `mkdocs.yml`, not by syntax in Markdown source files. Examples:
+ * Plugin-driven Starlight integrations:
+ *   mkdocs-glightbox → starlight-image-zoom
+ *   mike             → starlight-versions
  *
- *   mkdocs-glightbox  → starlight-image-zoom (click-to-zoom for images)
- *   mike              → starlight-versions   (versioned doc trees)
+ * Extension-driven:
+ *   pymdownx.keys    → starlight-kbd
  *
- * Some are driven by Markdown extension presence:
- *
- *   pymdownx.keys     → starlight-kbd        (prettier `<kbd>` styling)
- *
- * This use-case is the parallel of `detect-features/detect.ts` (which scans
- * source) — they produce the same `DetectedFeature` union and the site-level
- * orchestrator takes the union of both. Pure: takes plugins/extensions,
- * returns a `Set<DetectedFeature>`.
- *
- * Adding a new mapping is one line in PLUGIN_TO_FEATURE.
+ * Parallel to `detect-features/detect.ts` (which scans source). Both
+ * produce `DetectedFeature` and the site-level orchestrator unions them.
+ * Adding a mapping is one line in PLUGIN_TO_FEATURE. Pure.
  */
 
 import type { MkdocsPlugin } from '../../domain/config/mkdocs-config.js';
@@ -51,6 +45,12 @@ const PLUGIN_TO_FEATURE: ReadonlyMap<string, DetectedFeature> = new Map([
   // header config (icon links to social-media accounts) — that one is wired
   // separately from `extra.social[]` in mkdocs.yml.
   ['social', 'og-cards'] as const,
+  // `mkdocs-git-authors-plugin` and `mkdocs-git-committers-2` →
+  // `starlight-contributor-list` (HiDeoo). Both register under different
+  // names in mkdocs.yml but share the same Starlight target — installing
+  // either triggers the same plugin install + integration emission.
+  ['git-authors', 'contributor-list'] as const,
+  ['git-committers', 'contributor-list'] as const,
 ]);
 
 export function detectFeaturesFromPlugins(

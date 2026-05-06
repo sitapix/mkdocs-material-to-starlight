@@ -1,24 +1,20 @@
 /**
  * AST-level admonition transformer (remark plugin).
  *
- * Walks `containerDirective` nodes whose `name` matches a Material admonition
- * type and rewrites them in place so they serialize back out as the
- * corresponding Starlight aside directive — `:::note`, `:::tip`, `:::caution`,
- * or `:::danger`. Starlight understands these natively in plain `.md` files,
- * which keeps the converted output reviewable as Markdown rather than MDX.
+ * Walks `containerDirective` nodes whose `name` is a Material admonition
+ * type and rewrites them as the matching Starlight aside (`:::note`,
+ * `:::tip`, `:::caution`, `:::danger`) so output stays plain Markdown
+ * instead of MDX.
  *
- * Mapping table is owned by `admonition-mapping.ts`. The transform is total
- * over the 12 Material admonition types: `quote` becomes a blockquote node;
- * the other 11 become directive renames, with optional icon-hint attached
- * via Starlight's `{icon="..."}` directive attribute syntax.
+ * Mapping lives in `admonition-mapping.ts`. Total over the 12 Material
+ * types: `quote` becomes a blockquote; the other 11 become directive
+ * renames with an optional icon hint via `{icon="..."}`.
  *
  * Plugin contract:
- *   - Owns `(containerDirective, <admonition-name>)` for the 12 admonition
- *     names. Other directives are ignored.
- *   - Idempotent: detects already-converted nodes via `data.starlightConverted`
- *     and via the directive name already being a Starlight type.
- *   - Pure given the AST: no I/O, no diagnostics emitted (the source
- *     normalizer already handled type-level fallbacks).
+ *   - Owns `(containerDirective, <admonition-name>)` for the 12 names.
+ *   - Idempotent (`data.starlightConverted`; output names match Starlight
+ *     types).
+ *   - Pure given the AST. The source normalizer handles type fallbacks.
  */
 
 import { visit, SKIP } from 'unist-util-visit';

@@ -1,25 +1,18 @@
 /**
  * Extract Starlight `locales: { … }` config from MkDocs `extra.alternate[]`.
  *
- * Material's `extra.alternate` is a manual language switcher used by sites
- * that maintain per-language directories outside the `mkdocs-static-i18n`
- * plugin (Tiangolo's FastAPI/Typer template; Ultralytics with emoji flags).
+ * `extra.alternate` is a manual language switcher used by sites with
+ * per-language directories outside `mkdocs-static-i18n` (Tiangolo's
+ * FastAPI/Typer template, Ultralytics):
  *
  *   extra:
  *     alternate:
- *       - name: en - English
- *         link: /
- *         lang: en
- *       - name: fr - Français
- *         link: /fr/
- *         lang: fr
+ *       - { name: 'en - English', link: '/',    lang: en }
+ *       - { name: 'fr - Français', link: '/fr/', lang: fr }
  *
- * The default locale is inferred either from `default: true` on an entry
- * (rare in practice) or from the entry whose `link` is `/` (canonical site
- * root).
- *
- * Pure: takes the extras dict, returns the structured i18n shape or null
- * when the extras have no usable alternate config.
+ * The default locale comes from `default: true` on an entry (rare) or the
+ * entry whose `link` is `/`. Pure; returns null when extras have no
+ * usable alternate config.
  */
 
 export interface AlternateLocaleConfig {

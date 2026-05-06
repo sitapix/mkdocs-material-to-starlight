@@ -1,43 +1,26 @@
 /**
- * Pre-parse normalizer: wrap mkautodoc-style `:::` blocks in fenced code so
- * they round-trip cleanly through remark-stringify.
+ * Pre-parse normalizer: wrap mkautodoc-style `:::` blocks in a fenced code
+ * block so they round-trip through remark-stringify.
  *
- * mkautodoc (and similar single-marker docstring extensions) use:
+ * mkautodoc uses:
  *
  *   ::: httpx.request
  *       :docstring:
- *       :members:
  *
- * The `:::` opener has no matching closing `:::` — the body is delimited
- * solely by indentation. Without this normalizer, remark-directive sees the
- * `:::` line as a directive opener, fails to find a closer, and leaves the
- * tokens as a paragraph. remark-stringify then defensively escapes the
- * `:::` and `:identifier:` to prevent re-parsing as a directive on the next
- * round-trip — producing `\:::` and `\:` gibberish in the output.
+ * The `:::` opener has no closer; the body is delimited by indentation.
+ * remark-directive treats the `:::` as a directive opener, fails to find a
+ * closer, and remark-stringify escapes the tokens to `\:::` and `\:` on the
+ * next round-trip.
  *
- * The cleanest fix is to take the entire mkautodoc block (the `:::` line
- * plus all following indented content) and wrap it in a fenced code block.
- * That preserves the original syntax verbatim for the human reader, gives
- * them a recognizable marker for "this used to render Python docs", and
- * round-trips through remark untouched.
+ * Fix: wrap the `:::` line plus its indented body in a fenced code block.
+ * The lookahead on "next non-blank line indented 4+ spaces" distinguishes
+ * mkautodoc from a real Starlight aside (`:::name\n  body\n:::`).
  *
- * Discriminator (vs. real Starlight asides):
- *   - mkautodoc:  `::: identifier\n    :body:\n` (indented body, no closing `:::`)
- *   - aside:      `:::name\n  body\n:::`         (non-indented body, closing `:::`)
- *
- * The "next non-blank line is indented 4+ spaces" lookahead distinguishes
- * the two. Aside body is conventionally non-indented; in CommonMark, 4+
- * space indent would be parsed as a code block anyway.
- *
- * Idempotency: the wrapped output is inside a fenced code block, so a
- * second pass sees the inner `:::` as fenced content and skips it.
- *
- * Fenced-code safety: lines inside an existing triple-backtick fence are
- * preserved verbatim — example documentation showing mkautodoc syntax is
- * not double-wrapped.
+ * Idempotent: the wrapped output is fenced; existing fences pass through.
  */
 
-const FENCE = /^ {0,3}(```|~~~)/;
+import { isFenceLine } from '../../domain/syntax/fence.js';
+
 const MKAUTODOC_OPENER = /^:::\s+\S+/;
 const INDENTED_LINE = /^ {4,}\S/;
 
@@ -48,7 +31,7 @@ export function normalizeMkautodocBlocks(source: string): string {
   let i = 0;
   while (i < lines.length) {
     const line = lines[i] ?? '';
-    if (FENCE.test(line)) {
+    if (isFenceLine(line)) {
       out.push(line);
       inFence = !inFence;
       i += 1;

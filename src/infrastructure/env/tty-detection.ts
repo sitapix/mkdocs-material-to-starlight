@@ -8,7 +8,7 @@
  *   3. TTY detection
  */
 
-export interface InteractivityFlags {
+interface InteractivityFlags {
   readonly noInteractive?: boolean;
   readonly ci?: boolean;
   readonly color?: boolean;

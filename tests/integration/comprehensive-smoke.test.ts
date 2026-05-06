@@ -88,9 +88,11 @@ describe('comprehensive end-to-end conversion', () => {
     // Generic grid
     expect(indexOut).toContain('<div class="sl-grid">');
 
-    // Icons
-    expect(indexOut).toContain(':icon[rocket]');
-    expect(indexOut).toContain(':icon[github]');
+    // Icons render as JSX `<Icon>` tags so Starlight's auto-injected
+    // `Icon` import resolves them — the legacy `:icon[name]` directive
+    // form would render as `<div>name</div>` (no remark plugin).
+    expect(indexOut).toContain('<Icon name="rocket" class="sl-inline-icon" />');
+    expect(indexOut).toContain('<Icon name="github" class="sl-inline-icon" />');
 
     // Internal link rewriting
     expect(indexOut).toContain('[auth](/api/auth)');

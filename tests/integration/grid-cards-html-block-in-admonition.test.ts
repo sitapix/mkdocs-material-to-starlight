@@ -37,7 +37,8 @@ describe('grid-cards HTML block inside admonition body (pydantic regression)', (
     });
     expect(result.ok).toBe(true);
 
-    const indexOut = readFileSync(join(out, 'src', 'content', 'docs', 'index.md'), 'utf8');
+    // Material icons promote the file to `.mdx` (JSX `<Icon>` tag).
+    const indexOut = readFileSync(join(out, 'src', 'content', 'docs', 'index.mdx'), 'utf8');
     expect(indexOut).toMatch(/Validators/);
     expect(indexOut).toMatch(/Serialization/);
     expect(indexOut).not.toMatch(/sl-card-grid"\s*>\s*<\/div>/);

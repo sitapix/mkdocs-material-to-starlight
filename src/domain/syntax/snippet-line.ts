@@ -1,28 +1,24 @@
 /**
  * Parse a single line as a PyMdown `pymdownx.snippets` inline reference.
  *
- * Recognized shapes (per the official PyMdown 10.21 spec):
- *   --8<-- "path/to/file.ext"          (basic inline form)
- *   --8<-- "file.md:3"                 (start line)
- *   --8<-- "file.md::3"                (end-only range, lines 1..3)
- *   --8<-- "file.md:4:6"               (start:end range)
- *   --8<-- "file.md:1:3,5:6"           (multiple selections, comma-separated)
- *   --8<-- "file.md:-3:-1"             (negative indexes — last 3 lines)
- *   --8<-- "file.md:section_name"      (named section markers)
- *   --8<-- ";file.md"                  (skip prefix)
+ * Shapes (PyMdown 10.21):
+ *   --8<-- "path/to/file.ext"      basic
+ *   --8<-- "file.md:3"             start line
+ *   --8<-- "file.md::3"            end-only range (lines 1..3)
+ *   --8<-- "file.md:4:6"           start:end
+ *   --8<-- "file.md:1:3,5:6"       comma-separated selections
+ *   --8<-- "file.md:-3:-1"         negative indexes (last 3 lines)
+ *   --8<-- "file.md:section_name"  named section
+ *   --8<-- ";file.md"              skip prefix
  *
- * Scissor lengths are flexible — `-8<-` through `----8<-------` are all
- * accepted, mirroring the upstream parser. Unquoted paths and empty paths
- * are rejected.
+ * Scissor lengths are flexible (`-8<-` through `----8<-------`), matching
+ * the upstream parser. Unquoted and empty paths are rejected.
  *
- * Block-form snippets (`--8<--` opening line followed by file list, closed by
- * another `--8<--`) are out of scope for this single-line parser; a separate
- * block detector handles them.
- *
- * Pure: takes a string, returns a record or null.
+ * Block-form snippets are out of scope here; a separate block detector
+ * handles them. Pure.
  */
 
-export interface SnippetLineRange {
+interface SnippetLineRange {
   /** 1-based start line. Negative values are end-relative (resolved later). */
   readonly start: number | null;
   /** 1-based end line, inclusive. Null means "to EOF". */

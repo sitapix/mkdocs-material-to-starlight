@@ -1,28 +1,21 @@
 /**
- * Promote Material's `<!-- md:* -->` HTML-comment shortcodes to Starlight
- * `<Badge>` JSX components.
+ * Promote Material `<!-- md:* -->` HTML-comment shortcodes to Starlight
+ * `<Badge>` JSX. Sample mappings:
  *
- * Material's docs use shortcodes like:
- *   <!-- md:version 8.3.0 -->         → <Badge text="Since 8.3.0" variant="note" />
- *   <!-- md:flag experimental -->     → <Badge text="Experimental" variant="caution" />
- *   <!-- md:flag deprecated -->       → <Badge text="Deprecated" variant="danger" />
- *   <!-- md:flag required -->         → <Badge text="Required" variant="caution" />
- *   <!-- md:option name -->           → <Badge text="Option: name" variant="note" />
- *   <!-- md:setting plugins.foo -->   → <Badge text="Setting: plugins.foo" variant="note" />
- *   <!-- md:plugin search -->         → <Badge text="Plugin: search" variant="note" />
- *   <!-- md:extension pymdownx.x -->  → <Badge text="Extension: pymdownx.x" variant="note" />
- *   <!-- md:utility -->               → <Badge text="Utility" variant="note" />
- *   <!-- md:default -->               → <Badge text="Default" variant="default" />
- *   <!-- md:default 'value' -->       → <Badge text="Default: value" variant="default" />
- *   <!-- md:default none -->          → <Badge text="No default" variant="default" />
- *   <!-- md:sponsors -->              → <Badge text="Sponsors" variant="tip" />
+ *   <!-- md:version 8.3.0 -->     → <Badge text="Since 8.3.0" variant="note" />
+ *   <!-- md:flag experimental --> → <Badge text="Experimental" variant="caution" />
+ *   <!-- md:flag deprecated -->   → <Badge text="Deprecated" variant="danger" />
+ *   <!-- md:flag required -->     → <Badge text="Required" variant="caution" />
+ *   <!-- md:option name -->       → <Badge text="Option: name" variant="note" />
+ *   <!-- md:setting foo -->       → <Badge text="Setting: foo" variant="note" />
+ *   <!-- md:plugin search -->     → <Badge text="Plugin: search" variant="note" />
+ *   <!-- md:default 'value' -->   → <Badge text="Default: value" variant="default" />
+ *   <!-- md:sponsors -->          → <Badge text="Sponsors" variant="tip" />
  *
- * The emitted `<Badge>` is a Starlight built-in. The mdx-detection step
- * sees the JSX and auto-promotes the file to `.mdx` and injects the import.
+ * `<Badge>` is a Starlight built-in; mdx-detection promotes the file to
+ * `.mdx` and injects the import.
  *
- * Pure: text → text. Idempotent — the regex matches `<!-- md:* -->` only,
- * and `<Badge ... />` does not contain that pattern, so a second pass is a
- * no-op.
+ * Pure and idempotent (the regex matches only `<!-- md:* -->`).
  */
 
 const SHORTCODE_RE = /<!--\s*md:([a-z][a-z0-9_-]*)\s*([^>]*?)-->/g;

@@ -52,4 +52,28 @@ describe('normalizeLinkAttrLists', () => {
     const result = normalizeLinkAttrLists(input);
     expect(result.diagnostics[0]?.place?.line).toBe(3);
   });
+
+  it('preserves inline `{ .md-button }` (handed off to normalizeButtons)', () => {
+    // Inline links with md-button classes are kept intact here so the later
+    // `normalizeButtons` pass can rewrite them to `<LinkButton>`.
+    const input = '[Click](./demo.html){ .md-button }\n';
+    const result = normalizeLinkAttrLists(input);
+    expect(result.text).toBe(input);
+    expect(result.diagnostics).toEqual([]);
+  });
+
+  it('strips reference-style `{ .md-button }` (normalizeButtons cannot resolve [ref])', () => {
+    // Real mkdocs-material regression: `reference/buttons.md` uses
+    // `[label][Demo]{ .md-button }` reference-style links. `normalizeButtons`
+    // only matches inline `[label](url){…}` because it needs the URL to
+    // build the `<LinkButton>` component. Reference-style links survive
+    // normalizeButtons untouched, and the previous link-attr-list code
+    // skipped them too — so the literal `{ .md-button }` was visible in
+    // the rendered output.
+    const input = '[Subscribe to our newsletter][Demo]{ .md-button }\n';
+    const result = normalizeLinkAttrLists(input);
+    expect(result.text).toBe('[Subscribe to our newsletter][Demo]\n');
+    expect(result.diagnostics).toHaveLength(1);
+    expect(result.diagnostics[0]?.ruleId).toBe('link-attr-list-stripped');
+  });
 });

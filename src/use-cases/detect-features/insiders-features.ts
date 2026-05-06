@@ -1,28 +1,21 @@
 /**
- * Detect Material for MkDocs *Insiders*-only features in `mkdocs.yml`.
+ * Detect Material *Insiders*-only features in `mkdocs.yml`.
  *
- * Material has a paid Insiders tier. Configs are commonly shared between
- * Insiders and non-Insiders sites (because they are forked from public
- * templates), so unrecognized Insiders flags often appear in real
- * `mkdocs.yml` files even when the site is not actually built with Insiders.
+ * Configs are forked from public templates, so Insiders flags routinely
+ * appear in non-Insiders builds. The converter cannot reproduce them
+ * (they're not in the public distribution), but it can label each one so
+ * the user has a structured record of what their config asks for vs. what
+ * the open-source converter delivers.
  *
- * The converter cannot reproduce Insiders features (they are not part of the
- * public Material distribution). The closest the converter can do is name
- * each Insiders feature explicitly so the user has a structured record of
- * what their config asks for vs. what the open-source converter can deliver.
+ * Returns one entry per detected Insiders flag or plugin. The interface
+ * shell maps each to a `material-insiders-feature-detected` info diagnostic.
  *
- * The detector returns one entry per detected Insiders flag/plugin. The
- * interface shell maps each entry to a `material-insiders-feature-detected`
- * info diagnostic. This is INDEPENDENT of the longtail/diagnose-plugins
- * detectors — those provide Starlight approximations; this one provides the
- * Insiders labeling. A single feature can produce both diagnostics; the
- * Insiders one carries the "this requires a paid Material subscription"
- * signal that grep/CI workflows can filter on.
- *
- * Pure function: takes config slices, returns readonly entries. No I/O.
+ * Independent of the longtail and diagnose-plugins detectors: those give
+ * Starlight approximations; this one carries the "requires a paid
+ * subscription" signal that CI and grep workflows filter on. Pure.
  */
 
-export type InsidersKind = 'theme-feature' | 'plugin';
+type InsidersKind = 'theme-feature' | 'plugin';
 
 export interface InsidersEntry {
   /** The flag name (for theme-feature) or plugin name (for plugin). */

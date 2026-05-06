@@ -29,9 +29,12 @@ describe('transformIcons', () => {
     expect(out.diagnostics).toEqual([]);
   });
 
-  it('rewrites a curated Material shortcode into a Starlight icon directive', () => {
+  it('rewrites a curated Material shortcode into a `<Icon>` JSX tag', () => {
+    // Output is JSX, not the legacy `:icon[name]` directive form — Starlight
+    // has no remark plugin to render the directive, so the directive form
+    // would silently become `<div>name</div>` in the rendered HTML.
     const out = process('Click :material-rocket: to launch.\n');
-    expect(out.text).toContain(':icon[rocket]');
+    expect(out.text).toContain('<Icon name="rocket" class="sl-inline-icon" />');
     expect(out.text).toContain('Click');
     expect(out.text).toContain('to launch.');
     expect(out.diagnostics).toEqual([]);
@@ -39,14 +42,12 @@ describe('transformIcons', () => {
 
   it('rewrites a known fontawesome brand shortcode', () => {
     const out = process('See :fontawesome-brands-github: for source.\n');
-    expect(out.text).toContain(':icon[github]');
+    expect(out.text).toContain('<Icon name="github" class="sl-inline-icon" />');
   });
 
-  it('emits a local-svg directive with iconset metadata for unmapped Material icons', () => {
+  it('emits a `<Icon name="local:set:name" />` for unmapped Material icons', () => {
     const out = process('Use :material-totally-made-up: here.\n');
-    // Serializer may escape colons inside the directive label; accept both forms.
-    const stripped = out.text.replace(/\\/g, '');
-    expect(stripped).toContain(':icon[local:material:totally-made-up]');
+    expect(out.text).toContain('<Icon name="local:material:totally-made-up" class="sl-inline-icon" />');
   });
 
   it('emits a placeholder and a diagnostic for unrecognized icon-set prefixes', () => {
@@ -66,20 +67,20 @@ describe('transformIcons', () => {
 
   it('handles multiple shortcodes in one text node', () => {
     const out = process(':material-rocket: and :fontawesome-brands-github: side by side.\n');
-    expect(out.text).toContain(':icon[rocket]');
-    expect(out.text).toContain(':icon[github]');
+    expect(out.text).toContain('<Icon name="rocket" class="sl-inline-icon" />');
+    expect(out.text).toContain('<Icon name="github" class="sl-inline-icon" />');
   });
 
   it('does not match shortcodes inside fenced code', () => {
     const out = process('```\n:material-rocket:\n```\n');
     expect(out.text).toContain(':material-rocket:');
-    expect(out.text).not.toContain(':icon[rocket]');
+    expect(out.text).not.toContain('<Icon name="rocket"');
   });
 
   it('does not match shortcodes inside inline code', () => {
     const out = process('Use `:material-rocket:` literally.\n');
     expect(out.text).toContain('`:material-rocket:`');
-    expect(out.text).not.toContain(':icon[rocket]');
+    expect(out.text).not.toContain('<Icon name="rocket"');
   });
 
   it('is idempotent — converting the converted output is a no-op', () => {
@@ -88,22 +89,25 @@ describe('transformIcons', () => {
     expect(second.text).toBe(first.text);
   });
 
-  it('promotes attr_list { title="X" } following an icon to the directive label attribute', () => {
+  it('promotes attr_list { title="X" } following an icon to an `aria-label` attribute', () => {
     const out = process(':material-information:{ title="Important info" }\n');
-    // Icon directive carries the title as `label` so Starlight renders
-    // `<Icon name="information" label="Important info" />`.
-    expect(out.text).toContain(':icon[information]');
-    expect(out.text).toContain('label="Important info"');
+    // The title becomes an `aria-label` attribute on the `<Icon>` tag so
+    // screen readers announce it; Starlight passes the prop through to the
+    // rendered SVG.
+    expect(out.text).toContain('<Icon name="information"');
+    expect(out.text).toContain('aria-label="Important info"');
     // The raw `{title="..."}` blob must NOT survive into the output.
     expect(out.text).not.toContain('{ title="Important info" }');
     expect(out.text).not.toContain('{title="Important info"}');
   });
 
-  it('leaves a non-title attr_list blob untouched (only title is recognized)', () => {
+  it('strips a non-title pure attr_list blob (`{ .class }`) when emitting the icon', () => {
     const out = process(':material-rocket:{ .youtube }\n');
-    // Class-only attr blobs are out of scope for Phase-1; the icon is still
-    // resolved, and the blob falls through as text. (Future: extend.)
-    expect(out.text).toContain(':icon[rocket]');
+    // The icon resolves and the class-only attr_list (no Starlight `<Icon>`
+    // equivalent for arbitrary classes) gets stripped — leaving the literal
+    // `{ .youtube }` would render as visible text.
+    expect(out.text).toContain('<Icon name="rocket" class="sl-inline-icon" />');
+    expect(out.text).not.toContain('{ .youtube }');
   });
 
   it('does not flag bare :identifier: tokens from other markdown extensions as unmapped icons', () => {

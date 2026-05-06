@@ -24,6 +24,22 @@ describe('normalizeInlineMarks', () => {
     });
   });
 
+  describe('insert (^^text^^)', () => {
+    it('rewrites ^^text^^ into <ins>', () => {
+      expect(normalizeInlineMarks('^^Insert^^')).toBe('<ins>Insert</ins>');
+    });
+
+    it('rewrites ^^...^^ before single-caret superscript so the outer markers win', () => {
+      // Without INS-before-SUP ordering, the inner `^Insert^` would match
+      // SUP_RE, producing `^<sup>Insert</sup>^` (broken).
+      expect(normalizeInlineMarks('See ^^Insert^^ here.')).toBe('See <ins>Insert</ins> here.');
+    });
+
+    it('does not interfere with single-caret superscript on the same line', () => {
+      expect(normalizeInlineMarks('^^Note^^ X^2^')).toBe('<ins>Note</ins> X<sup>2</sup>');
+    });
+  });
+
   describe('subscript (H~2~O)', () => {
     it('rewrites ~text~ into <sub>', () => {
       expect(normalizeInlineMarks('H~2~O')).toBe('H<sub>2</sub>O');

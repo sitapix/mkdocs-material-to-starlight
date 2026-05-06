@@ -1,33 +1,27 @@
 /**
  * Expand `pymdownx.snippets` references in-place.
  *
- * Composes:
- *   detectSnippets       — locate inline `--8<-- "x"` references
- *   resolveSnippet       — find the file in base_path order
- *   recursive expansion  — snippets within snippets, with cycle detection
+ * Composes detectSnippets (locate `--8<-- "x"` refs), resolveSnippet (find
+ * the file in base_path order), and recursive expansion with cycle detection.
  *
  * Behavior:
- *   - Inline snippets are replaced with their resolved content.
- *   - A direct or indirect cycle is broken by emitting a `snippet-cycle`
- *     diagnostic and leaving the offending marker in place.
- *   - Depth-exceeded conditions emit a `snippet-depth-exceeded` diagnostic.
- *   - Snippet-not-found emits a warning diagnostic and leaves the marker in
- *     place so the source remains valid Markdown.
+ *   - Inline snippets get replaced with their resolved content.
+ *   - Cycles emit a `snippet-cycle` diagnostic; the offending marker stays.
+ *   - Depth exceeded emits `snippet-depth-exceeded`.
+ *   - Not-found emits a warning and leaves the marker so the source stays
+ *     valid Markdown.
  *
- * Idempotency: once a snippet is inlined, the resulting text contains the
- * inlined body and no `--8<--` marker for that path. Re-running the expander
- * on the output is a no-op for that snippet.
+ * Block-form snippets (multi-file `--8<--` ... `--8<--`) are handled too.
+ * Each non-skipped (`;`-prefix) entry resolves in order; bodies concatenate
+ * and replace the block. Unclosed blocks emit `snippet-malformed`.
  *
- * Block-form snippets (multi-file `--8<--` ... `--8<--`) are also handled.
- * Each non-skipped (`;`-prefix) entry in the block is resolved in order and
- * the resolved bodies are concatenated, replacing the entire block in-place.
- * Unclosed blocks emit a `snippet-malformed` diagnostic.
+ * Idempotent: an inlined snippet leaves no `--8<--` marker for that path.
  */
 
-import { detectSnippets, type SnippetDetection } from '../normalize/snippets.js';
-import { resolveSnippet } from './resolve.js';
 import { createDiagnostic, type Diagnostic } from '../../domain/diagnostics/diagnostic.js';
 import type { FileSystem } from '../../domain/ports/file-system.js';
+import { detectSnippets, type SnippetDetection } from '../normalize/snippets.js';
+import { resolveSnippet } from './resolve.js';
 
 export interface ExpandInput {
   readonly source: string;
@@ -257,6 +251,20 @@ async function expandOne(
   }
   const resolved = await resolveSnippet({ relativePath, basePaths, fs });
   if (!resolved.ok) {
+    if (resolved.error.code === 'snippet-path-unsafe') {
+      diagnostics.push(
+        createDiagnostic({
+          severity: 'warning',
+          ruleId: 'path-escapes-base',
+          message:
+            `snippet "${relativePath}" resolves outside its base path "${resolved.error.unsafeBase ?? '?'}" ` +
+            `after symlink resolution; rejected to prevent reads outside the project tree.`,
+          source: SOURCE,
+          place: { line: line + 1, column: 1 },
+        }),
+      );
+      return null;
+    }
     diagnostics.push(
       createDiagnostic({
         severity: 'warning',
@@ -282,13 +290,7 @@ async function expandOne(
     return null;
   }
 
-  const sliced = applySlice(
-    resolved.value.content,
-    relativePath,
-    line,
-    slice,
-    diagnostics,
-  );
+  const sliced = applySlice(resolved.value.content, relativePath, line, slice, diagnostics);
   if (sliced === null) {
     return null;
   }
@@ -321,9 +323,7 @@ function dedentBlock(text: string): string {
     minIndent = minIndent === null ? indent : Math.min(minIndent, indent);
   }
   if (minIndent === null || minIndent === 0) return text;
-  return lines
-    .map((line) => (line.length >= minIndent ? line.slice(minIndent) : line))
-    .join('\n');
+  return lines.map((line) => (line.length >= minIndent ? line.slice(minIndent) : line)).join('\n');
 }
 
 const SECTION_START = /^.*--8<--\s+\[start:([A-Za-z0-9_-]+)\]\s*$/;
@@ -374,11 +374,7 @@ function sliceLineRanges(
   return out.join('\n');
 }
 
-function resolveBound(
-  raw: number | null,
-  total: number,
-  defaultIfNull: number,
-): number {
+function resolveBound(raw: number | null, total: number, defaultIfNull: number): number {
   if (raw === null) return defaultIfNull;
   if (raw === 0) return 1; // PyMdown: "If 0 is used it will be clamped to 1."
   if (raw < 0) return Math.max(1, total + raw + 1);
@@ -421,4 +417,3 @@ function extractSection(
   }
   return lines.slice(startIdx, endIdx).join('\n');
 }
-

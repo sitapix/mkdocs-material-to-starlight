@@ -47,12 +47,25 @@ describe('extractLabelIcon', () => {
     });
   });
 
-  it('extracts only the first shortcode when several appear', () => {
+  it('extracts the first shortcode AND strips later ones from the label', () => {
+    // Real mkdocs-material regression: tab labels like
+    // `:material-link: blog/2024/01/31/:material-dots-horizontal:/`
+    // left the trailing shortcode visible inside the rendered tab title
+    // because JSX attribute strings can't embed JSX components. Strip
+    // every shortcode beyond the first so labels render as clean text.
     const result = extractLabelIcon({
       rawLabel: ':fontawesome-brands-python: A :fontawesome-brands-python: B',
     });
-    // Only the first is consumed; the second remains in the label.
     expect(result.iconName).toBe('seti:python');
-    expect(result.label).toBe('A :fontawesome-brands-python: B');
+    expect(result.label).toBe('A B');
+  });
+
+  it('strips a mid-label shortcode while keeping the leading icon', () => {
+    const result = extractLabelIcon({
+      rawLabel: ':material-link: blog/2024/01/31/:material-dots-horizontal:/',
+    });
+    expect(result.iconName).toBe('external');
+    // The mid-label shortcode is stripped; the path keeps its slashes.
+    expect(result.label).toBe('blog/2024/01/31//');
   });
 });

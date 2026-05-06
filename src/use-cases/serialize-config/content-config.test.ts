@@ -53,7 +53,7 @@ describe('serializeContentConfig', () => {
     expect(out).toContain('version: z.string().optional(),');
   });
 
-  it('quotes field names that aren\'t valid JS identifiers (hyphens, leading digits, etc.)', () => {
+  it("quotes field names that aren't valid JS identifiers (hyphens, leading digits, etc.)", () => {
     // Real-world (iolanta-tech/python-yaml-ld, tbklang/documentation):
     // sources use kebab-case frontmatter fields like `header-includes`
     // and `is-blocked-by`. Emitting them as bare TS identifiers
@@ -83,5 +83,43 @@ describe('serializeContentConfig', () => {
     const zetaIdx = out.indexOf('zeta:');
     expect(alphaIdx).toBeLessThan(muIdx);
     expect(muIdx).toBeLessThan(zetaIdx);
+  });
+
+  it('emits docsLoader() with no generateId by default', () => {
+    // Default behaviour: rely on Starlight's built-in github-slugger. Only
+    // sites with slug-incompatible source paths need the override.
+    const out = serializeContentConfig();
+    expect(out).toContain('docsLoader()');
+    expect(out).not.toContain('generateId');
+  });
+
+  it('emits docsLoader({ generateId }) when preserveSlugs is true', () => {
+    // Starlight 0.35+ added a generateId option that lets the converter
+    // bypass github-slugger's strip behaviour. When source paths contain
+    // segments github-slugger would reshape (`1.0/`, `c++-primer.md`),
+    // emitting a path-preserving generateId lets the sidebar entries
+    // resolve verbatim — replacing the previous slug-incompatible-path
+    // warning with an actual fix.
+    const out = serializeContentConfig({}, { preserveSlugs: true });
+    expect(out).toContain('docsLoader({');
+    expect(out).toContain('generateId');
+    // The function must strip the .md/.mdx extension and the trailing
+    // /index or /readme suffix, lowercase the rest, and preserve every
+    // other character.
+    expect(out).toMatch(/\.md\|mdx|md\|mdx/);
+    expect(out).toMatch(/index|readme/i);
+  });
+
+  it('preserves docsSchema() emission when preserveSlugs is true', () => {
+    // The two options compose: a site can both override the slug derivation
+    // and extend the frontmatter schema with custom fields.
+    const out = serializeContentConfig(
+      { tags: 'z.array(z.string()).optional()' },
+      { preserveSlugs: true },
+    );
+    expect(out).toContain('generateId');
+    expect(out).toContain('schema: docsSchema({');
+    expect(out).toContain('extend: z.object({');
+    expect(out).toContain('tags: z.array(z.string()).optional(),');
   });
 });

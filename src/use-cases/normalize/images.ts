@@ -1,39 +1,28 @@
 /**
  * Pre-parse normalizer for Material's image attribute extensions.
  *
- * Material uses `attr_list` to attach alignment, sizing, lazy-loading, and
- * other attributes to image syntax:
- *
+ * Material uses `attr_list` to attach attributes to images:
  *   ![alt](url){ align=left }
  *   ![alt](url){ width="300" loading=lazy }
+ * and a URL-fragment trick to swap images by color scheme
+ * (`image.png#only-light`, `#only-dark`).
  *
- * It also uses a URL-fragment trick to swap images by color scheme:
+ * `attr_list` suffixes drop on a CommonMark/remark-gfm round-trip. Rewrite
+ * attributed images to raw `<img>` HTML so the attributes survive and
+ * `customCss` can style them.
  *
- *   ![alt](image.png#only-light)
- *   ![alt](image.png#only-dark)
+ * Recognized keys:
+ *   - `align=left` / `align=right` becomes `class="md-align-{left,right}"`
+ *   - `width="N"` and `height="N"` map straight through
+ *   - `loading=lazy` (or "lazy") becomes `loading="lazy"`
  *
- * None of these survive a CommonMark/remark-gfm round-trip — `attr_list`
- * suffixes are silently dropped. This normalizer rewrites attributed images
- * into raw `<img>` HTML so all Material-specific attributes survive into the
- * final document, where they can be styled by `customCss`.
+ * Images whose attr_list contains only unknown keys, and plain images
+ * without attr_list, pass through so remark/Astro can still optimize them.
  *
- * Recognized attr_list keys:
- *   - `align=left` / `align=right` → `class="md-align-{left,right}"`
- *   - `width="N"`  → `width="N"`
- *   - `height="N"` → `height="N"`
- *   - `loading=lazy` (or "lazy") → `loading="lazy"`
- *
- * If an attr_list contains ONLY unrecognized keys, the image passes through
- * unchanged so downstream remark / Astro can still optimize it. Plain images
- * with no attr_list also pass through.
- *
- * Idempotency: rewritten output is raw `<img>` HTML (no `![...]` syntax,
- * no curly braces) so a second pass finds nothing to rewrite.
- *
- * Fenced-code safety: lines inside ` ``` ` are passed through verbatim.
+ * Idempotent (output is raw `<img>`) and fence-shielded.
  */
 
-const FENCE = /^ {0,3}(```|~~~)/;
+import { isFenceLine } from '../../domain/syntax/fence.js';
 
 // Match `![alt](url){ attrs }` on a single line. The attrs blob is optional;
 // when absent, the trailing `{...}` group is skipped. alt cannot contain `]`,
@@ -56,7 +45,7 @@ export function normalizeImages(source: string): string {
   let inFence = false;
 
   for (const line of lines) {
-    if (FENCE.test(line)) {
+    if (isFenceLine(line)) {
       output.push(line);
       inFence = !inFence;
       continue;

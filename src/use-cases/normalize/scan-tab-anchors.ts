@@ -17,14 +17,13 @@
 
 import { parseTabLine } from '../../domain/syntax/tab-line.js';
 import { createDiagnostic, type Diagnostic } from '../../domain/diagnostics/diagnostic.js';
-
-const FENCE = /^ {0,3}(```|~~~)/;
+import { isFenceLine } from '../../domain/syntax/fence.js';
 
 export function scanTabAnchors(source: string): ReadonlyArray<Diagnostic> {
   const lines = source.split('\n');
   let inFence = false;
   for (const line of lines) {
-    if (FENCE.test(line)) {
+    if (isFenceLine(line)) {
       inFence = !inFence;
       continue;
     }

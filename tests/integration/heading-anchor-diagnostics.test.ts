@@ -21,10 +21,14 @@ describe('heading explicit-id diagnostics', () => {
     expect(result.ok).toBe(true);
     if (!result.ok) return;
 
-    // The anchor should be stripped from the heading
+    // The anchor should be stripped from the heading. The body `# My Title`
+    // is also stripped because it duplicates the synthesized frontmatter
+    // title — that's a separate, intentional dedupe (Starlight auto-renders
+    // the title; leaving the body H1 produces a visible duplicate).
     const body = readFileSync(join(out, 'src', 'content', 'docs', 'index.md'), 'utf8');
     expect(body).not.toMatch(/\{ #my-anchor \}/);
-    expect(body).toMatch(/# My Title/);
+    expect(body).toContain('title: My Title');
+    expect(body).not.toMatch(/^# My Title\b/m);
 
     // A diagnostic should be emitted naming the stripped anchor
     const diag = result.value.diagnostics.find(

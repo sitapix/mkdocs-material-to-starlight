@@ -1,27 +1,21 @@
 /**
  * Classify a Python MkDocs hook file by archetype.
  *
- * MkDocs hooks are arbitrary Python code, but real-world usage falls into
- * six recognizable archetypes (catalogued in the research bundle):
+ * Real-world hooks fall into six recognizable shapes:
+ *   1. shortcode-replacement: `re.sub` on `<!-- md:* -->` in
+ *      `on_page_markdown`.
+ *   2. i18n-fallback: `on_files` subclasses File or filters by language
+ *      path prefix.
+ *   3. title-extraction: `on_page_markdown` sets `page.meta["title"]` or
+ *      `social_options["title"]`.
+ *   4. extension-registration: `on_config` appends a Markdown Extension.
+ *   5. post-build-emission: `on_post_build` writes files or posts to
+ *      external services.
+ *   6. dynamic-content: `on_page_markdown` reads YAML and renders templates.
  *
- *   1. shortcode-replacement  — re.sub on `<!-- md:* -->` tokens in
- *                               on_page_markdown.
- *   2. i18n-fallback          — on_files subclasses File or filters by
- *                               language path prefix.
- *   3. title-extraction       — on_page_markdown sets page.meta["title"]
- *                               or social_options["title"].
- *   4. extension-registration — on_config appends a Markdown Extension.
- *   5. post-build-emission    — on_post_build writes files / posts to
- *                               external services.
- *   6. dynamic-content        — on_page_markdown reads YAML data and
- *                               renders templates dynamically.
- *
- * Pure: takes the source text, returns the union of detected archetypes.
- * Returns `['unknown']` when nothing matches. Pattern-based, no Python
- * parse — deliberately tolerant of stylistic variation.
- *
- * The output drives a more-specific diagnostic in MIGRATION_NOTES so users
- * see what their hook was doing and what the Astro/Starlight equivalent is.
+ * Pattern-based, no Python parse — tolerant of stylistic variation.
+ * Returns `['unknown']` for no match. Drives a per-archetype diagnostic
+ * in MIGRATION_NOTES so users see the Starlight equivalent.
  */
 
 export type HookArchetype =

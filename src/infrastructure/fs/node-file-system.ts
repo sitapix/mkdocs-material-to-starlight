@@ -11,7 +11,7 @@
  * implements the same port without touching consumers.
  */
 
-import { readFile, stat } from 'node:fs/promises';
+import { readFile, realpath, stat } from 'node:fs/promises';
 import { ok, err, type Result } from '../../domain/result.js';
 import type {
   FileSystem,
@@ -34,6 +34,14 @@ export function createNodeFileSystem(): FileSystem {
         return true;
       } catch {
         return false;
+      }
+    },
+    async realpath(path: string): Promise<Result<string, FileSystemError>> {
+      try {
+        const resolved = await realpath(path);
+        return ok(resolved);
+      } catch (cause) {
+        return err(translateError(cause, path));
       }
     },
   };

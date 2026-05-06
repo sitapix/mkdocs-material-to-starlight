@@ -58,4 +58,46 @@ describe('escapeJsxExpressionsForMdx', () => {
       }
     }
   });
+
+  it('wraps {% block %} (Jinja control flow) in inline code', () => {
+    const out = escapeJsxExpressionsForMdx('{% if user %}admin{% endif %}\n');
+    expect(out).toContain('`{% if user %}`');
+    expect(out).toContain('`{% endif %}`');
+    // No bare `{%` should remain outside backticks.
+    expect(out).not.toMatch(/(?<!`)\{%[^`]/);
+  });
+
+  it('wraps Jinja whitespace-control variants ({%- ... -%})', () => {
+    const out = escapeJsxExpressionsForMdx('{%- set x = 1 -%}\n');
+    expect(out).toContain('`{%- set x = 1 -%}`');
+  });
+
+  it('wraps {# Jinja comment #} in inline code', () => {
+    const out = escapeJsxExpressionsForMdx('{# this is a comment #}\n');
+    expect(out).toContain('`{# this is a comment #}`');
+  });
+
+  it('does not wrap {% inside fenced code blocks', () => {
+    const src = '```jinja\n{% if user %}admin{% endif %}\n```\n';
+    expect(escapeJsxExpressionsForMdx(src)).toBe(src);
+  });
+
+  it('handles real-world governance shape (set + for loop)', () => {
+    // Real input from gitlab.com/alasca.cloud/governance: page-level Jinja
+    // template directives mixed with body content. None of these should
+    // survive as bare `{%` in MDX.
+    const src = '{% set project = projects.arko %}\n# {{ project.name }}\n';
+    const out = escapeJsxExpressionsForMdx(src);
+    expect(out).toContain('`{% set project = projects.arko %}`');
+    expect(out).toContain('`{{ project.name }}`');
+  });
+
+  it('escapes multi-line {% blocks %} via entity escape', () => {
+    const src = '{% for item in items %}\n  - {{ item }}\n{% endfor %}\n';
+    const out = escapeJsxExpressionsForMdx(src);
+    // Single-line {% if %} and {% endif %} get inline-code-wrapped first;
+    // any remaining `{%` (e.g., that the regex couldn't match because it
+    // genuinely spanned lines) gets entity-escaped.
+    expect(out).not.toMatch(/^\{%/m);
+  });
 });

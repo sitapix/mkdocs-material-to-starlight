@@ -14,14 +14,19 @@
  */
 
 import { createDiagnostic, type Diagnostic } from '../../domain/diagnostics/diagnostic.js';
-
-const FENCE = /^ {0,3}(```|~~~)/;
-const ALERT_RE = /^>\s*\[!(NOTE|TIP|IMPORTANT|WARNING|CAUTION)\]\s*$/;
+import { isFenceLine } from '../../domain/syntax/fence.js';
+// Case-insensitive: matches both GitHub-flavored (`> [!NOTE]`) and the
+// PyMdown `quotes` callouts (`> [!note]`, with optional `-`/`+` collapse
+// suffix and inline title text). The collapse suffix and title are
+// preserved by the rendering plugin (`starlight-github-alerts`); we only
+// detect-and-flag here so the converter installs the plugin dep.
+const ALERT_RE = /^>\s*\[!(NOTE|TIP|IMPORTANT|WARNING|CAUTION)\][-+]?(?:\s+.*)?\s*$/i;
 
 function asideTypeFor(githubType: string): string {
-  if (githubType === 'CAUTION') return 'danger';
-  if (githubType === 'WARNING') return 'caution';
-  return githubType.toLowerCase();
+  const upper = githubType.toUpperCase();
+  if (upper === 'CAUTION') return 'danger';
+  if (upper === 'WARNING') return 'caution';
+  return upper.toLowerCase();
 }
 
 export function scanGithubAlerts(source: string): ReadonlyArray<Diagnostic> {
@@ -32,7 +37,7 @@ export function scanGithubAlerts(source: string): ReadonlyArray<Diagnostic> {
 
   for (const line of lines) {
     lineNumber += 1;
-    if (FENCE.test(line)) {
+    if (isFenceLine(line)) {
       inFence = !inFence;
       continue;
     }
@@ -61,7 +66,7 @@ export function sourceContainsGithubAlerts(source: string): boolean {
   const lines = source.split('\n');
   let inFence = false;
   for (const line of lines) {
-    if (FENCE.test(line)) {
+    if (isFenceLine(line)) {
       inFence = !inFence;
       continue;
     }

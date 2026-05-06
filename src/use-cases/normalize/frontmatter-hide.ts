@@ -1,25 +1,14 @@
 /**
  * Translate Material's per-page `hide:` frontmatter array into Starlight
- * frontmatter equivalents.
- *
- * Material:
- *   ---
- *   title: X
- *   hide:
- *     - navigation
- *     - toc
- *     - footer
- *   ---
+ * equivalents.
  *
  * Mapping:
  *   - hide: toc        → tableOfContents: false
  *   - hide: navigation → template: splash
- *   - hide: footer     → no Starlight equivalent in core; dropped silently
+ *   - hide: footer     → no Starlight equivalent (dropped)
  *
- * The `hide:` block is removed from frontmatter regardless of mapping
- * outcome (otherwise it would surface as `unknown-frontmatter-field`).
- *
- * Pure: text → text. Idempotent (the `hide:` key never reappears).
+ * The `hide:` block is always removed (otherwise it surfaces as
+ * `unknown-frontmatter-field`). Pure and idempotent.
  */
 
 const FRONTMATTER_RE = /^---\n([\s\S]*?)\n---/;

@@ -1,23 +1,17 @@
 /**
  * Rewrite a single Markdown link href into a Starlight-shaped href.
  *
- * Pure: takes a href + the source file's path + the slug map, returns either
- * a typed `RewrittenLink` or a typed `BrokenLink` error. The caller (an
- * AST-level transformer or the link-rewriter remark plugin) walks the tree
- * and applies this function to each link node.
+ * Pure: takes (href, source path, slug map) and returns `RewrittenLink` or
+ * `BrokenLink`. Callers walk the tree and apply this per link node.
  *
- * Five outcomes are possible:
- *   - external (http/https/mailto)             → passed through untouched
- *   - fragment-only (#anchor)                  → passed through untouched
- *   - relative .md / .mdx pointing to a known  → rewritten to /slug[#fragment]
- *     source file
- *   - relative non-md (image, css, js, etc.)   → kept as-is (asset path; copy
- *                                                 stage handles them)
- *   - relative .md pointing to nothing in the  → BrokenLink error
- *     slug map
+ * Five outcomes:
+ *   - external (http/https/mailto): unchanged
+ *   - fragment-only (#anchor): unchanged
+ *   - relative .md / .mdx pointing to a known source: /slug[#fragment]
+ *   - relative non-md (image, css, js): unchanged (copy stage handles them)
+ *   - relative .md with no slug match: BrokenLink
  *
- * The function does no I/O. It uses POSIX-style path arithmetic (string ops),
- * since both MkDocs and Starlight conventions use forward slashes.
+ * No I/O. POSIX path arithmetic (forward slashes throughout).
  */
 
 import { ok, err, type Result } from '../../domain/result.js';
@@ -58,7 +52,9 @@ export function rewriteInternalLink(
     return ok({ kind: 'asset', href: rewriteAssetHref(split, input.fromSourcePath) });
   }
 
-  const targetSourcePath = resolveRelative(input.fromSourcePath, split.path);
+  const targetSourcePath = decodePathSegments(
+    resolveRelative(input.fromSourcePath, split.path),
+  );
   const record = input.slugMap.getBySourcePath(targetSourcePath);
   if (record === undefined) {
     return err({
@@ -124,6 +120,23 @@ function resolveRelative(fromSourcePath: string, target: string): string {
 function parentDirectory(path: string): string {
   const slash = path.lastIndexOf('/');
   return slash === -1 ? '' : path.slice(0, slash);
+}
+
+// Markdown link hrefs are HTTP-style percent-encoded (`%20`, `%C3%A4`); the
+// slug map is keyed by literal filesystem paths. Decode each segment
+// independently so a literal `%` in a filename survives, and a malformed
+// sequence falls back to the raw segment instead of throwing.
+function decodePathSegments(path: string): string {
+  return path
+    .split('/')
+    .map((seg) => {
+      try {
+        return decodeURIComponent(seg);
+      } catch {
+        return seg;
+      }
+    })
+    .join('/');
 }
 
 function renderSlugUrl(slug: string, fragment: string | null): string {

@@ -1,0 +1,181 @@
+/**
+ * Project-dir picker for the wizard. Re-prompts on missing or invalid
+ * mkdocs.yml so a typo doesn't drop the user back to the shell, and runs
+ * the read+parse under a spinner so slow disks don't look like a hang.
+ *
+ * If `<dir>/mkdocs.yml` is missing but the project tree contains one or
+ * more candidates (e.g. a monorepo with `website/mkdocs.yml`), the picker
+ * surfaces them via discovery — auto-confirming a single match or
+ * presenting a select prompt for multiple — instead of forcing the user
+ * to retype a deeper path. That redirect is the single biggest UX win
+ * for first-time runs against unfamiliar repos.
+ *
+ * Pulled out of `wizard-runner.ts` to keep that file under the size cap
+ * and to give the spinner-driven recovery loop a single home.
+ */
+
+import { access, readFile } from 'node:fs/promises';
+import { join } from 'node:path';
+import { createJsYamlDecoder } from '../../infrastructure/yaml/js-yaml-decoder.js';
+import { parseMkdocsConfig } from '../../use-cases/config/parse-mkdocs.js';
+import { createNodeConfigDiscoverer } from '../../infrastructure/fs/node-config-discoverer.js';
+import {
+  rankCandidates,
+  type ConfigCandidate,
+} from '../../use-cases/discover-config/rank-candidates.js';
+import type { MkdocsConfig } from '../../domain/config/mkdocs-config.js';
+import type { Prompter } from '../../domain/wizard/ports/prompter.js';
+
+export interface LoadedConfig {
+  readonly projectDir: string;
+  readonly configValue: MkdocsConfig;
+}
+
+async function fileExists(path: string): Promise<boolean> {
+  try {
+    await access(path);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** Max attempts to re-prompt for a project dir before giving up. */
+const PROJECT_DIR_MAX_ATTEMPTS = 3;
+
+export async function readProjectDirInteractively(
+  prompter: Prompter,
+  initialHint: string,
+): Promise<LoadedConfig | 'cancelled'> {
+  const yaml = createJsYamlDecoder();
+  let hint = initialHint;
+  for (let attempt = 0; attempt < PROJECT_DIR_MAX_ATTEMPTS; attempt++) {
+    const inputDir = await prompter.path({
+      message: 'Project directory (containing mkdocs.yml)',
+      initialValue: hint,
+      directory: true,
+      validate: (value) => {
+        if (value.trim().length === 0) return 'Path is required.';
+        return undefined;
+      },
+    });
+    if (inputDir === null) return 'cancelled';
+
+    const resolved = await resolveConfigPathInteractively(prompter, inputDir);
+    if (resolved === 'cancelled') return 'cancelled';
+    if (resolved === 'not-found') {
+      prompter.log.error(
+        `No mkdocs.yml at ${inputDir} or in any subdirectory (searched depth 4, pruning node_modules/dist/build/.git/site/...).`,
+      );
+      hint = inputDir;
+      continue;
+    }
+
+    const { effectiveDir, configPath } = resolved;
+    const spin = prompter.spinner({ initialMessage: `Reading ${configPath}` });
+    let configText: string;
+    try {
+      configText = await readFile(configPath, 'utf8');
+    } catch {
+      spin.error(`No mkdocs.yml at ${configPath}.`);
+      hint = inputDir;
+      continue;
+    }
+    spin.message('Parsing mkdocs.yml');
+    const decoded = yaml.decode(configText);
+    if (!decoded.ok) {
+      spin.error(`mkdocs.yml is not valid YAML: ${decoded.error.message}`);
+      hint = inputDir;
+      continue;
+    }
+    const config = parseMkdocsConfig(decoded.value);
+    if (!config.ok) {
+      spin.error(`mkdocs.yml is missing required fields: ${config.error.message}`);
+      hint = inputDir;
+      continue;
+    }
+    spin.stop(`Loaded ${configPath}`);
+    return {
+      projectDir: effectiveDir,
+      configValue: config.value,
+    };
+  }
+  prompter.log.error(
+    `Gave up after ${String(PROJECT_DIR_MAX_ATTEMPTS)} attempts. Run with --help to see CLI flags.`,
+  );
+  return 'cancelled';
+}
+
+type ResolveResult =
+  | { readonly effectiveDir: string; readonly configPath: string }
+  | 'cancelled'
+  | 'not-found';
+
+async function resolveConfigPathInteractively(
+  prompter: Prompter,
+  inputDir: string,
+): Promise<ResolveResult> {
+  const rootConfig = join(inputDir, 'mkdocs.yml');
+  if (await fileExists(rootConfig)) {
+    return { effectiveDir: inputDir, configPath: rootConfig };
+  }
+
+  const spin = prompter.spinner({
+    initialMessage: `Searching ${inputDir} for mkdocs.yml`,
+  });
+  const discoverer = createNodeConfigDiscoverer();
+  const discovery = await discoverer.findMkdocsConfigs(inputDir);
+  if (!discovery.ok) {
+    spin.error(`Could not search ${inputDir}: ${discovery.error.message}`);
+    return 'not-found';
+  }
+  const ranked = rankCandidates(discovery.value);
+  if (ranked.kind === 'none') {
+    spin.error(`No mkdocs.yml found under ${inputDir}.`);
+    return 'not-found';
+  }
+  spin.stop(`Found ${String(1 + ranked.alternatives.length)} mkdocs config file(s).`);
+
+  const chosen =
+    ranked.alternatives.length === 0
+      ? await confirmSingle(prompter, ranked.primary)
+      : await pickFromMany(prompter, ranked.primary, ranked.alternatives);
+  if (chosen === 'cancelled' || chosen === null) return 'cancelled';
+  if (chosen === 'declined') return 'not-found';
+
+  return {
+    effectiveDir: join(inputDir, chosen.configDir),
+    configPath: join(inputDir, chosen.relPath),
+  };
+}
+
+async function confirmSingle(
+  prompter: Prompter,
+  candidate: ConfigCandidate,
+): Promise<ConfigCandidate | 'declined' | 'cancelled' | null> {
+  const ok = await prompter.confirm({
+    message: `Use ${candidate.relPath}?`,
+    initialValue: true,
+  });
+  if (ok === null) return 'cancelled';
+  return ok ? candidate : 'declined';
+}
+
+async function pickFromMany(
+  prompter: Prompter,
+  primary: ConfigCandidate,
+  alternatives: ReadonlyArray<ConfigCandidate>,
+): Promise<ConfigCandidate | 'cancelled' | null> {
+  const all = [primary, ...alternatives];
+  const choice = await prompter.select<string>({
+    message: `Multiple mkdocs.yml found — pick one:`,
+    options: all.map((c) =>
+      c.reasons.length > 0
+        ? { value: c.relPath, label: c.relPath, hint: c.reasons.join('; ') }
+        : { value: c.relPath, label: c.relPath },
+    ),
+    initialValue: primary.relPath,
+  });
+  if (choice === null) return 'cancelled';
+  return all.find((c) => c.relPath === choice) ?? null;
+}

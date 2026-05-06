@@ -75,9 +75,7 @@ function appendDocsSchemaExtendSection(
   const inferred = inferFrontmatterTypes(fields, sourceDocs);
   lines.push('## Extending the docsSchema', '');
   lines.push(
-    'Your pages use frontmatter fields that Starlight\'s `docsSchema()` does not recognize. Astro\'s build will fail unless you extend the schema.',
-    '',
-    'Paste the snippet below into `src/content.config.ts`. Field types were inferred from the values observed across your source files; review and tighten as needed.',
+    'Your pages use frontmatter fields that Starlight\'s `docsSchema()` does not recognize. The generated `src/content.config.ts` already extends the schema with the snippet below — types were inferred from the values observed across your source files. Review and tighten as needed.',
     '',
     '```ts',
     'import { defineCollection } from \'astro:content\';',

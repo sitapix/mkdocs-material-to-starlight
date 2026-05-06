@@ -108,6 +108,7 @@ export function serializeAstroConfig(input: AstroConfigInput): string {
   const hasAnnouncement = features.has('announcement');
   const hasPageActions = features.has('page-actions');
   const hasHeadingBadges = features.has('heading-badges');
+  const hasContributorList = features.has('contributor-list');
 
   // `starlight-llms-txt` requires `site:` in astro.config.mjs (it builds
   // absolute URLs into the emitted llms.txt index). When the source
@@ -169,6 +170,9 @@ export function serializeAstroConfig(input: AstroConfigInput): string {
   }
   if (hasHeadingBadges) {
     imports.push(`import starlightHeadingBadges from 'starlight-heading-badges';`);
+  }
+  if (hasContributorList) {
+    imports.push(`import starlightContributorList from 'starlight-contributor-list';`);
   }
   if (hasMath) {
     imports.push(`import remarkMath from 'remark-math';`);
@@ -381,6 +385,13 @@ export function serializeAstroConfig(input: AstroConfigInput): string {
   }
   if (hasHeadingBadges) {
     lines.push('        starlightHeadingBadges(),');
+  }
+  if (hasContributorList) {
+    // The converter has no git port, so it cannot enumerate authors at
+    // conversion time. Emit a placeholder `list: []` the user fills in
+    // post-install — same pattern as starlight-announcement above.
+    lines.push("        // TODO: populate `list` with your contributors (each: { name, url, avatar }).");
+    lines.push('        starlightContributorList({ list: [] }),');
   }
   if (enableLinksValidator) {
     // Migrated MkDocs sites routinely link to pages that the original build

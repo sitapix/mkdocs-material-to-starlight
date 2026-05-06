@@ -34,9 +34,10 @@ function isTutorialHeading(headingText: string): boolean {
   return TUTORIAL_VERB_RE.test(stripped);
 }
 
+import { isFenceLine } from '../../../domain/syntax/fence.js';
+
 const HEADING_RE = /^#{1,6} (.+)$/;
 const OL_ITEM_RE = /^(\d+)\. /;
-const FENCE_OPEN_RE = /^ {0,3}(`{3,}|~{3,})/;
 
 interface OrderedListSpan {
   readonly start: number;
@@ -58,7 +59,7 @@ function readOrderedList(
   while (i < lines.length) {
     const line = lines[i] ?? '';
 
-    if (FENCE_OPEN_RE.test(line)) {
+    if (isFenceLine(line)) {
       inFence = !inFence;
       current.push(line);
       i += 1;
@@ -150,7 +151,14 @@ export function promoteSteps(source: string): StepsResult {
 
     if (qualifies) {
       const listLines = lines.slice(list.start, list.end);
-      const replacement = ['<Steps>', '', ...listLines, '</Steps>'];
+      // The blank line before `</Steps>` is load-bearing. Without it,
+      // CommonMark parses the closer as belonging to the last list item's
+      // continuation; remark-stringify then re-emits it indented at the
+      // item's column, and MDX rejects the misaligned closing tag.
+      // (DDEV `users/topics/sharing.md` regression.)
+      const trailing = listLines[listLines.length - 1] ?? '';
+      const padded = trailing.trim().length === 0 ? listLines : [...listLines, ''];
+      const replacement = ['<Steps>', '', ...padded, '</Steps>'];
       replacements.push({ start: list.start, end: list.end, replacement });
       diagnostics.push(
         createDiagnostic({

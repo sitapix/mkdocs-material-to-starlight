@@ -12,7 +12,7 @@
 
 export type Severity = 'info' | 'warning' | 'error';
 
-export interface SourcePlace {
+interface SourcePlace {
   readonly line: number;
   readonly column: number;
 }

@@ -1,7 +1,7 @@
 /**
  * Pre-parse normalizer for Material code-block annotations.
  *
- * Material annotates code with two coupled forms:
+ * Material annotates code with:
  *
  *   ``` { .python .annotate }
  *   print("hello")  # (1)!
@@ -9,30 +9,16 @@
  *
  *   1.  This is an annotation.
  *
- * The `(N)!` form (with bang) tells PyMdown to strip the surrounding comment
- * characters when rendering the marker, producing an inline popover icon.
- * Starlight has no popover component and no remark plugin handles the
- * positional `(N)` ↔ list-item binding inside fenced code (per
- * `library_audit_20260501.md`).
+ * The `(N)!` form (with bang) tells PyMdown to render an inline popover.
+ * Starlight has no popover and no remark plugin handles the positional
+ * binding inside fenced code.
  *
- * Phase 1 downgrade: strip the `.annotate` class from the fence info string
- * and drop the bang from `(N)!` markers, leaving plain `(N)` visible inside
- * the code (which already pairs with the trailing ordered list's numbers).
- * The user sees:
+ * Phase 1 downgrade: drop the `.annotate` class from the fence info string
+ * and the bang from `(N)!`. The visible `(1)` still pairs with the trailing
+ * ordered list. The converter emits a `code-annotation-downgraded`
+ * diagnostic to make the loss explicit.
  *
- *   ``` python
- *   print("hello")  # (1)
- *   ```
- *
- *   1.  This is an annotation.
- *
- * — buildable, readable, semantically intact (the visible `(1)` matches the
- * legend below the code). The popover UX is lost but the user can manually
- * adopt a Starlight component for it; the converter surfaces a diagnostic
- * (`code-annotation-downgraded`) so that loss is explicit.
- *
- * Idempotency: stripping `.annotate` and `!` is monotonic — output contains
- * neither marker, so a second pass finds nothing to rewrite.
+ * Idempotent: stripping `.annotate` and `!` is monotonic.
  */
 
 const FENCE_OPEN = /^( {0,3})(```|~~~)(.*)$/;

@@ -1,25 +1,19 @@
 /**
- * Extract the list of non-default locale codes from a `mkdocs-static-i18n`
- * plugin configuration in `mkdocs.yml`.
- *
- * Source shape:
+ * Extract non-default locale codes from a `mkdocs-static-i18n` plugin in
+ * `mkdocs.yml`:
  *
  *   plugins:
  *     - i18n:
  *         languages:
  *           - locale: en
  *             default: true
- *             name: English
  *           - locale: fr
- *             name: Français
  *           - locale: de
  *
- * Returns `['fr', 'de']` — the locales that triggered file-suffix renames in
- * the source. The default locale is dropped because Starlight's directory
- * layout has no prefix for it. When `default: true` is missing, the first
- * language entry is treated as default.
- *
- * Pure: takes a plugin list, returns string[]. No I/O.
+ * Returns `['fr', 'de']` — the locales that triggered file-suffix renames.
+ * The default locale is dropped (Starlight's directory layout has no prefix
+ * for it). Without `default: true`, the first entry is treated as default.
+ * Pure.
  */
 
 import type { MkdocsPlugin } from '../../domain/config/mkdocs-config.js';
@@ -75,7 +69,7 @@ function collectNonDefault(languages: ReadonlyArray<unknown>): ReadonlyArray<str
  * Structured representation of the i18n configuration suitable for emitting
  * a Starlight `locales: { … }` block in `astro.config.mjs`.
  */
-export interface I18nLocaleEntry {
+interface I18nLocaleEntry {
   readonly code: string;
   readonly label: string;
   readonly isDefault: boolean;

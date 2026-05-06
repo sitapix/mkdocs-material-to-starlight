@@ -25,4 +25,15 @@ export interface FileSystemError {
 export interface FileSystem {
   readText(path: string): Promise<Result<string, FileSystemError>>;
   exists(path: string): Promise<boolean>;
+  /**
+   * Canonicalise a path: resolve symlinks, normalise `..` segments. Required
+   * for safe path-containment checks against user-supplied input. Returns
+   * `not-found` when the path itself does not exist on disk.
+   *
+   * Adapters that have no concept of symlinks (in-memory test fakes) MAY
+   * return the input verbatim, which is sound for the prefix-check use case
+   * — escape attempts via `..` are still caught because callers
+   * `path.resolve()` first.
+   */
+  realpath(path: string): Promise<Result<string, FileSystemError>>;
 }

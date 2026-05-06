@@ -533,4 +533,179 @@ describe('normalizeCardGrids', () => {
     // The links should be present and accessible
     expect(out).toContain('[field after](#field-after)');
   });
+
+  it('inserts a blank line before `::::card-grid` when emitted inside an outer HTML wrapper', () => {
+    // Real mkdocs-material regression: `reference/grids.md` nests
+    // `<div class="grid cards" markdown>` inside `<div class="result" markdown>`.
+    // CommonMark HTML blocks consume every non-blank line as raw HTML, so
+    // without a blank-line separator the converted `::::card-grid` directive
+    // and its `:::card` children are absorbed into the outer div's text and
+    // never parsed as directives — leaving icon shortcodes and directive
+    // markers as visible literal text.
+    const src = [
+      '<div class="result" markdown>',
+      '  <div class="grid cards" markdown>',
+      '',
+      '- :material-html5: HTML',
+      '- :material-css3: CSS',
+      '',
+      '  </div>',
+      '</div>',
+      '',
+    ].join('\n');
+    const out = normalizeCardGrids(src);
+    // The output must have a blank line between the outer `<div ...>` and
+    // the converted `::::card-grid` opener so the HTML block ends before
+    // the directive starts.
+    expect(out).toMatch(/<div class="result" markdown>\n\n/);
+    // And a blank line after the directive closer before the next non-blank
+    // (the outer `</div>` here was preceded by a blank in the source, so
+    // we don't double-blank — the existing blank suffices).
+    expect(out).toContain('::::card-grid');
+  });
+
+  it('dedents Material-style cards where title is column-0 and body is column-4', () => {
+    // Real-world: PowerTools `index.md` writes
+    //   - :icon:{ .lg } __Support this project__
+    //
+    //       ---
+    //       Become a public reference, share your work...
+    //       [:octicons-arrow-right-24: Support](#support-...)
+    // After stripping `- `, the title sits at column 0 while the body
+    // lines retain 4 spaces of indent. A naive min-indent dedent computes
+    // `minIndent = 0` because of the title and leaves the body alone —
+    // CommonMark then treats the 4-space-indented body as an indented
+    // code block, and the rendered card body shows up as code.
+    // The mixed-indent case must dedent body lines to align with the title.
+    const src = [
+      '<div class="grid cards" markdown>',
+      '',
+      '- :heart:{ .lg .middle } __Support this project__',
+      '',
+      '    ---',
+      '',
+      '    Become a public reference, share your work, join the community.',
+      '',
+      '    [:octicons-arrow-right-24: Support](#support)',
+      '',
+      '</div>',
+      '',
+    ].join('\n');
+    const out = normalizeCardGrids(src);
+    // No body line should retain 4-space indent (which would code-fence it).
+    const cardLines = out.split('\n');
+    const inCard: string[] = [];
+    let inside = false;
+    for (const line of cardLines) {
+      if (line === ':::card') { inside = true; continue; }
+      if (line === ':::') { inside = false; continue; }
+      if (inside) inCard.push(line);
+    }
+    const codeLikeLines = inCard.filter((l) => /^ {4,}\S/.test(l));
+    expect(codeLikeLines).toHaveLength(0);
+    // The body content reaches the output verbatim.
+    expect(out).toContain('Become a public reference');
+    expect(out).toContain('[:octicons-arrow-right-24: Support](#support)');
+  });
+
+  describe('dedent robustness — false-positive guards', () => {
+    it('preserves nested list structure when body has mixed indents', () => {
+      // Title at 0, intro at 4, nested list at 4, deeply-nested at 8.
+      // After dedent the *relative* structure must survive: intro and the
+      // nested list bullets at 0; the deep nested item at 4.
+      const src = [
+        '<div class="grid cards" markdown>',
+        '',
+        '- __Title__',
+        '',
+        '    Intro paragraph.',
+        '',
+        '    - First subitem',
+        '        - Deeply nested',
+        '    - Second subitem',
+        '',
+        '</div>',
+        '',
+      ].join('\n');
+      const out = normalizeCardGrids(src);
+      // Intro and the top-level subitems sit at column 0, the deep one at 4.
+      expect(out).toContain('\nIntro paragraph.\n');
+      expect(out).toContain('\n- First subitem\n');
+      expect(out).toContain('\n    - Deeply nested\n');
+      expect(out).toContain('\n- Second subitem\n');
+    });
+
+    it('does not destroy a fenced code block inside the card body', () => {
+      // The fence opener was indented to fit under the list marker. After
+      // dedent the fence must end at column 0 so it is still a fenced
+      // code block (not an indented one) and the body inside it is intact.
+      const src = [
+        '<div class="grid cards" markdown>',
+        '',
+        '- __Title__',
+        '',
+        '    ```python',
+        '    print("hello")',
+        '    ```',
+        '',
+        '</div>',
+        '',
+      ].join('\n');
+      const out = normalizeCardGrids(src);
+      expect(out).toContain('```python');
+      expect(out).toContain('print("hello")');
+      // No 4-space-indented content survives inside the card.
+      const cardBody = extractCardBodies(out);
+      const codeLikeLines = cardBody.filter((l) => /^ {4,}\S/.test(l));
+      expect(codeLikeLines).toHaveLength(0);
+    });
+
+    it('leaves a card alone whose title and body all share an indent (uniform-indent path)', () => {
+      // Both the title (after marker strip) and body sit at column 2
+      // because the whole grid is itself nested inside another container.
+      // The min-indent path handles this without our zero-count heuristic.
+      const src = [
+        '  <div class="grid cards" markdown>',
+        '',
+        '  - __Title__',
+        '',
+        '      Body line',
+        '',
+        '  </div>',
+        '',
+      ].join('\n');
+      const out = normalizeCardGrids(src);
+      // Body should not have 4+ leading spaces inside the rendered card.
+      const cardBody = extractCardBodies(out);
+      const codeLikeLines = cardBody.filter((l) => /^ {4,}\S/.test(l));
+      expect(codeLikeLines).toHaveLength(0);
+    });
+
+    it('leaves a single-line card (title only, no body) untouched', () => {
+      // Boundary: only one non-blank line. Dedent is a no-op — no body to
+      // shift. The title itself must still be present.
+      const src = [
+        '<div class="grid cards" markdown>',
+        '',
+        '- __Just a Title__',
+        '',
+        '</div>',
+        '',
+      ].join('\n');
+      const out = normalizeCardGrids(src);
+      expect(out).toContain('__Just a Title__');
+    });
+  });
 });
+
+function extractCardBodies(out: string): string[] {
+  const cardLines = out.split('\n');
+  const inCard: string[] = [];
+  let inside = false;
+  for (const line of cardLines) {
+    if (line.trim() === ':::card') { inside = true; continue; }
+    if (inside && line.trim() === ':::') { inside = false; continue; }
+    if (inside) inCard.push(line);
+  }
+  return inCard;
+}

@@ -16,8 +16,7 @@ import {
   createDiagnostic,
   type Diagnostic,
 } from '../../domain/diagnostics/diagnostic.js';
-
-const FENCE = /^ {0,3}(```|~~~)/;
+import { isFenceLine } from '../../domain/syntax/fence.js';
 // Matches a heading with a trailing { ... } attr_list. Captures:
 //   group 1 = heading text (without leading hashes)
 //   group 2 = full attr_list body (inside the braces)
@@ -35,7 +34,7 @@ export function scanHeadingAnchors(
 
   for (const line of lines) {
     lineNumber += 1;
-    if (FENCE.test(line)) {
+    if (isFenceLine(line)) {
       inFence = !inFence;
       continue;
     }

@@ -61,4 +61,45 @@ describe('normalizeCriticMarkup', () => {
     expect(out).toContain('<mark>important</mark>');
     expect(out).toContain('==also==');
   });
+
+  it('rewrites a multi-paragraph {== … ==} highlight (crafty-documentation regression)', () => {
+    // Real-world: crafty-documentation/macos.md uses Critic to highlight
+    // a multi-paragraph note. A line-by-line normalizer cannot match
+    // `{==\n\nbody\n\n==}` because the regex never sees both delimiters
+    // at once. The opening `{==` then leaks into MDX where acorn rejects
+    // it with "Could not parse expression."
+    const src = [
+      'Some intro.',
+      '',
+      '{==',
+      '',
+      'The command above runs and you will see progress.',
+      '',
+      '==}',
+      '',
+      'Closing text.',
+      '',
+    ].join('\n');
+    const out = normalizeCriticMarkup(src);
+    expect(out).toContain('<mark>');
+    expect(out).toContain('</mark>');
+    expect(out).not.toContain('{==');
+    expect(out).not.toContain('==}');
+  });
+
+  it('does not match a critic span split by a fenced code block', () => {
+    // Spans must NOT cross fences — fence shielding is preserved by the
+    // per-block batching strategy.
+    const src = [
+      '{==',
+      '```',
+      'literal inside code',
+      '```',
+      '==}',
+      '',
+    ].join('\n');
+    const out = normalizeCriticMarkup(src);
+    expect(out).toContain('{==');
+    expect(out).toContain('==}');
+  });
 });

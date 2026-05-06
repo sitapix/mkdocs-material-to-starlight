@@ -18,11 +18,25 @@
  * in mkdocs.yml.
  */
 
+import { translateOgCanvasOptions } from './og-canvas-options.js';
+
 export interface OgEndpointInput {
   readonly siteName: string;
+  /** Raw `plugins.social.cards_layout_options` from mkdocs.yml. Translated
+   *  via `og-canvas-options.ts` into the `getImageOptions` literal so users
+   *  who customized their Material social cards keep their colors/fonts
+   *  on day one. Empty input → `getImageOptions` only emits title and
+   *  description (legacy behavior). */
+  readonly cardsLayoutOptions?: Readonly<Record<string, unknown>>;
 }
 
 export function serializeOgEndpoint(input: OgEndpointInput): string {
+  const layoutLiteral = serializeLayoutLiteral(input.cardsLayoutOptions);
+  // When layout options exist, splice them into `getImageOptions`'s return
+  // record. Otherwise emit the bare title/description form.
+  const getImageOptionsBody = layoutLiteral === ''
+    ? '    title: page.title,\n    description: page.description,'
+    : `    title: page.title,\n    description: page.description,\n${spreadLayout(layoutLiteral)}`;
   return [
     "import { OGImageRoute } from 'astro-og-canvas';",
     "import { getCollection } from 'astro:content';",
@@ -49,12 +63,28 @@ export function serializeOgEndpoint(input: OgEndpointInput): string {
     "  param: 'slug',",
     '  pages,',
     '  getImageOptions: (_, page) => ({',
-    '    title: page.title,',
-    '    description: page.description,',
+    getImageOptionsBody,
     '  }),',
     '});',
     '',
   ].join('\n');
+}
+
+function serializeLayoutLiteral(opts: Readonly<Record<string, unknown>> | undefined): string {
+  if (opts === undefined) return '';
+  const literal = translateOgCanvasOptions(opts);
+  return literal === '{}' ? '' : literal;
+}
+
+function spreadLayout(literal: string): string {
+  // Strip outer braces, indent each comma-separated field by 4 spaces so
+  // the resulting object literal stays clean and Prettier-stable.
+  const inner = literal.slice(1, -1).trim();
+  if (inner === '') return '';
+  return inner
+    .split(',')
+    .map((p) => `    ${p.trim()}`)
+    .join(',\n') + ',';
 }
 
 function quote(value: string): string {

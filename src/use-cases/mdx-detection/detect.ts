@@ -31,13 +31,18 @@ const STARLIGHT_BUILTINS: ReadonlySet<string> = new Set([
 ]);
 
 const IMPORT_RE = /^[ \t]*import\s+[^\n]+\bfrom\s+['"][^'"]+['"]/m;
-const JSX_TAG_RE = /<([A-Z][A-Za-z0-9]*)\b/g;
+// Match a JSX-shaped opening or self-closing tag. The name must be PascalCase
+// and contain only JSX-identifier-legal characters (no hyphens — those would
+// be invalid JSX), and the tag must terminate cleanly with `>` or `/>`. This
+// rejects prose placeholders like `<EXTERNAL-IP>:8080` and `<NAME>` that the
+// MDX parser would treat as broken component references.
+const JSX_TAG_RE = /<([A-Z][A-Za-z0-9]*)(\s[^<>]*?)?(\/?)>/g;
 const FRONTMATTER_EXPR_RE = /\{\s*frontmatter\.[A-Za-z_]/;
 const FENCED_CODE_RE = /```[\s\S]*?```/g;
 const INLINE_CODE_RE = /`[^`\n]*`/g;
 
-export type MdxExtension = 'md' | 'mdx';
-export type MdxReason = 'import-statement' | 'jsx-component' | 'frontmatter-expression';
+type MdxExtension = 'md' | 'mdx';
+type MdxReason = 'import-statement' | 'jsx-component' | 'frontmatter-expression';
 
 export interface MdxDecision {
   readonly extension: MdxExtension;
@@ -68,9 +73,27 @@ function collectComponents(stripped: string): ReadonlyArray<string> {
   const seen = new Set<string>();
   for (const match of stripped.matchAll(JSX_TAG_RE)) {
     const name = match[1] ?? '';
-    if (name.length > 0) seen.add(name);
+    if (name.length === 0) continue;
+    const selfClosing = match[3] === '/';
+    if (selfClosing) {
+      seen.add(name);
+      continue;
+    }
+    // Open tag without `/>` — only counts as JSX use if a matching closing
+    // tag exists. Otherwise it's prose like `<NAME>` and would crash MDX.
+    if (hasClosingTag(stripped, name)) {
+      seen.add(name);
+    }
   }
   return [...seen].sort();
+}
+
+function hasClosingTag(stripped: string, name: string): boolean {
+  return new RegExp(`</${escapeRegex(name)}\\s*>`).test(stripped);
+}
+
+function escapeRegex(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
 export function starlightBuiltins(): ReadonlySet<string> {

@@ -10,8 +10,9 @@
  * map; production code injects a node:fs adapter from `infrastructure/fs`.
  */
 
-import { ok, err, type Result } from '../../domain/result.js';
 import type { FileSystem } from '../../domain/ports/file-system.js';
+import { err, ok, type Result } from '../../domain/result.js';
+import { safeResolveWithin } from '../safety/safe-resolve.js';
 
 export interface SnippetResolveInput {
   readonly relativePath: string;
@@ -25,9 +26,12 @@ export interface ResolvedSnippet {
 }
 
 export interface SnippetNotFound {
-  readonly code: 'snippet-not-found';
+  readonly code: 'snippet-not-found' | 'snippet-path-unsafe';
   readonly relativePath: string;
   readonly searched: ReadonlyArray<string>;
+  /** Set when `code === 'snippet-path-unsafe'`: the base directory whose
+   *  containment check the candidate failed. */
+  readonly unsafeBase?: string;
 }
 
 export async function resolveSnippet(
@@ -37,10 +41,32 @@ export async function resolveSnippet(
   for (const base of input.basePaths) {
     const candidate = joinPath(base, input.relativePath);
     searched.push(candidate);
-    const read = await input.fs.readText(candidate);
-    if (read.ok) {
-      return ok({ absolutePath: candidate, content: read.value });
+    // Containment check: realpath both base and candidate, ensure the
+    // resolved candidate is anchored at the resolved base. Rejects symlink
+    // escapes (`docs/snippets/secret-link → /etc/passwd`) and `..` traversal
+    // in user-controlled snippet directives. We only enforce when the
+    // candidate exists on disk — non-existent candidates are a normal
+    // miss-and-try-next-base path.
+    if (await input.fs.exists(candidate)) {
+      const safe = await safeResolveWithin(base, candidate, input.fs);
+      if (!safe.ok) {
+        if (safe.error.code === 'path-escapes-base') {
+          return err({
+            code: 'snippet-path-unsafe',
+            relativePath: input.relativePath,
+            searched,
+            unsafeBase: base,
+          });
+        }
+        // base-not-resolvable / candidate-not-resolvable: treat as miss.
+        continue;
+      }
+      const read = await input.fs.readText(safe.value);
+      if (read.ok) {
+        return ok({ absolutePath: safe.value, content: read.value });
+      }
     }
+    // Candidate doesn't exist on disk in this base; fall through to next.
   }
   return err({
     code: 'snippet-not-found',

@@ -62,7 +62,7 @@ export interface SectionEntry {
   readonly children: ReadonlyArray<MkdocsNavEntry>;
 }
 
-export interface ExternalEntry {
+interface ExternalEntry {
   readonly kind: 'external';
   readonly title: string;
   readonly href: string;

@@ -13,7 +13,14 @@
  * via presence of Expressive Code keywords).
  */
 
-const FENCE_RE = /^([ \t]*```+)([^\n`]*?)$/gm;
+// Match a backtick-fenced opener and capture everything to end-of-line.
+// CommonMark §4.5 forbids backticks INSIDE a backtick-fence info string,
+// but real-world Material sources routinely break this rule by embedding
+// inline-code in attr_list titles (`title="something with \`ics\`"`).
+// We capture those lines anyway so we can strip the offending backticks
+// before they reach the parser — leaving the line unrecognised would
+// stringify the opener as escaped text and break the entire block.
+const FENCE_RE = /^([ \t]*```+)([^\n]*?)$/gm;
 
 const LINENUMS_RE = /\blinenums="(\d+)"/;
 const HL_LINES_RE = /\bhl_lines="([^"]+)"/;
@@ -130,7 +137,19 @@ function rewriteMaterialBraceBlock(rest: string): string | null {
   const inner = braceMatch[1] ?? '';
   if (NUMERIC_RANGE_RE.test(inner)) return null;
   const titleMatch = inner.match(BRACE_TITLE_RE);
-  const titleValue = titleMatch === null ? null : (titleMatch[1] ?? titleMatch[2] ?? '');
+  const rawTitle = titleMatch === null ? null : (titleMatch[1] ?? titleMatch[2] ?? '');
+  // CommonMark §4.5: a backtick fence's info string may NOT contain
+  // backticks. If we leave a `\`code\`` inline in the title, remark-parse
+  // refuses to treat the line as a fence opener — the entire block then
+  // round-trips as escaped-text-plus-stranded-fences, breaking the page.
+  // Real-world: pyodide-mkdocs-theme `python_libs.md` line 395 writes
+  //   ```python { title="Code d'un IDE attendant que `ics` soit installé" }
+  // The author wants the rendered title to read with `ics` highlighted,
+  // but the PyMdown attr_list block is the wrong place to embed that
+  // markup. Strip the fence-killing backticks (they would render as
+  // literal text in Expressive Code's title regardless).
+  const titleValue =
+    rawTitle === null ? null : rawTitle.replace(/`/g, '');
   // Strip the entire brace block — its non-title contents are Material-only
   // attributes (test=, lint=, upgrade=, etc.) that Expressive Code does not
   // recognize. The title, if any, is reattached outside the braces.

@@ -1,9 +1,8 @@
 /**
- * Pre-parse normalizer for Material for MkDocs grid HTML wrappers.
+ * Pre-parse normalizer for Material grid HTML wrappers.
  *
- * Material's grids are written as raw HTML. This normalizer rewrites them
- * into remark-directive container syntax so the downstream AST stage can
- * consume them like any other directive:
+ * Rewrites raw-HTML grids into remark-directive containers so downstream
+ * AST stages can consume them:
  *
  *   <div class="grid cards" markdown>     →    :::card-grid
  *   - card body                                 :::card
@@ -12,21 +11,17 @@
  *   </div>                                     :::
  *
  *   <div class="grid" markdown>            →    :::grid
- *   ...arbitrary blocks...                      ...arbitrary blocks...
- *   </div>                                     :::
  *
- * The card variant unwraps each top-level list item into a :::card directive,
- * UNLESS the card body is a single bare Markdown link — in that case it is
- * promoted directly to `<LinkCard title="..." href="...">` (Starlight native).
- * If the link is followed by a single plain-prose paragraph, that paragraph
- * is captured as the LinkCard's `description=` attribute.
+ * The card variant unwraps each top-level list item into a `:::card`. A
+ * card whose body is a single bare Markdown link is promoted to
+ * `<LinkCard title="..." href="...">`; a following plain-prose paragraph
+ * becomes the `description=` attribute.
  *
- * The generic variant simply wraps the body in :::grid. Unclosed grid blocks
- * are passed through verbatim — the caller may emit a diagnostic by searching
- * for unconverted `<div class="grid` patterns.
+ * The generic variant just wraps the body in `:::grid`. Unclosed blocks
+ * pass through; callers can emit a diagnostic by searching for any
+ * remaining `<div class="grid"`.
  *
- * Idempotent: directive output contains no `<div class="grid"` substring,
- * so the second pass finds nothing to rewrite. Fence-shielded.
+ * Idempotent (output has no `<div class="grid"`) and fence-shielded.
  */
 
 import {
@@ -34,8 +29,7 @@ import {
   isGridCloseLine,
   type GridOpening,
 } from '../../domain/syntax/grid-line.js';
-
-const FENCE = /^ {0,3}(```|~~~)/;
+import { isFenceLine } from '../../domain/syntax/fence.js';
 
 /**
  * Matches a bare Markdown link as the sole non-blank content of a card body.
@@ -63,7 +57,7 @@ export function normalizeCardGrids(source: string): string {
 
   while (i < lines.length) {
     const line = lines[i] ?? '';
-    if (FENCE.test(line)) {
+    if (isFenceLine(line)) {
       output.push(line);
       inFence = !inFence;
       i += 1;
@@ -86,7 +80,39 @@ export function normalizeCardGrids(source: string): string {
       i += 1;
       continue;
     }
-    output.push(...renderGrid(opening, block.bodyLines));
+    const rendered = renderGrid(opening, block.bodyLines);
+    if (rendered === null) {
+      // Card-grid body has no list markers — we can't emit a meaningful
+      // `:::card-grid` for it. Pass through the original opener, body,
+      // AND closer untouched so structurally-balanced HTML remains so.
+      // (griffe's `index.md` uses `<div markdown>` cards instead of `-`
+      // list items inside the grid.)
+      output.push(line);
+      output.push(...block.bodyLines);
+      output.push(lines[block.nextIndex - 1] ?? '</div>');
+      i = block.nextIndex;
+      continue;
+    }
+    // Emit a blank line before the directive opener if the preceding line
+    // is non-blank. CommonMark HTML blocks (e.g. `<div class="result"
+    // markdown>`) consume every following non-blank line as raw HTML
+    // — without this guard, the `::::card-grid` directive disappears
+    // inside the enclosing div and remark-directive never sees it,
+    // leaving every `:fontawesome-…` icon shortcode and every `:::card`
+    // marker as visible literal text. Real mkdocs-material regression
+    // (`reference/grids.md` nested `<div class="result"><div class="grid cards">`).
+    const previousLine = output[output.length - 1];
+    if (previousLine !== undefined && previousLine.trim().length > 0) {
+      output.push('');
+    }
+    output.push(...rendered);
+    // Symmetric guard on the closing side: if the next non-emitted line is
+    // non-blank (e.g. `</div>` of an outer wrapper), inject a blank so the
+    // directive closer isn't merged into the wrapper's HTML block either.
+    const nextLine = lines[block.nextIndex];
+    if (nextLine !== undefined && nextLine.trim().length > 0) {
+      output.push('');
+    }
     i = block.nextIndex;
   }
 
@@ -116,7 +142,7 @@ function readGridBody(
 function renderGrid(
   opening: GridOpening,
   bodyLines: ReadonlyArray<string>,
-): ReadonlyArray<string> {
+): ReadonlyArray<string> | null {
   const indent = ' '.repeat(opening.indent);
   if (opening.kind === 'cards') {
     return renderCardGrid(indent, bodyLines);
@@ -131,9 +157,17 @@ function renderGrid(
 function renderCardGrid(
   indent: string,
   bodyLines: ReadonlyArray<string>,
-): ReadonlyArray<string> {
-  const out: string[] = [`${indent}::::card-grid`];
+): ReadonlyArray<string> | null {
   const items = splitListItems(bodyLines);
+  // If the body has no list markers, we can't split it into cards. The
+  // source likely uses nested `<div markdown>` blocks instead of `-` items
+  // (griffe's `index.md` regression). Return null so the caller leaves the
+  // entire div block — opener, body, AND closer — untouched. Otherwise we'd
+  // emit an empty `::::card-grid` and orphan the inner `</div>` closers.
+  if (items.length === 0) {
+    return null;
+  }
+  const out: string[] = [`${indent}::::card-grid`];
   for (const item of items) {
     // Dedent the card body to remove excess leading whitespace. Without
     // dedenting, lines with 4+ spaces of indent are treated as CommonMark
@@ -338,16 +372,46 @@ function trimTrailingBlanks(item: ReadonlyArray<string>): ReadonlyArray<string> 
 }
 
 /**
- * Strip the common leading indentation from all non-blank lines so card body
- * content starts at column 0. This prevents 4-space-indented lines from being
- * misread as CommonMark indented code blocks.
+ * Strip leading indentation so a card's body sits at column 0 and is not
+ * misread as a CommonMark indented code block.
+ *
+ * Two-pass dedent:
+ *   1. Title strip: dedent every line by the smallest indent in the item.
+ *      Flushes the title to column 0 even when nested in an outer container.
+ *   2. Body shift: lines still indented deeper than the title (Material's
+ *      list-item body alignment) shift down so their minimum indent matches
+ *      the title. Relative depth among body lines is preserved so nested
+ *      lists keep their structure.
+ *
+ * Guards against PowerTools `index.md` (title at 0, body at 4 → `<pre>`)
+ * and the same shape inside a nested grid where the outer 2-space indent
+ * masked the inner 4-space body.
  */
 function dedentLines(lines: ReadonlyArray<string>): ReadonlyArray<string> {
   const nonBlank = lines.filter((l) => l.trim().length > 0);
   if (nonBlank.length === 0) return lines;
-  const minIndent = Math.min(
-    ...nonBlank.map((l) => (l.match(/^ */)?.[0] ?? '').length),
-  );
-  if (minIndent === 0) return lines;
-  return lines.map((l) => (l.trim().length === 0 ? '' : l.slice(minIndent)));
+  const indents = nonBlank.map((l) => (l.match(/^ */)?.[0] ?? '').length);
+  const titleIndent = Math.min(...indents);
+
+  // Step 1: title-strip. Flushes the item to column 0 when nested inside
+  // an outer container.
+  const afterTitle = titleIndent === 0
+    ? lines.slice()
+    : lines.map((l) => (l.trim().length === 0 ? '' : l.slice(titleIndent)));
+
+  // Step 2: body-shift. Body lines = anything deeper than the title. If the
+  // body lines all share an indent ≥ 1, slide them down by that amount so
+  // they collapse to column 0 (the title's new column).
+  const bodyDepths = indents
+    .filter((n) => n > titleIndent)
+    .map((n) => n - titleIndent);
+  if (bodyDepths.length === 0) return afterTitle;
+  const bodyShift = Math.min(...bodyDepths);
+  if (bodyShift === 0) return afterTitle;
+  return afterTitle.map((l) => {
+    if (l.trim().length === 0) return '';
+    const lead = (l.match(/^ */)?.[0] ?? '').length;
+    // Title-at-column-0 lines stay; deeper lines slide down by bodyShift.
+    return lead === 0 ? l : l.slice(bodyShift);
+  });
 }

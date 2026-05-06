@@ -17,7 +17,7 @@ import { quoteYamlScalar } from '../../domain/syntax/yaml-scalar.js';
  * Idempotent: pages already carrying `template: splash` pass through. Pure.
  */
 
-export interface HeroFrontmatter {
+interface HeroFrontmatter {
   readonly title?: string;
   readonly tagline?: string;
   readonly image?: { readonly file: string };

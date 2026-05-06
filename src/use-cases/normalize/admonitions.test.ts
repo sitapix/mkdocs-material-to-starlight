@@ -196,4 +196,26 @@ describe('normalizeAdmonitions', () => {
     ].join('\n');
     expect(normalizeAdmonitions(src)).toBe(expected);
   });
+
+  it('does NOT treat ```info`opener-and-closer``` on the same line as a fence opener', () => {
+    // Real-world pydantic-ai regression: `examples/slack-lead-qualifier.md`
+    // contains `​`​`​`​`​snippet {path="..."}​`​`​`​`​`​` (three backticks at start
+    // AND end of line — that's CommonMark inline code with three-backtick
+    // delimiters, not a fenced block). The old `/^ {0,3}(`​`​`​|~~~)/` regex
+    // saw the leading backticks and toggled `inFence`, causing every
+    // subsequent admonition to be skipped (silently passed through unchanged).
+    const tick = '`';
+    const triple = tick + tick + tick;
+    const src = [
+      `${triple}snippet {path="/x.py" fragment="foo"}${triple}`,
+      '',
+      '!!! note',
+      '    Body content.',
+      '',
+    ].join('\n');
+    const result = normalizeAdmonitions(src);
+    // The admonition MUST be converted — directive marker (`::::::note`).
+    expect(result).toMatch(/^:{6,}note/m);
+    expect(result).not.toMatch(/^!!! note/m);
+  });
 });

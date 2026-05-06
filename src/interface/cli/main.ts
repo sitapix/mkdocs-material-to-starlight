@@ -14,25 +14,34 @@
 
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { parseArgs } from './parse-args.js';
+import {
+  getTranslationDepth,
+  type MappingRow,
+  type TranslationDepth,
+} from '../../domain/conversion-mapping/table.js';
+import { getAllRegisteredRuleIds } from '../../domain/diagnostics/registry.js';
+import type { BrowserAutomator } from '../../domain/ports/browser-automator.js';
+import type { ImageDiffer } from '../../domain/ports/image-differ.js';
+import type { ProcessRunner } from '../../domain/ports/process-runner.js';
+import type { DiffPair } from '../../domain/visual-diff/page-diff.js';
+import { createPlaywrightAutomator } from '../../infrastructure/browser/playwright-automator.js';
 import { resolveInteractivity } from '../../infrastructure/env/tty-detection.js';
-import { formatReport } from './format-report.js';
-import { convertSiteFromDisk } from '../api/convert-site.js';
-import { createJsYamlDecoder } from '../../infrastructure/yaml/js-yaml-decoder.js';
+import { atomicWriteText } from '../../infrastructure/fs/atomic-write.js';
+import { createNodeConfigDiscoverer } from '../../infrastructure/fs/node-config-discoverer.js';
+import { createNodeFileSystem } from '../../infrastructure/fs/node-file-system.js';
+import { createPixelmatchDiffer } from '../../infrastructure/image/pixelmatch-differ.js';
 import { createNodeProcessRunner } from '../../infrastructure/process/node-process-runner.js';
+import { createJsYamlDecoder } from '../../infrastructure/yaml/js-yaml-decoder.js';
 import { parseMkdocsConfig } from '../../use-cases/config/parse-mkdocs.js';
+import type { TaggedDiagnostic } from '../../use-cases/convert-site/convert.js';
+import { resolveProjectDir } from '../../use-cases/discover-config/resolve-project-dir.js';
 import { explainConversion } from '../../use-cases/explain-conversion/explain.js';
 import { runAstroCheck } from '../../use-cases/validate-output/run-astro-check.js';
 import { compareSites } from '../../use-cases/visual-diff/compare.js';
 import { serializeVisualDiffReport } from '../../use-cases/visual-diff/serialize-report.js';
-import { createPlaywrightAutomator } from '../../infrastructure/browser/playwright-automator.js';
-import { createPixelmatchDiffer } from '../../infrastructure/image/pixelmatch-differ.js';
-import { writeFile } from 'node:fs/promises';
-import type { ProcessRunner } from '../../domain/ports/process-runner.js';
-import type { BrowserAutomator } from '../../domain/ports/browser-automator.js';
-import type { ImageDiffer } from '../../domain/ports/image-differ.js';
-import type { DiffPair } from '../../domain/visual-diff/page-diff.js';
-import type { TaggedDiagnostic } from '../../use-cases/convert-site/convert.js';
+import { convertSiteFromDisk } from '../api/convert-site.js';
+import { formatReport } from './format-report.js';
+import { parseArgs } from './parse-args.js';
 
 export interface CliIo {
   readonly stdout: (line: string) => void;
@@ -134,9 +143,9 @@ export async function runCli(
     const wizard = await runWizardFlow(process.cwd(), io);
     if (wizard.kind === 'cancelled') return 130;
     if (wizard.kind === 'non-interactive') return 2;
-    io.stdout(
-      `Equivalent command: mkdocs-material-to-starlight ${wizard.equivalentFlags.join(' ')}`,
-    );
+    // The equivalent command is rendered inside the wizard via prompter.note,
+    // so the user sees it framed with the rest of the wizard output instead of
+    // mixed with the diagnostic report.
     return runConvert(wizard.command, io, overrides);
   }
 
@@ -163,11 +172,49 @@ export async function runCli(
   }
 }
 
+// Reverse-index of registered rule IDs by their `relatedFeatureId`. Built
+// once at module load so `--explain` can list every diagnostic that ties
+// back to a given mapping row in O(1) per row.
+const relatedRuleIdsByFeature: ReadonlyMap<string, ReadonlyArray<string>> = (() => {
+  const map = new Map<string, string[]>();
+  for (const entry of getAllRegisteredRuleIds()) {
+    if (entry.relatedFeatureId === undefined) continue;
+    const list = map.get(entry.relatedFeatureId) ?? [];
+    list.push(entry.id);
+    map.set(entry.relatedFeatureId, list);
+  }
+  return map;
+})();
+
 async function runExplain(projectDir: string, io: CliIo): Promise<number> {
   const yaml = createJsYamlDecoder();
+  // Resolve the effective project directory the same way `convertSiteFromDisk`
+  // does: try `<dir>/mkdocs.yml` first, fall back to bounded discovery so
+  // `--explain` against a wrapper directory is just as forgiving.
+  const fs = createNodeFileSystem();
+  const discoverer = createNodeConfigDiscoverer();
+  const resolved = await resolveProjectDir(projectDir, fs, discoverer);
+  if (!resolved.ok) {
+    if (resolved.error.kind === 'ambiguous') {
+      io.stderr(`error: multiple mkdocs.yml found under ${resolved.error.searchedDir}:`);
+      for (const c of resolved.error.candidates) {
+        io.stderr(`  - ${c}`);
+      }
+      io.stderr(`Re-run --explain pointing at the intended subdirectory directly.`);
+      return 1;
+    }
+    io.stderr(`error: mkdocs.yml not found under ${projectDir}.`);
+    return 1;
+  }
+  const effectiveDir = resolved.value.projectDir;
+  if (resolved.value.autoDiscovery !== null) {
+    io.stderr(
+      `note: auto-discovered ${resolved.value.autoDiscovery.discoveredRelPath} (no mkdocs.yml at ${projectDir}).`,
+    );
+  }
   let configText: string;
   try {
-    configText = await readFile(join(projectDir, 'mkdocs.yml'), 'utf8');
+    configText = await readFile(join(effectiveDir, 'mkdocs.yml'), 'utf8');
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     io.stderr(`error: could not read mkdocs.yml: ${message}`);
@@ -184,15 +231,52 @@ async function runExplain(projectDir: string, io: CliIo): Promise<number> {
     return 1;
   }
   const rows = explainConversion(config.value);
-  io.stdout(`Conversion plan for ${projectDir} — ${rows.length} rows will fire:`);
+  io.stdout(`Conversion plan for ${effectiveDir} — ${rows.length} rows will fire:`);
   io.stdout('');
   for (const row of rows) {
-    io.stdout(`[${row.featureId}] (${row.risk}, ${row.conversionType}, .${row.fileExt})`);
+    const depth = getTranslationDepth(row);
+    const ruleIds = relatedRuleIdsByFeature.get(row.featureId);
+    const ruleSummary =
+      ruleIds === undefined || ruleIds.length === 0 ? '' : ` · diagnostics: ${ruleIds.join(', ')}`;
+    io.stdout(
+      `[${row.featureId}] (${row.risk} risk · ${row.conversionType} · depth: ${depth} · .${row.fileExt})${ruleSummary}`,
+    );
     io.stdout(`  in : ${row.materialInput}`);
     io.stdout(`  out: ${row.starlightOutput}`);
     io.stdout('');
   }
+  // Group summary by translation depth so the user sees at a glance how many
+  // rows are full-fidelity vs lossy vs manual. Helps set expectations before
+  // a long build.
+  const counts = countDepths(rows);
+  io.stdout(
+    `Summary by depth: ` +
+      `full=${String(counts.full)}, ` +
+      `recommend-dep=${String(counts['recommend-dep'])}, ` +
+      `passthrough=${String(counts.passthrough)}, ` +
+      `lossy-named=${String(counts['lossy-named'])}, ` +
+      `manual=${String(counts.manual)}`,
+  );
+  if (counts['lossy-named'] > 0 || counts.manual > 0) {
+    io.stdout(
+      'Note: `lossy-named` and `manual` rows surface diagnostics in MIGRATION_NOTES.md after conversion.',
+    );
+  }
   return 0;
+}
+
+function countDepths(rows: ReadonlyArray<MappingRow>): Record<TranslationDepth, number> {
+  const out: Record<TranslationDepth, number> = {
+    full: 0,
+    'lossy-named': 0,
+    passthrough: 0,
+    'recommend-dep': 0,
+    manual: 0,
+  };
+  for (const row of rows) {
+    out[getTranslationDepth(row)] += 1;
+  }
+  return out;
 }
 
 interface ConvertCommand {
@@ -262,7 +346,9 @@ async function runConvert(
     ...(command.noAutoAppend ? { noAutoAppend: true } : {}),
     ...(command.snippetMaxDepth !== null ? { snippetMaxDepth: command.snippetMaxDepth } : {}),
     ...(command.snippetDedentSubsections ? { snippetDedentSubsections: true } : {}),
-    ...(command.expressiveCodeTheme !== null ? { expressiveCodeTheme: command.expressiveCodeTheme } : {}),
+    ...(command.expressiveCodeTheme !== null
+      ? { expressiveCodeTheme: command.expressiveCodeTheme }
+      : {}),
     ...(command.admonitionMapPath !== null ? { admonitionMapPath: command.admonitionMapPath } : {}),
     ...(command.extraAssets.length > 0 ? { extraAssets: command.extraAssets } : {}),
     ...(command.locales.length > 0 ? { locales: command.locales } : {}),
@@ -275,11 +361,14 @@ async function runConvert(
     return 1;
   }
   const conversionDiagnostics = result.value.diagnostics;
-  const checkDiagnostics = command.check
-    ? await runCheckPass(command, overrides)
-    : [];
-  io.stdout(formatReport([...conversionDiagnostics, ...checkDiagnostics]));
-  return checkDiagnostics.some((d) => d.diagnostic.severity === 'error') ? 1 : 0;
+  const checkDiagnostics = command.check ? await runCheckPass(command, overrides) : [];
+  const allDiagnostics = [...conversionDiagnostics, ...checkDiagnostics];
+  io.stdout(formatReport(allDiagnostics));
+  // CI-meaningful exit code: any error-severity diagnostic — whether emitted
+  // by the converter (e.g. output-syntax-error after MDX validation) or by
+  // astro check — means the generated project will not build. A clean exit 0
+  // here would silently ship broken output to consumers.
+  return allDiagnostics.some((d) => d.diagnostic.severity === 'error') ? 1 : 0;
 }
 
 interface CompareCommand {
@@ -310,21 +399,16 @@ async function runCompare(
   });
   const text = serializeVisualDiffReport(report);
   if (command.reportPath !== null) {
-    try {
-      await writeFile(command.reportPath, text, 'utf8');
-    } catch (cause) {
-      const message = cause instanceof Error ? cause.message : String(cause);
-      io.stderr(`error: failed to write ${command.reportPath}: ${message}`);
+    const written = await atomicWriteText(command.reportPath, text);
+    if (!written.ok) {
+      io.stderr(`error: ${written.error}`);
       return 1;
     }
     io.stdout(`wrote ${command.reportPath}`);
   } else {
     io.stdout(text);
   }
-  return report.summary.mismatched +
-    report.summary.captureFailed +
-    report.summary.diffFailed >
-    0
+  return report.summary.mismatched + report.summary.captureFailed + report.summary.diffFailed > 0
     ? 1
     : 0;
 }

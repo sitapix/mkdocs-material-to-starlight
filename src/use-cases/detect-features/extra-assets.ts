@@ -2,24 +2,19 @@
  * Extract `extra_css` and `extra_javascript` lists from the parsed
  * mkdocs.yml extras dict.
  *
- * Material accepts both forms for `extra_javascript`:
+ * Material accepts two forms for `extra_javascript`:
  *
  *   extra_javascript:
- *     - js/custom.js                # bare string
- *     - path: js/module.js           # object form
- *       type: module
- *       async: true
- *       defer: false
+ *     - js/custom.js                       # bare string
+ *     - { path: js/m.js, type: module, async: true, defer: false }
  *
- * The bare-string form is short for `{ path: '...' }`. The object form's
- * `type`/`async`/`defer` map directly onto HTML script attrs.
+ * Bare-string is short for `{ path: '...' }`. The object form's `type`,
+ * `async`, `defer` map onto HTML script attrs.
  *
- * Pure: takes the extras dict, returns parsed CSS paths + structured JS
- * entries. Both lists preserve source order. Unparseable entries are
- * skipped silently. No I/O.
+ * Pure. Both lists preserve source order; unparseable entries are skipped.
  */
 
-export interface ExtraJsEntry {
+interface ExtraJsEntry {
   readonly src: string;
   readonly type?: 'module';
   readonly async?: boolean;

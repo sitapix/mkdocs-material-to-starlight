@@ -1,31 +1,23 @@
 /**
  * Pre-parse normalizer: rewrite `pymdownx.blocks.*` fenced blocks into
- * remark-directive container syntax. Pure text → text, no AST involved.
+ * remark-directive container syntax. Pure text-to-text, no AST.
  *
- * Material for MkDocs is moving away from indentation-sensitive admonition
- * syntax (`!!! note`, `??? details`, `=== "Tab"`) to the unified
- * `pymdownx.blocks.*` family of fenced blocks:
+ * Material is moving from indented admonitions (`!!! note`, `??? details`,
+ * `=== "Tab"`) to fenced blocks:
  *
  *   /// note | Title
  *   body
  *   ///
  *
- * Like fenced code, the closing fence must use the same number of slashes as
- * the opener (>= 3). Body lines do **not** need to be indented; the fence
- * delimiter alone scopes the block. This normalizer recognizes the fenced
- * form and emits the equivalent `:::name[Title]` ... `:::` directive markup,
- * which the unified pipeline then parses without further special-casing.
+ * The closing fence uses the same number of slashes (>= 3); body lines need
+ * no indent. The normalizer emits `:::name[Title]` ... `:::` directive
+ * markup, which the unified pipeline parses directly.
  *
  * Tab grouping: consecutive sibling `/// tab | Title` blocks at the same
- * indent (separated only by blank lines) are wrapped in a single `::::tabs`
- * parent, matching the legacy `=== "Title"` normalizer's output shape so the
- * downstream tab-transform handles both grammars uniformly.
+ * indent (only blank lines between) are wrapped in `::::tabs`, matching
+ * the legacy `=== "Title"` shape so the tab-transform stays uniform.
  *
- * Idempotency: only `///`-prefixed lines are recognized; output that already
- * uses `:::` directive syntax is passed through untouched.
- *
- * Fenced-code safety: lines inside triple-backtick fences are preserved
- * verbatim, so a `/// note` example inside a code block is not rewritten.
+ * Idempotent (only `///`-prefixed lines are recognized) and fence-safe.
  */
 
 import {
@@ -33,8 +25,8 @@ import {
   type BlocksOpening,
 } from '../../domain/syntax/blocks-line.js';
 import { ADMONITION_FENCE_DEPTH } from './admonitions.js';
+import { isFenceLine } from '../../domain/syntax/fence.js';
 
-const FENCE = /^ {0,3}(```|~~~)/;
 const TAB_NAME = 'tab';
 const DETAILS_NAME = 'details';
 const CAPTION_NAME = 'caption';
@@ -96,7 +88,7 @@ function normalizeBlocksRec(lines: ReadonlyArray<string>): NormalizedBlocks {
   while (i < lines.length) {
     const line = lines[i] ?? '';
 
-    if (FENCE.test(line)) {
+    if (isFenceLine(line)) {
       output.push(line);
       inFence = !inFence;
       i += 1;

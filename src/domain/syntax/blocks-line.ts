@@ -1,9 +1,8 @@
 /**
  * Parse a single line as a `pymdownx.blocks.*` opening or closing.
  *
- * Material for MkDocs is migrating from legacy syntax (`!!! note`, `=== "Tab"`,
- * `??? details`) to the unified `pymdownx.blocks.*` family, which uses 3+ slash
- * fences:
+ * Material is migrating from legacy syntax (`!!! note`, `=== "Tab"`,
+ * `??? details`) to the unified `pymdownx.blocks.*` family on 3+ slash fences:
  *
  *   /// admonition | Title
  *       type: note
@@ -11,17 +10,15 @@
  *   body
  *   ///
  *
- * Or, more commonly, a named-shortcut form recognized by `blocks.admonition`,
- * `blocks.details`, `blocks.tab`, `blocks.definition`, `blocks.html`,
- * `blocks.caption`:
+ * The named-shortcut form is more common (`blocks.admonition`, `blocks.details`,
+ * `blocks.tab`, `blocks.definition`, `blocks.html`, `blocks.caption`):
  *
  *   /// note | Title
  *   body
  *   ///
  *
- * Like fenced code blocks, the opener and matching closer must use the same
- * number of slashes (>= 3). Returns `null` when the line is not a recognized
- * blocks fence; pure value transformation, no side effects.
+ * Opener and closer use the same slash count (>= 3). Returns `null` for a
+ * non-fence line. Pure.
  */
 
 export interface BlocksOpening {
@@ -32,7 +29,7 @@ export interface BlocksOpening {
   readonly indent: number;
 }
 
-export interface BlocksClosing {
+interface BlocksClosing {
   readonly kind: 'close';
   readonly fenceLength: number;
   readonly indent: number;

@@ -55,4 +55,59 @@ describe('normalizeStandardEmoji', () => {
       'Use `:smile:` here.',
     );
   });
+
+  it('replaces :red_circle:, :green_circle:, :yellow_circle: status markers', () => {
+    expect(normalizeStandardEmoji(':red_circle: :green_circle: :yellow_circle:')).toBe(
+      '🔴 🟢 🟡',
+    );
+  });
+
+  it('tolerates backslash-escaped underscores from remark-stringify (`:red\\_circle:`)', () => {
+    // After remark-stringify processes a markdown table cell, underscores get
+    // backslash-escaped. Without this tolerance, real Material site content
+    // like `| :red\_circle: This page... |` would render as literal text.
+    expect(normalizeStandardEmoji(':red\\_circle:')).toBe('🔴');
+    expect(normalizeStandardEmoji(':white\\_check\\_mark:')).toBe('✅');
+  });
+
+  it('replaces :+1: and :-1: keypad shortcodes', () => {
+    expect(normalizeStandardEmoji(':+1:')).toBe('👍');
+    expect(normalizeStandardEmoji(':-1:')).toBe('👎');
+  });
+
+  it('replaces common arrow shortcodes', () => {
+    expect(normalizeStandardEmoji(':arrow_up: :arrow_right:')).toBe('⬆️ ➡️');
+  });
+
+  describe('Starlight icon fallback', () => {
+    it('emits <Icon> JSX with `sl-inline-icon` class for shortcodes that match a Starlight icon name', () => {
+      // `bitbucket`, `mastodon`, `discord` are Starlight icon names but not
+      // standard GitHub emojis. The fallback emits `<Icon class="sl-inline-icon" />`;
+      // the converter's stylesheet shim restores inline-block layout so
+      // Starlight's default `display: block` for SVGs in markdown content
+      // doesn't break the icon onto its own line.
+      expect(normalizeStandardEmoji(':bitbucket:')).toBe(
+        '<Icon name="bitbucket" class="sl-inline-icon" />',
+      );
+      expect(normalizeStandardEmoji(':mastodon:')).toBe(
+        '<Icon name="mastodon" class="sl-inline-icon" />',
+      );
+    });
+
+    it('prefers gemoji emoji over Starlight icon when both have the name', () => {
+      // `rocket` is in BOTH gemoji (🚀) and Starlight icons. gemoji wins.
+      expect(normalizeStandardEmoji(':rocket:')).toBe('🚀');
+    });
+
+    it('still passes through GitHub-custom emojis with no Unicode and no icon', () => {
+      // `:octocat:` is GitHub-only (PNG asset). Not in gemoji, not in
+      // Starlight's icon set, so it stays as literal text.
+      expect(normalizeStandardEmoji(':octocat:')).toBe(':octocat:');
+    });
+
+    it('does not emit Icon JSX inside fenced code', () => {
+      const src = '```\n:bitbucket:\n```\n';
+      expect(normalizeStandardEmoji(src)).toBe(src);
+    });
+  });
 });

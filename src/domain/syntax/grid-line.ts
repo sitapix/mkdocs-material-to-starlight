@@ -11,7 +11,7 @@
  * companion `isGridCloseLine` recognizes the closing tag.
  */
 
-export type GridKind = 'cards' | 'generic';
+type GridKind = 'cards' | 'generic';
 
 export interface GridOpening {
   readonly kind: GridKind;

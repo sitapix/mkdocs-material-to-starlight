@@ -40,7 +40,7 @@ export function validateFrontmatter(source: string): ReadonlyArray<Diagnostic> {
         diagnostics.push({
           ruleId: 'unknown-frontmatter-field',
           severity: 'warning',
-          message: `frontmatter field "${key}" is not in Starlight's docsSchema; the build will fail unless docsSchema is extended in src/content.config.ts`,
+          message: `frontmatter field "${key}" is not in Starlight's docsSchema — auto-extended in src/content.config.ts with an inferred Zod type; review and tighten if needed`,
           source: 'validate-output/frontmatter',
           place: { line: line + 1, column: 1 },
         });

@@ -14,7 +14,7 @@
  *                        (e.g., dimension mismatch)
  */
 
-export type PageDiffStatus = 'match' | 'mismatch' | 'capture-failed' | 'diff-failed';
+type PageDiffStatus = 'match' | 'mismatch' | 'capture-failed' | 'diff-failed';
 
 export interface DiffPair {
   /** Stable identifier shown in the report (typically the URL path). */

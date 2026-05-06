@@ -1,27 +1,25 @@
 /**
  * Pure parser for `mkdocs-literate-nav` SUMMARY.md files.
  *
- * Translates the plugin's Markdown-list navigation format into the same
- * `MkdocsNavEntry[]` tree the YAML `nav:` parser produces, so the downstream
- * compile-navigation pipeline is unchanged.
+ * Translates the plugin's Markdown-list nav format into the same
+ * `MkdocsNavEntry[]` tree the YAML `nav:` parser produces, so the
+ * compile-navigation pipeline stays unchanged.
  *
- * Recognized shapes:
- *   * [Label](page.md)            → FileEntry
- *   * [Label](https://example)    → ExternalEntry
- *   * Label                       → SectionEntry (children come from nested list)
+ * Shapes:
+ *   * [Label](page.md)         → FileEntry
+ *   * [Label](https://...)     → ExternalEntry
+ *   * Label                    → SectionEntry (children from nested list)
  *     * [Child](child.md)
- *   * [Label](page.md)            → SectionEntry titled "Label" (link text wins)
+ *   * [Label](page.md)         → SectionEntry titled "Label"
  *     * [Child](child.md)
  *
- * Limitations (scoped for Phase 1):
- *   - Only the FIRST top-level list in the file is consumed; everything else
- *     (headings, prose, footer lists) is ignored.
- *   - The "directory pointer" form `[Section](dir/)` (which mkdocs-literate-nav
- *     resolves by reading `dir/SUMMARY.md`) is parsed as a plain FileEntry —
- *     wiring per-directory recursion is a follow-up.
+ * Limitations (Phase 1):
+ *   - Only the first top-level list in the file is consumed.
+ *   - `[Section](dir/)` (which mkdocs-literate-nav recurses into
+ *     `dir/SUMMARY.md`) is parsed as a plain FileEntry; recursion is a
+ *     follow-up.
  *
- * Pure: takes a Markdown source string, returns the nav tree plus diagnostics
- * for unparseable items. Never throws.
+ * Pure. Returns diagnostics for unparseable items. Never throws.
  */
 
 import { unified } from 'unified';

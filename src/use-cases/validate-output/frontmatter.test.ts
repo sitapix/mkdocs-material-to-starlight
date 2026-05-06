@@ -20,6 +20,18 @@ describe('validateFrontmatter', () => {
     expect(diagnostics[0]?.severity).toBe('warning');
   });
 
+  it('says the schema is auto-extended (not "build will fail")', () => {
+    // Once the converter started auto-extending src/content.config.ts with
+    // inferred Zod types for every unknown frontmatter field, the old
+    // "build will fail" wording became misleading.
+    const source = '---\ntitle: X\ntags: [a]\n---\n';
+    const diagnostics = validateFrontmatter(source);
+    expect(diagnostics[0]?.message).not.toContain('build will fail');
+    expect(diagnostics[0]?.message.toLowerCase()).toMatch(
+      /auto-extend|auto extended|content\.config\.ts/,
+    );
+  });
+
   it('flags multiple unknown fields independently', () => {
     const source = '---\ntitle: X\ntags: [a]\nauthors: [bob]\nfoo: 1\n---\n';
     const diagnostics = validateFrontmatter(source);

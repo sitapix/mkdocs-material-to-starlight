@@ -55,11 +55,15 @@ function renderSlug(entry: SlugEntry): string {
   // real Astro slug for `src/content/docs/index.md`. Emitting a `{ link: '/' }`
   // form is the documented Starlight pattern for linking to the root from a
   // sidebar entry — it bypasses the slug resolver entirely.
+  //
+  // Starlight's link-entry schema requires a `label`. When the source nav
+  // omitted it (`- index.md` with no inline label), default to 'Overview'
+  // so the config validates rather than crashing on container start. Real-
+  // world: PowerTools `mkdocs.yml` declares `Homepage: [index.md, ...]`
+  // and the implicit label for `index.md` would otherwise be missing.
   if (entry.slug === '') {
-    if (entry.label === undefined) {
-      return `{ link: '/' }`;
-    }
-    return `{ label: ${quote(entry.label)}, link: '/' }`;
+    const label = entry.label ?? 'Overview';
+    return `{ label: ${quote(label)}, link: '/' }`;
   }
   if (entry.label === undefined) {
     return quote(entry.slug);

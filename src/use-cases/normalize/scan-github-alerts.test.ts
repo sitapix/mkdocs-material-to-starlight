@@ -49,9 +49,24 @@ describe('scanGithubAlerts', () => {
     expect(diagnostics).toHaveLength(0);
   });
 
-  it('is case-sensitive — lowercase alert types are not matched (matches GitHub spec)', () => {
+  it('matches lowercase alert types so PyMdown `quotes` callouts route through the same handler', () => {
+    // GitHub spec uses uppercase; PyMdown's `pymdownx.quotes` extension uses
+    // lowercase (`> [!note]`) for callouts. starlight-github-alerts handles
+    // both, so the scanner detects both forms.
     const source = '> [!note]\n> Body\n';
-    expect(scanGithubAlerts(source)).toHaveLength(0);
+    const diagnostics = scanGithubAlerts(source);
+    expect(diagnostics).toHaveLength(1);
+    expect(diagnostics[0]?.message).toContain('note');
+  });
+
+  it('matches the optional collapse suffix (`[!warning]-` / `[!warning]+`) PyMdown callouts use', () => {
+    const source = '> [!warning]-\n> collapsed body\n';
+    expect(scanGithubAlerts(source)).toHaveLength(1);
+  });
+
+  it('matches an alert with inline title text after the type marker', () => {
+    const source = '> [!tip] Custom Title Here\n> body\n';
+    expect(scanGithubAlerts(source)).toHaveLength(1);
   });
 
   it('does not match alert syntax inside fenced code blocks', () => {

@@ -14,7 +14,7 @@
  * screen-reader / monochrome terminals still receive the same text content.
  */
 
-export interface SelectChoice<V extends string> {
+interface SelectChoice<V extends string> {
   readonly value: V;
   readonly label: string;
   readonly hint?: string;

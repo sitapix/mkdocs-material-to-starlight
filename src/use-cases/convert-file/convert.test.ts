@@ -16,9 +16,17 @@ describe('convertFile', () => {
       sourcePath: 'index.md',
       slugMap: map,
     });
-    expect(out.text).toContain('# Heading');
+    // The body H1 is stripped because it matches the synthesized
+    // frontmatter `title:` — Starlight auto-renders the title; leaving
+    // the body H1 produces a visible duplicate. The title survives in
+    // frontmatter; only the body H1 is dropped, and a `duplicate-h1-stripped`
+    // info diagnostic is emitted so MIGRATION_NOTES.md audits the change.
+    expect(out.text).toContain('title: Heading');
+    expect(out.text).not.toMatch(/^# Heading\b/m);
     expect(out.text).toContain('A paragraph.');
-    expect(out.diagnostics).toEqual([]);
+    const nonInfo = out.diagnostics.filter((d) => d.ruleId !== 'duplicate-h1-stripped');
+    expect(nonInfo).toEqual([]);
+    expect(out.diagnostics.some((d) => d.ruleId === 'duplicate-h1-stripped')).toBe(true);
   });
 
   it('normalizes a Material admonition into a Starlight aside directive', () => {
@@ -241,5 +249,72 @@ describe('convertFile', () => {
     expect(out.text).toMatch(/:::caution|<aside[^>]*caution/);
     expect(out.text).toContain('Block syntax.');
     expect(out.text).not.toContain('///');
+  });
+
+  describe('PyMdown attr_list strip diagnostics (MDX path)', () => {
+    // Once a file is promoted to .mdx, our text-level sanitizer drops bare
+    // `{ .class }` lines and inline `{ .class #id key=val }` blocks because
+    // MDX would otherwise try to acorn-parse them as JavaScript and crash.
+    // Users need to know which presentation attributes were lost — silent
+    // strips violate the "diagnostics over throws" discipline.
+
+    it('emits `block-attr-list-stripped` for a bare `{ .class }` line on the MDX path', () => {
+      const map = fixture(['index.md']);
+      const source = [
+        '# Title',
+        '',
+        '<Tabs>',
+        '<TabItem label="A">',
+        'A paragraph.',
+        '{ .card }',
+        '</TabItem>',
+        '</Tabs>',
+        '',
+      ].join('\n');
+      const out = convertFile({ source, sourcePath: 'index.md', slugMap: map });
+      expect(out.extension).toBe('mdx');
+      const stripped = out.diagnostics.filter((d) => d.ruleId === 'block-attr-list-stripped');
+      expect(stripped).toHaveLength(1);
+      expect(stripped[0]?.message).toContain('.card');
+    });
+
+    it('emits `heading-span-anchor-stripped` when `<span id="...">` wrappers are dropped on the MDX path', () => {
+      const map = fixture(['index.md']);
+      const source = [
+        '# Title',
+        '',
+        '<Tabs>',
+        '<TabItem label="A">',
+        '## <span id="release-notes"> Release notes',
+        'body',
+        '</TabItem>',
+        '</Tabs>',
+        '',
+      ].join('\n');
+      const out = convertFile({ source, sourcePath: 'index.md', slugMap: map });
+      expect(out.extension).toBe('mdx');
+      const stripped = out.diagnostics.filter((d) => d.ruleId === 'heading-span-anchor-stripped');
+      expect(stripped).toHaveLength(1);
+      expect(stripped[0]?.message).toContain('release-notes');
+    });
+
+    it('emits `inline-attr-list-stripped` for `:icon{ .lg }` on the MDX path', () => {
+      const map = fixture(['index.md']);
+      const source = [
+        '# Title',
+        '',
+        '<Tabs>',
+        '<TabItem label="A">',
+        'See :icon[clock]{ .lg .middle } here.',
+        '</TabItem>',
+        '</Tabs>',
+        '',
+      ].join('\n');
+      const out = convertFile({ source, sourcePath: 'index.md', slugMap: map });
+      expect(out.extension).toBe('mdx');
+      const stripped = out.diagnostics.filter((d) => d.ruleId === 'inline-attr-list-stripped');
+      expect(stripped).toHaveLength(1);
+      expect(stripped[0]?.message).toContain('.lg .middle');
+    });
   });
 });

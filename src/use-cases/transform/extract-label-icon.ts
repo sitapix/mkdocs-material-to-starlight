@@ -1,24 +1,24 @@
 /**
- * Pull a Material/FontAwesome/Octicon icon shortcode out of a directive
+ * Pull a Material / FontAwesome / Octicon icon shortcode out of a directive
  * label string so it can be promoted to a Starlight `icon="..."` JSX prop.
  *
- * Container directives like `:::tab[:fontawesome-brands-python: Python]`
- * stringify into JSX as `<TabItem label=":fontawesome-brands-python:
- * Python">` — the literal shortcode is visible to readers because the icon
- * transform only walks `text` mdast nodes, never JSX attribute strings. By
- * extracting the icon at label-build time we route mapped icons through the
- * structured `icon` prop and strip unmapped ones from the visible label.
+ * `:::tab[:fontawesome-brands-python: Python]` stringifies as
+ * `<TabItem label=":fontawesome-brands-python: Python">`. The icon transform
+ * only walks text mdast nodes, never JSX attribute strings, so the literal
+ * shortcode would render visibly. Extracting at label-build time routes
+ * mapped icons through the structured `icon` prop.
  *
- * Pure value transformation: rawLabel → { iconName, label }. Resolves
- * exactly one shortcode (the first one found); subsequent shortcodes are
- * left in the label since most directive labels carry only a single icon
- * by convention. Skips shortcodes that don't resolve to anything (passes
- * the original label through unchanged).
+ * Pure: rawLabel → { iconName, label }. The first shortcode becomes the
+ * prop; later shortcodes in the label are stripped (JSX attribute strings
+ * can't embed components). mkdocs-material tab labels like
+ * `:material-link: blog/2024/01/31/:material-dots-horizontal:/` regressed
+ * with the trailing shortcode visible.
  */
 
 import { resolveIcon, type IconDescriptor } from './resolve-icon.js';
 
 const SHORTCODE_RE = /:[a-z][a-z0-9-]*[a-z0-9]:/;
+const SHORTCODE_RE_GLOBAL = /:[a-z][a-z0-9-]*[a-z0-9]:/g;
 
 export interface LabelIcon {
   /** Starlight built-in icon name (e.g. "seti:python") or null if unresolved/unmappable. */
@@ -48,7 +48,11 @@ export function extractLabelIcon(input: ExtractLabelIconInput): LabelIcon {
   // so `:icon: Python` → `Python` rather than `  Python` or `Python `.
   const before = input.rawLabel.slice(0, match.index);
   const after = input.rawLabel.slice(match.index + shortcode.length);
-  const cleaned = `${before.replace(/\s+$/, '')} ${after.replace(/^\s+/, '')}`.trim();
+  const firstStripped = `${before.replace(/\s+$/, '')} ${after.replace(/^\s+/, '')}`.trim();
+  // Strip any remaining shortcodes from the label too. JSX attribute strings
+  // can't embed JSX, so a literal `:material-foo:` left behind would render
+  // as visible text rather than an icon — drop it.
+  const cleaned = stripRemainingShortcodes(firstStripped);
 
   if (descriptor.kind === 'starlight-builtin') {
     return { iconName: descriptor.name, label: cleaned };
@@ -57,6 +61,10 @@ export function extractLabelIcon(input: ExtractLabelIconInput): LabelIcon {
   // prop without per-project Iconify setup, so just strip the shortcode and
   // leave a clean label.
   return { iconName: null, label: cleaned };
+}
+
+function stripRemainingShortcodes(label: string): string {
+  return label.replace(SHORTCODE_RE_GLOBAL, '').replace(/\s{2,}/g, ' ').trim();
 }
 
 function resolveIconForLabel(

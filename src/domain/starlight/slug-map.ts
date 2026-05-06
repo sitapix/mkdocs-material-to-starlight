@@ -16,7 +16,7 @@
 import { ok, err, type Result } from '../result.js';
 import { deriveSlug } from './slug.js';
 
-export interface SlugRecord {
+interface SlugRecord {
   readonly sourcePath: string;
   readonly slug: string;
 }

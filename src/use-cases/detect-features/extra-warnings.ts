@@ -1,22 +1,15 @@
 /**
- * Surface diagnostics for MkDocs `extra:` keys that the converter does not
- * (and structurally cannot) translate.
+ * Surface diagnostics for MkDocs `extra:` keys the converter cannot translate.
  *
- * Currently covers two well-documented Material idioms:
+ *   - `extra.consent`: Material's cookie consent dialog. Starlight has no
+ *     consent primitive; recreating it requires a third-party manager
+ *     wired into `astro.config` `head[]`.
+ *   - `extra.status`: per-page lifecycle badges (`new`, `deprecated`, ...)
+ *     declared in `extra.status` and applied via `status: <key>` in
+ *     frontmatter. Closest Starlight match is a `<Badge>` next to the
+ *     heading.
  *
- *   - `extra.consent` — Material's cookie consent dialog. Starlight has no
- *     consent-management primitive; recreating it requires a third-party
- *     consent manager wired into `astro.config` `head[]`.
- *
- *   - `extra.status` — Material's per-page lifecycle status badges (`new`,
- *     `deprecated`, etc., declared in `extra.status` and applied via page
- *     frontmatter `status: <key>`). The display-name dictionary has no
- *     direct Starlight equivalent; the closest match is reproducing each
- *     status as a Starlight `<Badge>` placed inline next to the page heading.
- *
- * Pure function: takes the parsed `extras` dict (either the full mkdocs.yml
- * object or just its `extra:` sub-block), returns Diagnostic[]. No I/O.
- * Idempotent: same input → same output.
+ * Pure. Idempotent.
  */
 
 import {
@@ -87,6 +80,37 @@ export function detectExtraWarnings(
 
   const versionDiag = detectVersionMetadata(inner.version);
   if (versionDiag !== null) out.push(versionDiag);
+
+  // Top-level `validation:` block — MkDocs 1.6+ knobs that change how the
+  // upstream build treats nav/link errors. The converter has its own
+  // diagnostic-level taxonomy and is stricter by default; surface this
+  // mismatch so the user knows their custom validation policy is dropped.
+  if (isPlainObject(extras['validation'])) {
+    const v = extras['validation'] as Record<string, unknown>;
+    const setKnobs: string[] = [];
+    if (isPlainObject(v.nav)) setKnobs.push('nav.*');
+    if (isPlainObject(v.links)) setKnobs.push('links.*');
+    out.push(
+      createDiagnostic({
+        severity: 'info',
+        ruleId: 'mkdocs-validation-config-dropped',
+        source: SOURCE,
+        message:
+          `mkdocs.yml \`validation:\` block (${setKnobs.length === 0 ? 'top-level' : setKnobs.join(', ')}) detected. The converter has its own diagnostic taxonomy (\`broken-link\`, \`nav-missing-target\`, etc.) and emits at \`warning\` severity by default — stricter than MkDocs' defaults. The custom levels (\`info\`/\`warn\`/\`ignore\`) you set in mkdocs.yml are not translated; review MIGRATION_NOTES.md after conversion to triage findings.`,
+      }),
+    );
+  }
+  if (extras['strict'] === true) {
+    out.push(
+      createDiagnostic({
+        severity: 'info',
+        ruleId: 'mkdocs-strict-mode-info',
+        source: SOURCE,
+        message:
+          'mkdocs.yml `strict: true` detected. The converter does not have a strict mode that fails the run on any warning. To approximate the same behavior post-migration, treat the conversion run as failing if any `warning`-level diagnostic appears in MIGRATION_NOTES.md, and run `astro check` (the converter\'s `--check` flag) to surface build-blocking issues.',
+      }),
+    );
+  }
 
   // Sortable tables in MkDocs require pulling in `tablesort` via
   // `extra_javascript`. Starlight has no built-in equivalent; surface the
@@ -192,7 +216,7 @@ function detectAnalyticsProviderFallback(
   }
   return createDiagnostic({
     severity: 'warning',
-    ruleId: 'extra-analytics-provider-recommended',
+    ruleId: 'extra-analytics-provider-unsupported',
     source: SOURCE,
     message:
       'mkdocs.yml `extra.analytics.provider: ' + provider + '` detected — Starlight has no plugin for this provider and the converter only auto-wires Google Analytics. Add the provider\'s tracking script manually to your Starlight `head[]` config.',

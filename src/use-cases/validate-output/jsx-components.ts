@@ -1,25 +1,17 @@
 /**
- * Pre-flight validation: scan a converted file for JSX components that are
- * neither Starlight built-ins nor explicitly imported in the file. Astro's
- * MDX runtime fails the build with an "Unknown component" error in that
- * case, so a converter that emits a typo or forgets an import produces a
- * project that fails its first build.
+ * Pre-flight validation: flag JSX components that are neither Starlight
+ * built-ins nor imported in the file. Astro's MDX runtime fails such builds
+ * with "Unknown component", so a converter typo or missing import produces
+ * a project that fails its first build.
  *
- * Static check — no MDX parser required. We use a conservative regex that:
- *   1. Matches JSX-style opening tags `<ComponentName ...>` or `<ComponentName />`
- *      where `ComponentName` starts with an uppercase letter (HTML elements
- *      start lowercase by convention; React/MDX uses the same rule).
- *   2. Skips `.md` files — JSX is only meaningful in `.mdx`/`.mdoc`.
- *   3. Reads `import { Foo, Bar } from '...'` statements at the top of the
- *      file to extend the local allowlist.
+ * Static, no MDX parser. Conservative regex matches `<ComponentName ...>`
+ * or `<ComponentName />` (uppercase-leading; HTML and JSX use the same
+ * rule), skips `.md` (JSX needs `.mdx`/`.mdoc`), and reads top-of-file
+ * `import { Foo, Bar } from '...'` to extend the local allowlist.
  *
- * Pure: takes a source string + path, returns Diagnostic[]. No I/O.
- *
- * Limitations: namespace imports (`import * as X`), default imports, and
- * dynamic imports are not parsed; they cannot extend the allowlist. Most
- * Starlight migration output uses named imports exclusively, so this is
- * sufficient. Edge cases produce false positives (warnings, not errors) and
- * the user can either ignore them or extend the schema.
+ * Pure. Limitations: namespace, default, and dynamic imports do not extend
+ * the allowlist. Migration output uses named imports almost exclusively;
+ * edge-case false positives surface as warnings, not errors.
  */
 
 import { STARLIGHT_COMPONENTS } from '../../domain/starlight/component-allowlist.js';

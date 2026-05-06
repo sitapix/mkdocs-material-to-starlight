@@ -1,41 +1,31 @@
 /**
  * Expand `mkdocs-include-markdown-plugin` directives in-place.
  *
- * Recognized syntaxes (from the plugin's documentation):
- *
+ * Recognized:
  *   {% include "path" %}
  *   {% include-markdown "path" %}
  *   {% include-markdown "path" start="<!--s-->" end="<!--e-->" %}
- *
- * Both `{% ... %}` and the multi-line block form
- *   {%
- *     include-markdown "path"
- *     start="<!--s-->"
- *   %}
- * are accepted.
+ * The multi-line `{% ... %}` block form is also accepted.
  *
  * Behavior:
- *   - The referenced file is read via the FileSystem port and its content
- *     is inserted in place of the directive.
- *   - `start=` / `end=` markers (include-markdown only) extract the substring
- *     between (exclusive of) the markers. A missing marker leaves the file
- *     content unchanged and emits a diagnostic.
- *   - Plugin options the converter does not honor (heading-offset, dedent,
- *     rewrite-relative-urls, comments, preserve-includer-indent,
- *     trailing-newlines) emit a single unsupported-option diagnostic per
- *     directive listing every ignored key. The file content is still
- *     expanded.
- *   - Recursion is supported up to a depth limit (default 8). Cycles are
- *     broken with a diagnostic, leaving the partial output in place.
- *   - File-not-found leaves the directive verbatim so the source remains
- *     valid Markdown for inspection.
+ *   - Reads the file via the FileSystem port and inserts its content.
+ *   - `start=` / `end=` extract the substring between the markers
+ *     (exclusive). A missing marker emits a diagnostic and leaves content
+ *     unchanged.
+ *   - Unsupported options (heading-offset, dedent, rewrite-relative-urls,
+ *     comments, preserve-includer-indent, trailing-newlines) emit one
+ *     diagnostic per directive listing the ignored keys; expansion still
+ *     proceeds.
+ *   - Recursion goes up to depth 8. Cycles emit a diagnostic and leave
+ *     the partial output in place.
+ *   - File-not-found leaves the directive verbatim.
  *
- * Idempotent: once expanded, the resulting text contains no `{% include %}`
- * marker for that path. A second pass is a no-op.
+ * Idempotent: expanded output has no `{% include %}` marker for that path.
  */
 
 import { createDiagnostic, type Diagnostic } from '../../domain/diagnostics/diagnostic.js';
 import type { FileSystem } from '../../domain/ports/file-system.js';
+import { safeResolveWithin } from '../safety/safe-resolve.js';
 
 const SOURCE = 'include-markdown';
 const DEFAULT_MAX_DEPTH = 8;
@@ -105,17 +95,7 @@ async function expandWithStack(
   for (const match of matches) {
     const start = match.index ?? 0;
     parts.push(source.slice(cursor, start));
-    parts.push(
-      await renderDirective(
-        match,
-        docsDir,
-        fs,
-        stack,
-        depth,
-        maxDepth,
-        diagnostics,
-      ),
-    );
+    parts.push(await renderDirective(match, docsDir, fs, stack, depth, maxDepth, diagnostics));
     cursor = start + match[0].length;
   }
   parts.push(source.slice(cursor));
@@ -148,6 +128,25 @@ async function renderDirective(
     return directiveText;
   }
 
+  // Reject paths that escape the docs directory after symlink resolution. The
+  // include directive comes from user-controlled source markdown, so a
+  // symlink in docs/ pointing at /etc/passwd would otherwise be silently
+  // dereferenced and inlined into the converted output.
+  const safe = await safeResolveWithin(docsDir, resolvedPath, fs);
+  if (!safe.ok && safe.error.code === 'path-escapes-base') {
+    diagnostics.push(
+      createDiagnostic({
+        severity: 'warning',
+        ruleId: 'path-escapes-base',
+        message: `include-markdown path "${path}" resolves outside the docs directory after symlink resolution; rejected. ${safe.error.message}`,
+        source: SOURCE,
+      }),
+    );
+    return directiveText;
+  }
+  // For non-existent paths or other realpath failures, fall through — the
+  // existing read-error path emits `plugin-include-markdown-not-found`.
+
   const read = await fs.readText(resolvedPath);
   if (!read.ok) {
     diagnostics.push(
@@ -161,9 +160,7 @@ async function renderDirective(
     return directiveText;
   }
 
-  const ignored = [...options.keys()].filter(
-    (k) => !SUPPORTED_OPTIONS.has(k),
-  );
+  const ignored = [...options.keys()].filter((k) => !SUPPORTED_OPTIONS.has(k));
   if (ignored.length > 0) {
     diagnostics.push(
       createDiagnostic({
@@ -177,15 +174,7 @@ async function renderDirective(
 
   const sliced = sliceByMarkers(read.value, options, path, diagnostics);
   const recursedStack = new Set(stack).add(resolvedPath);
-  return expandWithStack(
-    sliced,
-    docsDir,
-    fs,
-    recursedStack,
-    depth + 1,
-    maxDepth,
-    diagnostics,
-  );
+  return expandWithStack(sliced, docsDir, fs, recursedStack, depth + 1, maxDepth, diagnostics);
 }
 
 function sliceByMarkers(

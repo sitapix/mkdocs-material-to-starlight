@@ -1,28 +1,23 @@
 /**
  * Sanitize untrusted strings before printing them to the terminal.
  *
- * Defends against CWE-150 (terminal escape injection): a hostile string in a
- * source file (e.g. `mkdocs.yml`'s `site_name`, a frontmatter value, an error
- * message from a third-party library) can embed terminal control sequences
- * that move the cursor, clear the screen, change the window title, or render
- * forged output that looks like legitimate CLI feedback.
- *
- * The diagnostics report rendered by `format-report.ts` interpolates
- * source-derived strings — file paths, rule messages, validation errors —
- * directly into stdout. Without sanitization, converting a malicious site
- * could compromise the user's terminal session.
+ * Defends against CWE-150 (terminal escape injection). A hostile
+ * `mkdocs.yml`, frontmatter value, or third-party error string can embed
+ * control sequences that move the cursor, clear the screen, change the
+ * window title, or forge legitimate-looking CLI output. `format-report.ts`
+ * interpolates source-derived strings directly into stdout, so unsanitized
+ * input would compromise the user's terminal session.
  *
  * Strips:
- *   - CSI sequences        (ESC [ … final byte)        — cursor, color, screen ops
- *   - OSC sequences        (ESC ] … BEL or ESC\)       — window title, hyperlinks
- *   - DCS / PM / APC       (ESC P|^|_ … ESC\)          — device control strings
- *   - Simple two-byte ESC  (ESC + single 0x20–0x7E)    — DECSC / DECRC / RIS / etc.
- *   - C1 control codes     (0x80–0x9F)                 — 8-bit ESC equivalents
- *   - Raw control chars    (BEL / BS / CR / DEL / …)   — KEEPS tab and newline
+ *   - CSI (ESC [ ... final byte): cursor, color, screen ops
+ *   - OSC (ESC ] ... BEL or ESC\): window title, hyperlinks
+ *   - DCS / PM / APC (ESC P|^|_ ... ESC\): device control
+ *   - Simple two-byte ESC (ESC + 0x20-0x7E): DECSC / DECRC / RIS
+ *   - C1 control codes (0x80-0x9F): 8-bit ESC equivalents
+ *   - Raw control chars (BEL / BS / CR / DEL); tab and newline pass through
  *
- * Patterns and approach adapted from vercel-labs/skills (MIT-licensed,
- * https://github.com/vercel-labs/skills/blob/main/src/sanitize.ts) — the
- * regex set is the established defense-in-depth recipe for this CWE class.
+ * Regex set adapted from vercel-labs/skills (MIT,
+ * https://github.com/vercel-labs/skills/blob/main/src/sanitize.ts).
  */
 
 const CSI_RE = /\x1b\[[\x30-\x3f]*[\x20-\x2f]*[\x40-\x7e]/g;

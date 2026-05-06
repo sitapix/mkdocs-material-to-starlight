@@ -4,32 +4,23 @@
  *   [Subscribe](https://example.com){ .md-button }
  *   [Subscribe](https://example.com){ .md-button .md-button--primary }
  *
- * Material uses `attr_list` to attach a CSS class to the link. Starlight ships
- * `<LinkButton>` (`@astrojs/starlight/components`) which renders the same UI
- * affordance natively; emitting it here lets Starlight's theme handle dark
- * mode, focus rings, accessibility, and Liquid-Glass-style accent variants
- * for free. The file is automatically promoted to `.mdx` by the downstream
- * `detectMdxNeeds` step (PascalCase JSX tag → mdx).
+ * Emits Starlight's `<LinkButton>` so the theme handles dark mode, focus
+ * rings, and accent variants. The file gets promoted to `.mdx` by
+ * `detectMdxNeeds` (PascalCase JSX tag).
  *
- * Variant mapping mirrors Material's two documented variants:
- *   - `.md-button`                          → `variant="secondary"` (subtle CTA)
- *   - `.md-button .md-button--primary`      → `variant="primary"`   (accent CTA)
+ * Variants:
+ *   .md-button                       → variant="secondary"
+ *   .md-button .md-button--primary   → variant="primary"
  *
- * Icon shortcodes inside the link text (`[Send :fontawesome-solid-paper-plane:](#)`)
- * are extracted via `extractLabelIcon`. Resolvable shortcodes are promoted
- * to the `icon=` JSX prop; unresolved ones are stripped from the visible
- * label so the user doesn't see a literal `:foo:` artifact.
+ * Icon shortcodes inside the link text are extracted by `extractLabelIcon`:
+ * resolvable ones move to the `icon=` prop; unresolved ones are stripped
+ * so users don't see a literal `:foo:`.
  *
- * Idempotency: `<LinkButton …>` output contains no `.md-button` source markers,
- * so `normalize(normalize(x)) === normalize(x)`.
- *
- * Fenced-code safety: lines inside triple-backtick fences are passed through
- * verbatim so a button example inside a code block is not rewritten.
+ * Idempotent (output has no `.md-button` markers) and fence-shielded.
  */
 
 import { extractLabelIcon } from '../transform/extract-label-icon.js';
-
-const FENCE = /^ {0,3}(```|~~~)/;
+import { isFenceLine } from '../../domain/syntax/fence.js';
 const BUTTON_RE =
   /\[(?<label>[^\]\n]+)\]\((?<url>[^)\n]+)\)\{ *(?<classes>\.md-button(?: +\.md-button--[a-z0-9-]+)*) *\}/g;
 
@@ -38,7 +29,7 @@ export function normalizeButtons(source: string): string {
   const output: string[] = [];
   let inFence = false;
   for (const line of lines) {
-    if (FENCE.test(line)) {
+    if (isFenceLine(line)) {
       output.push(line);
       inFence = !inFence;
       continue;

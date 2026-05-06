@@ -6,10 +6,10 @@ import { detectLongtailFeatures } from './theme-features-longtail.js';
  * thus will be returned by detectLongtailFeatures:
  *   - navigation.instant.preview  (catalog has navigation.instant.prefetch, not preview)
  *   - navigation.sections.expand  (not in catalog)
- *   - content.footnote.tooltips   (not in catalog)
  *
  * All other flags listed in the spec's LONGTAIL table are already in the
- * primary catalog and will be skipped.
+ * primary catalog and will be skipped (e.g., content.footnote.tooltips
+ * has a richer note in the primary catalog and is filtered out here).
  */
 
 describe('detectLongtailFeatures', () => {
@@ -17,13 +17,11 @@ describe('detectLongtailFeatures', () => {
     const flags = [
       'navigation.instant.preview',
       'navigation.sections.expand',
-      'content.footnote.tooltips',
     ];
     const entries = detectLongtailFeatures(flags);
     const flagNames = entries.map((e) => e.flag);
     expect(flagNames).toContain('navigation.instant.preview');
     expect(flagNames).toContain('navigation.sections.expand');
-    expect(flagNames).toContain('content.footnote.tooltips');
   });
 
   it('excludes flags already handled by the primary classifier', () => {
@@ -60,7 +58,7 @@ describe('detectLongtailFeatures', () => {
 
   it('each detected entry has a non-empty recommendation string', () => {
     const entries = detectLongtailFeatures([
-      'content.footnote.tooltips',
+      'navigation.sections.expand',
       'navigation.instant.preview',
     ]);
     expect(entries.length).toBeGreaterThan(0);
@@ -78,22 +76,24 @@ describe('detectLongtailFeatures', () => {
 
   it('returns only longtail flags when mixed with primary-catalog and unknown flags', () => {
     const flags = [
-      'navigation.instant.preview',  // longtail — not in primary catalog
+      'navigation.instant.preview',   // longtail — not in primary catalog
+      'navigation.sections.expand',   // longtail — not in primary catalog
       'navigation.tabs',              // handled-elsewhere → excluded
       'content.code.copy',            // replaced-by-default → excluded
       'navigation.top',               // unsupported in primary catalog → excluded
       'totally.unknown.flag',         // not in any catalog → excluded
-      'content.footnote.tooltips',    // longtail — not in primary catalog
+      'content.footnote.tooltips',    // primary catalog (rich note) → excluded
       'navigation.instant',           // replaced-by-default in primary → excluded
     ];
     const entries = detectLongtailFeatures(flags);
     const flagNames = entries.map((e) => e.flag);
     expect(flagNames).toContain('navigation.instant.preview');
-    expect(flagNames).toContain('content.footnote.tooltips');
+    expect(flagNames).toContain('navigation.sections.expand');
     expect(flagNames).not.toContain('navigation.tabs');
     expect(flagNames).not.toContain('content.code.copy');
     expect(flagNames).not.toContain('navigation.top');
     expect(flagNames).not.toContain('totally.unknown.flag');
     expect(flagNames).not.toContain('navigation.instant');
+    expect(flagNames).not.toContain('content.footnote.tooltips');
   });
 });

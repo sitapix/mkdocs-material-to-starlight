@@ -14,8 +14,7 @@
  */
 
 import { createDiagnostic, type Diagnostic } from '../../domain/diagnostics/diagnostic.js';
-
-const FENCE = /^ {0,3}(```|~~~)/;
+import { isFenceLine } from '../../domain/syntax/fence.js';
 const HEADING_ATTR_RE = /^#{1,6} [^\n{]+\{([^}\n]*)\}\s*#*\s*$/;
 const CLASS_TOKEN_RE = /(?:^|\s)\.[A-Za-z][A-Za-z0-9_-]*/;
 
@@ -27,7 +26,7 @@ export function scanHeadingBadges(source: string): ReadonlyArray<Diagnostic> {
 
   for (const line of lines) {
     lineNumber += 1;
-    if (FENCE.test(line)) {
+    if (isFenceLine(line)) {
       inFence = !inFence;
       continue;
     }

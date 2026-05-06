@@ -1,29 +1,28 @@
 /**
- * Pre-parse normalizer for the inline PyMdown extensions: `==mark==`,
- * `~sub~`, `^sup^`, and `++keys++`.
+ * Pre-parse normalizer for inline PyMdown extensions: `==mark==`, `~sub~`,
+ * `^sup^`, `^^insert^^`, `++keys++`.
  *
- * Each extension translates into a small chunk of HTML that flows through the
- * downstream Markdown pipeline as a raw `html` node:
+ *   ==text==          → <mark>text</mark>
+ *   H~2~O             → H<sub>2</sub>O
+ *   2^10^             → 2<sup>10</sup>
+ *   ^^Insert^^        → <ins>Insert</ins>
+ *   ++ctrl+alt+del++  → <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>Del</kbd>
  *
- *   ==text==                 → <mark>text</mark>
- *   H~2~O                    → H<sub>2</sub>O
- *   2^10^                    → 2<sup>10</sup>
- *   ++ctrl+alt+del++         → <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>Del</kbd>
+ * Pure, fence-shielded, inline-code-shielded, idempotent.
  *
- * Pure: takes a string, returns a string. Fence-shielded (` ``` `) and
- * inline-code-shielded (`` ` ``). Idempotent — the output contains HTML tags,
- * not the source markers, so the second pass finds nothing to rewrite.
- *
- * The four patterns are applied in a fixed order on each non-code segment;
- * within a segment they operate on disjoint character classes (`=`, `~`, `^`,
- * `+`) so they commute. Order is therefore stable but not load-bearing.
+ * Order: `^^...^^` must match before `^...^`. Otherwise the inner
+ * `^Insert^` consumes the markers and leaves stray `^`s.
  */
 
-const FENCE = /^ {0,3}(```|~~~)/;
+import { isFenceLine } from '../../domain/syntax/fence.js';
+
 const MATH_FENCE = /^ {0,3}\$\$\s*$/;
 
 const MARK_RE = /==(?=\S)([^=\s][^=]*[^=\s]|[^=\s])==/g;
 const SUB_RE = /~(?=\S)([^~\s][^~]*[^~\s]|[^~\s])~/g;
+// Double-caret `pymdownx.caret` insert form. Must run before SUP_RE so the
+// outer `^^` wins. Body cannot contain `^^` (no nesting).
+const INS_RE = /\^\^(?=\S)([^\s][^\^]*[^\s]|[^\s\^])\^\^/g;
 const SUP_RE = /\^(?=\S)([^\^\s][^\^]*[^\^\s]|[^\^\s])\^/g;
 const KEYS_RE = /\+\+([A-Za-z0-9-]+(?:\+[A-Za-z0-9-]+)*)\+\+/g;
 
@@ -33,7 +32,7 @@ export function normalizeInlineMarks(source: string): string {
   let inFence = false;
   let inMathBlock = false;
   for (const line of lines) {
-    if (FENCE.test(line)) {
+    if (isFenceLine(line)) {
       output.push(line);
       inFence = !inFence;
       continue;
@@ -65,6 +64,9 @@ function rewriteSegment(segment: string): string {
   let out = segment;
   out = out.replace(MARK_RE, (_match, body: string) => `<mark>${body}</mark>`);
   out = out.replace(SUB_RE, (_match, body: string) => `<sub>${body}</sub>`);
+  // INS before SUP — `^^Insert^^` must produce `<ins>Insert</ins>`, not the
+  // single-caret form's accidental `^<sup>Insert</sup>^`.
+  out = out.replace(INS_RE, (_match, body: string) => `<ins>${body}</ins>`);
   out = out.replace(SUP_RE, (_match, body: string) => `<sup>${body}</sup>`);
   out = out.replace(KEYS_RE, (_match, body: string) =>
     body

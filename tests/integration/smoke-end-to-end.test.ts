@@ -109,10 +109,12 @@ describe('end-to-end smoke conversion', () => {
       const result = convertFile({ source, sourcePath, slugMap: slugMap.value });
       converted[sourcePath] = result.text;
       for (const d of result.diagnostics) {
-        // `mdx-promotion` is informational (file uses a Starlight JSX
-        // component, so it was promoted to .mdx). Not a problem; filter it
-        // out to keep the smoke test focused on actual conversion issues.
+        // Informational rules that surface routine, expected transformations.
+        // Filter them out so the smoke test stays focused on actual issues.
+        //   - mdx-promotion: file used a Starlight JSX component → .mdx
+        //   - duplicate-h1-stripped: body H1 deduped against frontmatter title
         if (d.ruleId === 'mdx-promotion') continue;
+        if (d.ruleId === 'duplicate-h1-stripped') continue;
         allDiagnostics.push(`${sourcePath}: ${d.ruleId}: ${d.message}`);
       }
     }
@@ -125,7 +127,7 @@ describe('end-to-end smoke conversion', () => {
 
     const indexOut = converted['index.md'] ?? '';
     expect(indexOut).toContain('title: Welcome');
-    expect(indexOut).toContain(':icon[rocket]');
+    expect(indexOut).toContain('<Icon name="rocket" class="sl-inline-icon" />');
     expect(indexOut).toContain(':::caution');
     expect(indexOut).toContain('Heads up');
     expect(indexOut).toContain('[this](/api/auth)');
@@ -139,7 +141,7 @@ describe('end-to-end smoke conversion', () => {
     const apiOut = converted['api/auth.md'] ?? '';
     expect(apiOut).toContain(':::danger');
     expect(apiOut).toContain('Security');
-    expect(apiOut).toContain(':icon[github]');
+    expect(apiOut).toContain('<Icon name="github" class="sl-inline-icon" />');
   });
 
   it('the site is idempotent when re-converted', () => {

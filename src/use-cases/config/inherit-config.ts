@@ -2,23 +2,19 @@
  * Resolve MkDocs `INHERIT:` directives by deep-merging the referenced YAML
  * config objects.
  *
- * MkDocs (since 1.5) treats a top-level `INHERIT:` key as a deep-merge base
- * config. The value is a path resolved relative to the config file location.
- * Multiple levels of INHERIT chain transitively.
+ * MkDocs 1.5+ treats a top-level `INHERIT:` key as a deep-merge base config.
+ * The value resolves relative to the config file. Multiple `INHERIT:` levels
+ * chain transitively.
  *
- * Merge semantics (matching MkDocs's documented behaviour):
- *   - For each key in the derived object, if the base has the same key AND
- *     both values are plain objects (not arrays), recursively merge.
- *   - Otherwise the derived value wins outright — including arrays, which are
- *     NOT merged element-wise. The derived array fully replaces the base array.
- *   - Keys present only in the base are preserved as-is.
- *   - Keys present only in the derived are kept as-is.
+ * Merge semantics (matching MkDocs):
+ *   - Same-key plain objects recurse.
+ *   - Otherwise derived wins outright. Arrays do NOT merge element-wise —
+ *     derived replaces base.
+ *   - Base-only and derived-only keys both pass through.
  *
- * The merged JS object is re-encoded to YAML (via js-yaml.dump) so the
- * existing downstream parser sees a clean, duplicate-free string.
- *
- * Pure given the FileSystem port. Returns the merged source plus tracking info
- * (included files for diagnostics, missing references for warnings).
+ * The merged object re-encodes via `js-yaml.dump` so downstream sees a
+ * clean, duplicate-free string. Pure given FileSystem; tracks included
+ * files for diagnostics and missing references for warnings.
  */
 
 import { load as yamlLoad, dump as yamlDump } from 'js-yaml';

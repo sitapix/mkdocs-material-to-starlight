@@ -9,32 +9,19 @@
  *
  *   :   Second definition for the same term.
  *
- *       Continuation paragraph (4-space indent).
+ * Starlight has no native deflist rendering and no maintained remark plugin
+ * exists (every candidate is pinned to unified 10 / micromark 2). Rewrite
+ * to inline `<dl><dt>...</dt><dd>...</dd></dl>` HTML.
  *
- * Material sites use this syntax via the `def_list` Python-Markdown extension.
- * Starlight has no native definition-list rendering and there is no maintained
- * remark plugin for the construct (see library_audit_20260501.md — every
- * candidate is pinned to the unified 10 / micromark 2 chain). We rewrite to
- * inline HTML so the output works in plain `.md`:
+ * Recognition: a non-empty line followed by a line whose first non-space
+ * char is `:` with at least one space before its content. Subsequent `:`
+ * lines belong to the same `<dl>` until a non-deflist line.
  *
- *   <dl>
- *     <dt>Term</dt>
- *     <dd>Definition body.</dd>
- *   </dl>
- *
- * Recognition rule: a non-empty line followed by a line whose first non-space
- * character is `:` and which has at least one space (or tab) between the `:`
- * and the content. The term is the line above; subsequent `:` lines (with
- * blank lines between them) belong to the same `<dl>` block until the next
- * non-deflist line is reached.
- *
- * Idempotency: HTML output contains no `:` definition markers, so a second
- * pass finds nothing to rewrite.
- *
- * Fenced-code safety: lines inside ` ``` ` are passed through verbatim.
+ * Idempotent (output has no `:` definition markers) and fence-shielded.
  */
 
-const FENCE = /^ {0,3}(```|~~~)/;
+import { isFenceLine } from '../../domain/syntax/fence.js';
+
 const DEFINITION = /^:[ \t]+(.+)$/;
 
 export function normalizeDefinitionLists(source: string): string {
@@ -46,7 +33,7 @@ export function normalizeDefinitionLists(source: string): string {
   while (i < lines.length) {
     const line = lines[i] ?? '';
 
-    if (FENCE.test(line)) {
+    if (isFenceLine(line)) {
       output.push(line);
       inFence = !inFence;
       i += 1;

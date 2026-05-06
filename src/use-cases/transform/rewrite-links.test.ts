@@ -168,6 +168,51 @@ describe('rewriteInternalLink', () => {
     }
   });
 
+  it('resolves a percent-encoded space in a relative .md link', () => {
+    // Markdown link hrefs use HTTP-style percent-encoding; the slug map is
+    // keyed by literal filesystem paths. Decode per-segment before lookup.
+    const wikiMap = fixture(['Tränke/Großer Heiltrank/index.md']);
+    const result = rewriteInternalLink({
+      href: 'Großer%20Heiltrank/index.md',
+      fromSourcePath: 'Tränke/index.md',
+      slugMap: wikiMap,
+    });
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.value.kind).toBe('internal');
+    }
+  });
+
+  it('resolves percent-encoded UTF-8 path segments', () => {
+    // %C3%A4 = ä, %C3%B6 = ö — common in non-English wikis.
+    const wikiMap = fixture(['personen/München/Janette Landgraf/index.md']);
+    const result = rewriteInternalLink({
+      href: '../personen/M%C3%BCnchen/Janette%20Landgraf/index.md',
+      fromSourcePath: 'gegenstaende/index.md',
+      slugMap: wikiMap,
+    });
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.value.kind).toBe('internal');
+    }
+  });
+
+  it('tolerates a malformed percent-sequence by falling back to the raw segment', () => {
+    // `%E0` alone is not valid UTF-8; decodeURIComponent throws. We must not
+    // throw — fall back to the raw segment so the lookup proceeds and (likely)
+    // emits a clean broken-link diagnostic instead of crashing the file.
+    const wikiMap = fixture(['guide/intro.md']);
+    const result = rewriteInternalLink({
+      href: 'bad%E0name.md',
+      fromSourcePath: 'guide/intro.md',
+      slugMap: wikiMap,
+    });
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error.code).toBe('broken-link');
+    }
+  });
+
   it('is idempotent on asset paths — rewriting the rewritten URL is a no-op', () => {
     // `convert(convert(x)) === convert(x)` invariant. Feed the output back in.
     const first = rewriteInternalLink({

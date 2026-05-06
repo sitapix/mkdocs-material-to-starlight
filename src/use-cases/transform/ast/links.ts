@@ -1,22 +1,19 @@
 /**
  * AST-level link transformer (remark plugin).
  *
- * Walks `link` and `image` nodes and rewrites their `url` field using the
- * pure `rewriteInternalLink` use-case. Broken internal `.md` references are
- * reported via the supplied diagnostics array — the link itself is left
- * intact so the surrounding Markdown stays parseable.
+ * Walks `link` and `image` nodes and rewrites their `url` via the pure
+ * `rewriteInternalLink` use-case. Broken internal `.md` refs append to the
+ * supplied diagnostics array; the link node stays intact so surrounding
+ * Markdown remains parseable.
  *
  * Plugin contract:
  *   - Owns the `(link, *)` and `(image, *)` namespace cells.
- *   - Idempotent: a link whose href is already in `/slug` form stays as
- *     `/slug` because it does not end in `.md`/`.mdx` and is classified as
- *     `asset` (preserved untouched).
- *   - Pure given the AST and the injected slug map: no I/O, no global state.
+ *   - Idempotent: hrefs already in `/slug` form stay as `/slug` (no `.md`,
+ *     classified as `asset`).
+ *   - Pure given the AST and injected slug map.
  *
- * Options:
- *   fromSourcePath  — the source file's path, used to resolve relative refs
- *   slugMap         — the run-wide slug map
- *   diagnostics     — output sink; the plugin appends Diagnostics, never throws
+ * Options: `fromSourcePath` (resolves relative refs), `slugMap` (run-wide),
+ * `diagnostics` (sink; never throws).
  */
 
 import { visit, SKIP } from 'unist-util-visit';
@@ -36,7 +33,14 @@ const SOURCE = 'mkdocs-material-to-starlight';
 
 export const transformLinkNodes: Plugin<[LinkTransformOptions], Root> = (options) => {
   return (tree) => {
-    visit(tree, ['link', 'image'], (node, index, parent) => {
+    // Include `definition` nodes so reference-style links (`[id]: url`)
+    // and reference-style images get the same asset/internal-link
+    // rewriting as inline links. Real-world break (orzih/mkdocs-with-pdf):
+    // the source uses `[18]: assets/screenshots/creating-your-site.png`
+    // and `![alt][18]` to share captions across pages — without rewriting
+    // the definition, the relative path resolves under `src/content/docs/`
+    // at build time and Vite errors with "Rollup failed to resolve import".
+    visit(tree, ['link', 'image', 'definition'], (node, index, parent) => {
       const linkLike = node as Link | Image;
       if (typeof linkLike.url !== 'string') {
         return undefined;
@@ -63,17 +67,25 @@ export const transformLinkNodes: Plugin<[LinkTransformOptions], Root> = (options
             );
             return [SKIP, index];
           }
-          // Image node: replace with its alt text (or drop entirely if empty).
-          const alt = (linkLike as Image).alt ?? '';
-          if (alt.length > 0) {
-            (parent.children as unknown[]).splice(index, 1, {
-              type: 'text',
-              value: alt,
-            });
-          } else {
-            (parent.children as unknown[]).splice(index, 1);
+          if (linkLike.type === 'image') {
+            // Image node: replace with its alt text (or drop entirely if empty).
+            const alt = (linkLike as Image).alt ?? '';
+            if (alt.length > 0) {
+              (parent.children as unknown[]).splice(index, 1, {
+                type: 'text',
+                value: alt,
+              });
+            } else {
+              (parent.children as unknown[]).splice(index, 1);
+            }
+            return [SKIP, index];
           }
-          return [SKIP, index];
+          // `definition` nodes are top-level metadata. Leave them in place
+          // with the original URL — the diagnostic already surfaced the
+          // problem and nothing references the definition unless the
+          // corresponding `linkReference`/`imageReference` exists, which
+          // is also visited and stripped.
+          return undefined;
         }
         return undefined;
       }

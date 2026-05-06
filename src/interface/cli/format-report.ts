@@ -20,17 +20,63 @@
 import type { TaggedDiagnostic } from '../../use-cases/convert-site/convert.js';
 import { sanitizeForSingleLine } from '../../infrastructure/terminal/sanitize-terminal-output.js';
 
+// When a single ruleId has more than COLLAPSE_AT occurrences, only the first
+// SHOW_FIRST are printed and the rest are summarised on one line. This stops
+// 88-line walls (real regression: zbghost325/XRIML-WIKI's
+// `unknown-frontmatter-field`) from drowning out useful diagnostics. The
+// complete list is always available in MIGRATION_NOTES.md.
+const COLLAPSE_AT = 5;
+const SHOW_FIRST = 3;
+
 export function formatReport(diagnostics: ReadonlyArray<TaggedDiagnostic>): string {
   if (diagnostics.length === 0) {
     return 'OK — 0 issues found.\n';
   }
 
+  const groups = groupByRuleId(diagnostics);
   const lines: string[] = [];
-  for (const tagged of diagnostics) {
-    lines.push(formatOne(tagged));
+  for (const { ruleId, items } of groups) {
+    const collapse = items.length > COLLAPSE_AT;
+    const visible = collapse ? items.slice(0, SHOW_FIRST) : items;
+    for (const tagged of visible) {
+      lines.push(formatOne(tagged));
+    }
+    if (collapse) {
+      const hidden = items.length - SHOW_FIRST;
+      lines.push(
+        `  … and ${String(hidden)} more "${ruleId}" — see MIGRATION_NOTES.md for the full list`,
+      );
+    }
   }
   lines.push('', summarize(diagnostics));
   return lines.join('\n') + '\n';
+}
+
+interface RuleGroup {
+  readonly ruleId: string;
+  readonly items: ReadonlyArray<TaggedDiagnostic>;
+}
+
+// Group by ruleId, preserving the order in which each ruleId first appears.
+// Groups stay together so a user reading the report sees every "broken-link"
+// before every "unknown-frontmatter-field", which is more useful than the
+// per-file interleaving the input might have.
+function groupByRuleId(
+  diagnostics: ReadonlyArray<TaggedDiagnostic>,
+): ReadonlyArray<RuleGroup> {
+  const order: string[] = [];
+  const buckets = new Map<string, TaggedDiagnostic[]>();
+  for (const tagged of diagnostics) {
+    const id = tagged.diagnostic.ruleId;
+    let bucket = buckets.get(id);
+    if (bucket === undefined) {
+      bucket = [];
+      buckets.set(id, bucket);
+      order.push(id);
+    }
+    bucket.push(tagged);
+  }
+  return order.map((id) => ({ ruleId: id, items: buckets.get(id) ?? [] }));
 }
 
 function formatOne(tagged: TaggedDiagnostic): string {

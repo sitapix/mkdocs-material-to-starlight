@@ -25,6 +25,7 @@ import type { SanitizeReport } from '../mdx-detection/sanitize-mdx-syntax.js';
 import { normalizeCodeBlockMeta } from './code-block-meta.js';
 import { normalizeInlineHilite } from './inlinehilite.js';
 import { normalizeMaterialShortcodes } from './material-shortcodes.js';
+import { normalizeMedia, type MediaPromotion } from './media.js';
 import { normalizeOnlyMkdocs } from './only-mkdocs.js';
 import { normalizeFrontmatterCommentsStrip } from './frontmatter-comments-strip.js';
 import { normalizeFrontmatterHide } from './frontmatter-hide.js';
@@ -61,6 +62,8 @@ import { normalizeProgressBar } from './progressbar.js';
 export interface NormalizeReport {
   legacy: LegacySyntaxReport;
   attrList?: SanitizeReport;
+  /** mkdocs-audio / mkdocs-video promotions (one entry per `![type:...]` rewrite). */
+  media?: MediaPromotion[];
 }
 
 export function normalize(source: string, report?: NormalizeReport): string {
@@ -77,6 +80,16 @@ export function normalize(source: string, report?: NormalizeReport): string {
   current = normalizeCardGrids(current);
   current = normalizeHeadingAttrList(current);
   current = normalizeImages(current);
+  // mkdocs-audio / mkdocs-video — must run BEFORE remark-directive sees the
+  // file, because `:video` / `:audio` inside the image alt would otherwise
+  // be parsed as an inline text directive and silently truncated.
+  {
+    const r = normalizeMedia(current);
+    current = r.text;
+    if (report !== undefined) {
+      report.media = (report.media ?? []).concat(r.promotions);
+    }
+  }
   current = normalizeInlineMarks(current);
   current = normalizeMkautodocBlocks(current);
   current = normalizeFastapiIncludes(current);

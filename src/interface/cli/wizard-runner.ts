@@ -11,15 +11,16 @@ import { resolveInteractivity } from '../../infrastructure/env/tty-detection.js'
 import { deriveDefaults } from '../../use-cases/wizard/derive-defaults.js';
 import { runWizard } from '../../use-cases/wizard/run-wizard.js';
 import { answersToFlags } from '../../use-cases/wizard/answers-to-flags.js';
+import { needsAttentionPreview } from '../../use-cases/wizard/needs-attention-preview.js';
+import { confirmOverwriteIfNeeded } from '../../use-cases/wizard/confirm-overwrite.js';
+import { formatEquivalentCommand } from '../../use-cases/wizard/format-equivalent-command.js';
+import { getTranslationDepth } from '../../domain/conversion-mapping/table.js';
 import { parseArgs, type Command } from './parse-args.js';
-import { readFile } from 'node:fs/promises';
-import { join } from 'node:path';
-import { createJsYamlDecoder } from '../../infrastructure/yaml/js-yaml-decoder.js';
-import { parseMkdocsConfig } from '../../use-cases/config/parse-mkdocs.js';
+import { createNodeDirInspector } from '../../infrastructure/fs/dir-inspector.js';
 import { explainConversion } from '../../use-cases/explain-conversion/explain.js';
 import { extractSnippetBasePaths } from '../../use-cases/config/snippet-base-paths.js';
+import { readProjectDirInteractively } from './wizard-project-dir.js';
 import type { ConversionPlan } from '../../domain/wizard/plan.js';
-import type { Prompter } from '../../domain/wizard/ports/prompter.js';
 import type { CliIo } from './main.js';
 
 export interface WizardRunResult {
@@ -33,9 +34,6 @@ export interface WizardRunCancelled {
 export interface WizardRunNonInteractive {
   readonly kind: 'non-interactive';
 }
-
-/** Max attempts to re-prompt for a project dir before giving up. */
-const PROJECT_DIR_MAX_ATTEMPTS = 3;
 
 export async function runWizardFlow(
   projectDirHint: string,
@@ -92,6 +90,42 @@ export async function runWizardFlow(
     );
   }
 
+  // Pre-conversion warnings: surface every mapping row whose translation is
+  // lossy or manual BEFORE the conversion runs, so the user knows what
+  // post-conversion work to expect. Full / passthrough / recommend-dep rows
+  // are silent — those are the happy-path translations.
+  const lossyRows = plan.mappingRows.filter(
+    (row) => getTranslationDepth(row) === 'lossy-named',
+  );
+  const manualRows = plan.mappingRows.filter(
+    (row) => getTranslationDepth(row) === 'manual',
+  );
+  if (lossyRows.length > 0) {
+    prompter.note(
+      lossyRows.map((r) => `• ${r.featureId} — ${r.starlightOutput}`).join('\n'),
+      `${String(lossyRows.length)} lossy translation${lossyRows.length === 1 ? '' : 's'} (named loss; diagnostic surfaces it)`,
+    );
+  }
+  if (manualRows.length > 0) {
+    prompter.note(
+      manualRows.map((r) => `• ${r.featureId} — ${r.starlightOutput}`).join('\n'),
+      `${String(manualRows.length)} manual remediation${manualRows.length === 1 ? '' : 's'} required (no automatic translation)`,
+    );
+  }
+
+  // Heads-up: any plugin/extension that won't auto-convert is surfaced as a
+  // single bulleted note before any prompt fires, with a learn-more URL per
+  // item. Same data that lands in MIGRATION_NOTES.md after conversion — we
+  // just show it earlier so the user can decide whether to proceed.
+  const attention = needsAttentionPreview(configValue);
+  if (attention.length > 0) {
+    const lines = attention.map((a) => `• ${a.name} — ${a.docsUrl}`);
+    prompter.note(
+      lines.join('\n'),
+      `${String(attention.length)} item${attention.length === 1 ? '' : 's'} will need manual attention`,
+    );
+  }
+
   // Step 3: run the rest of the wizard (outputDir, packageManager, Tier 1, Tier 2).
   const result = await runWizard({ projectDir, plan, defaults, prompter });
   if (!result.ok) {
@@ -99,83 +133,34 @@ export async function runWizardFlow(
     return { kind: 'cancelled' };
   }
 
-  const flags = answersToFlags(result.value);
+  // Safety net: outputDir is a destructive write target. If it already exists
+  // and is non-empty, surface the warning and ask once — defaulting to "no" so
+  // an inattentive Enter can't trample an unrelated project. On confirm we
+  // append --force so the convert path proceeds; on decline we exit cleanly.
+  const overwrite = await confirmOverwriteIfNeeded(
+    prompter,
+    createNodeDirInspector(),
+    result.value.outputDir,
+  );
+  if (overwrite === 'cancelled') {
+    prompter.cancel('Cancelled. No files were written.');
+    return { kind: 'cancelled' };
+  }
+
+  const baseFlags = answersToFlags(result.value);
+  const flags = overwrite === 'confirmed' ? [...baseFlags, '--force'] : baseFlags;
   const reparsed = parseArgs(flags);
   if (reparsed.kind !== 'convert') {
     io.stderr(`error: wizard produced an invalid command: ${JSON.stringify(reparsed)}`);
     prompter.cancel('Cancelled. No files were written.');
     return { kind: 'cancelled' };
   }
-  return { kind: 'success', command: reparsed, equivalentFlags: flags };
-}
-
-interface LoadedConfig {
-  readonly projectDir: string;
-  readonly configValue: ReturnType<typeof parseMkdocsConfig> extends infer R
-    ? R extends { ok: true; value: infer V }
-      ? V
-      : never
-    : never;
-}
-
-/**
- * Prompt for the project dir, validate non-empty, then attempt to load
- * mkdocs.yml. If loading fails, surface the reason via `log.warn` and re-prompt
- * up to a small max so a typo is recoverable.
- *
- * The path picker (clack 1.3+) renders directory completion live, so users
- * can tab through their filesystem instead of typing the full path. While
- * the mkdocs.yml read+parse runs, a spinner shows progress so the prompt
- * doesn't appear to hang on slow disks or large config files.
- */
-async function readProjectDirInteractively(
-  prompter: Prompter,
-  initialHint: string,
-): Promise<LoadedConfig | 'cancelled'> {
-  const yaml = createJsYamlDecoder();
-  let hint = initialHint;
-  for (let attempt = 0; attempt < PROJECT_DIR_MAX_ATTEMPTS; attempt++) {
-    const projectDir = await prompter.path({
-      message: 'Project directory (containing mkdocs.yml)',
-      initialValue: hint,
-      directory: true,
-      validate: (value) => {
-        if (value.trim().length === 0) return 'Path is required.';
-        return undefined;
-      },
-    });
-    if (projectDir === null) return 'cancelled';
-
-    const configPath = join(projectDir, 'mkdocs.yml');
-    const spin = prompter.spinner({
-      initialMessage: `Reading ${configPath}`,
-    });
-    let configText: string;
-    try {
-      configText = await readFile(configPath, 'utf8');
-    } catch {
-      spin.error(`No mkdocs.yml at ${configPath}.`);
-      hint = projectDir;
-      continue;
-    }
-    spin.message('Parsing mkdocs.yml');
-    const decoded = yaml.decode(configText);
-    if (!decoded.ok) {
-      spin.error(`mkdocs.yml is not valid YAML: ${decoded.error.message}`);
-      hint = projectDir;
-      continue;
-    }
-    const config = parseMkdocsConfig(decoded.value);
-    if (!config.ok) {
-      spin.error(`mkdocs.yml is missing required fields: ${config.error.message}`);
-      hint = projectDir;
-      continue;
-    }
-    spin.stop(`Loaded ${configPath}`);
-    return { projectDir, configValue: config.value as LoadedConfig['configValue'] };
-  }
-  prompter.log.error(
-    `Gave up after ${String(PROJECT_DIR_MAX_ATTEMPTS)} attempts. Run with --help to see CLI flags.`,
+  // Show the equivalent CLI invocation as a framed note so the user can save
+  // it for unattended re-runs. Rendered while the prompter session is still
+  // active — once we return, the shell prints the diagnostic report unframed.
+  prompter.note(
+    formatEquivalentCommand(flags),
+    'Equivalent command (save to re-run unattended)',
   );
-  return 'cancelled';
+  return { kind: 'success', command: reparsed, equivalentFlags: flags };
 }

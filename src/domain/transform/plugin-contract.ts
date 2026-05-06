@@ -24,7 +24,7 @@ export type PipelineStage = (typeof PIPELINE_STAGES)[number];
  * No two plugins may declare the same cell. Plugins that consume nodes whose
  * `name` is absent (e.g. raw `code` fences) declare `name: null`.
  */
-export interface NamespaceClaim {
+interface NamespaceClaim {
   readonly nodeType: string;
   readonly name: string | null;
 }
@@ -36,7 +36,7 @@ export interface PluginDescriptor {
   readonly dependsOn: ReadonlyArray<string>;
 }
 
-export interface ValidationError {
+interface ValidationError {
   readonly message: string;
 }
 

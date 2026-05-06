@@ -5,53 +5,165 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
 [![Node](https://img.shields.io/node/v/mkdocs-material-to-starlight.svg)](./package.json)
 
-Convert MkDocs Material documentation sites to Astro Starlight. Built on the unified/remark ecosystem with plugin-isolated, idempotent, diagnostic-first transforms.
+**Move your MkDocs Material site to Astro Starlight without rewriting pages by hand.**
+
+Point one command at your `mkdocs.yml` and get a buildable Starlight project: pages converted, plugins mapped, sidebar wired up, redirects preserved, i18n intact. Anything the converter cannot handle lands in `MIGRATION_NOTES.md` with a file and line number.
+
+---
 
 ## Quick start
-
-Requires Node ≥ 20. Run the interactive wizard against your MkDocs project — no install needed:
 
 ```bash
 npx mkdocs-material-to-starlight
 ```
 
-The wizard auto-detects features in your `mkdocs.yml` and only asks about decisions that actually apply. When it finishes, it prints the equivalent unattended command so you can reproduce the run in CI.
+The interactive wizard reads your `mkdocs.yml`, asks about the decisions that apply to your site, and writes a working Astro project. Then:
 
-The output directory will contain a complete, buildable Astro/Starlight project:
+```bash
+cd ./starlight-out
+npm install
+npm run dev
+```
+
+Your docs are live on Starlight. Requires Node 20+.
+
+> **Preview the plan without writing files:**
+> `npx mkdocs-material-to-starlight ./my-mkdocs --explain`
+
+---
+
+## Why use this
+
+- **Handles real sites.** Around 860 tests run against fixtures from FastAPI, Pydantic, Polars, httpx, Typer, SQLModel, AWS Nuke, and Privacy Guides. The full pipeline finishes in seconds.
+- **Maps every Material feature.** Admonitions, tabs, grids, snippets, icons, math, mermaid, i18n, mike versions. Features without a clean Starlight equivalent (Jinja macros, custom theme overrides) become diagnostics with file and line numbers.
+- **Scripts cleanly.** The wizard prints its equivalent unattended command on exit. Drop that command into a CI workflow. Exit codes follow Unix convention.
+- **Idempotent.** Running it twice produces byte-identical output, so reruns do not churn diffs.
+
+---
+
+## What it converts
+
+If MkDocs Material renders it, this tool maps it. The mapping by area:
+
+<details>
+<summary><strong>Markdown syntax and PyMdown extensions</strong></summary>
+
+| MkDocs Material | Starlight output |
+|---|---|
+| `!!! note "Title"` admonitions (12 types) | `:::note[Title]` aside directives, type-mapped to Starlight's 4 |
+| `??? note` / `???+ note` collapsible | `<details><summary>Title</summary>...</details>` |
+| `=== "Tab"` content tabs | `<div class="sl-tabs">…</div>` (with shim CSS) |
+| `<div class="grid cards" markdown>` | `<div class="sl-card-grid">…</div>` |
+| `<div class="grid" markdown>` | `<div class="sl-grid">…</div>` |
+| `:material-rocket:` / `:fontawesome-brands-github:` | `:icon[rocket]` / `:icon[github]`, with curated name mapping plus SVG fallback |
+| `--8<-- "snippet.md"` | Inlines snippet content (with cycle detection and depth limit) |
+| `==text==` highlights | `<mark>text</mark>` |
+| `H~2~O` subscripts and `2^10^` superscripts | `<sub>` and `<sup>` |
+| `++ctrl+alt+del++` keyboard keys | `<kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>Del</kbd>` |
+| `[link](api/auth.md)` internal refs | Rewritten to Starlight slugs (`[link](/api/auth)`) |
+| Footnotes (`[^1]`) | GFM footnotes via remark-gfm |
+| Math (`$inline$`, `$$block$$`) | remark-math plus rehype-katex (deps included) |
+| ` ```mermaid ` blocks | astro-mermaid (dep included) |
+| MagicLink autolinks (`@user`, `#123`) | Markdown links pointing at GitHub from `repo_url` |
+| Definition lists, abbreviations, buttons, CriticMarkup, code annotations | Normalized to standard Markdown or styled HTML |
+
+</details>
+
+<details>
+<summary><strong>Site config and navigation</strong></summary>
+
+| MkDocs | Starlight output |
+|---|---|
+| `nav:` tree | `sidebar` config in `astro.config.mjs` |
+| `site_name`, `site_description`, `site_url` | `title`, `description` on the integration; `site` on Astro config |
+| Missing frontmatter `title` | Synthesized from first H1 or humanized filename (Starlight requires it) |
+
+</details>
+
+<details>
+<summary><strong>Plugins</strong></summary>
+
+| MkDocs plugin | Starlight output |
+|---|---|
+| `mkdocs-redirects` | `redirects: { … }` in `astro.config.mjs` |
+| `mkdocs-static-i18n` | Directory-prefix layout (`fr/page.md`) plus `locales: { … }` |
+| `mkdocs-section-index` | Section `index.md` hoisted to first child of its sidebar group |
+| `mkdocs-literate-nav` | `SUMMARY.md` parsed and used as the nav source |
+| `mkdocs-include-markdown-plugin` | `{% include %}` resolved inline before conversion |
+| `mkdocs-rss-plugin` | `@astrojs/rss` dep plus `src/pages/rss.xml.ts` scaffold |
+| `mkdocs-glightbox` | `starlight-image-zoom` dep |
+| `mike` (versioned docs) | `starlight-versions` dep |
+| `mkdocs-git-revision-date-localized` | Built-in `lastUpdated: true` |
+| `blog`, `tags` (Material) | `starlight-blog`, `starlight-tags` deps |
+| `mkdocs-macros-plugin` (Jinja2) | Per-occurrence diagnostic with file:line locator (cannot be evaluated) |
+| `gen-files`, `print-site`, `monorepo`, `multirepo`, `social`, `meta`, `privacy`, `mkdocstrings`, `mkdocs-jupyter` | Diagnostic in `MIGRATION_NOTES.md` with documented workaround |
+
+</details>
+
+---
+
+## What you get
 
 ```
 output/
-├── astro.config.mjs              ← migrated config + sidebar
-├── package.json                  ← buildable scripts + pinned deps
-├── MIGRATION_NOTES.md            ← human-readable diagnostics
-├── public/                       ← non-Markdown assets (images, PDFs, …)
+├── astro.config.mjs              ← migrated config: sidebar, redirects, locales
+├── package.json                  ← scripts and pinned deps for every feature you used
+├── MIGRATION_NOTES.md            ← human-readable diagnostics, grouped by rule
+├── public/                       ← non-Markdown assets (images, PDFs) copied through
 └── src/
-    ├── content/docs/             ← every Markdown file converted
-    └── styles/mkdocs-migration.css  ← shim for grid/card/tabs styling
+    ├── content/docs/             ← every Markdown page, converted
+    └── styles/mkdocs-migration.css  ← shim so grids, cards, and tabs render correctly
 ```
 
-Then `cd output && npm install && npm run dev`.
+The project builds as-is for the common case. `cd output && npm install && npm run dev` and you have a running Starlight site.
 
-## Usage
+---
 
-```sh
-# Interactive wizard (recommended for first-time conversions)
+## Common workflows
+
+```bash
+# First-time conversion: interactive wizard (recommended)
 npx mkdocs-material-to-starlight
 
-# Unattended (CI / scripted)
+# Unattended (CI or scripted): accepts the wizard's defaults
 npx mkdocs-material-to-starlight ./mkdocs-project ./starlight-out --yes
 
-# See what will happen, without writing anything
+# Dry-run: print the migration plan, write nothing
 npx mkdocs-material-to-starlight ./mkdocs-project --explain
+
+# Run with astro check so type and link errors fail fast
+npx mkdocs-material-to-starlight ./mkdocs-project ./starlight-out --yes --check
+
+# Resolve PyMdown snippets from a custom directory
+npx mkdocs-material-to-starlight ./mkdocs-project ./starlight-out \
+  --yes --snippet-base-path docs --snippet-base-path includes
 ```
 
-The wizard auto-detects features in your `mkdocs.yml` (tabs, snippets, RSS,
-mike versions, i18n, palette) and only asks about decisions that actually
-apply to your site. Every wizard answer maps to a CLI flag, so you can
-reproduce a wizard run unattended by pasting the equivalent command the
-wizard prints at the end.
+The wizard prints the equivalent unattended command when it finishes, ready to paste into CI.
 
-## CLI
+---
+
+## Diagnostics
+
+The converter does not throw on bad input. Anything it cannot handle becomes a typed diagnostic on the run report. A malformed admonition will not abort a 2,000-page conversion.
+
+In your terminal:
+
+```
+api/auth.md:12:4  warning  broken-link  link target "missing.md" was not found in the slug map
+```
+
+In `outputDir/MIGRATION_NOTES.md`:
+
+- A per-rule breakdown of every diagnostic, grouped by file
+- Any unmapped `mkdocs.yml` top-level fields you may want to migrate by hand
+- Workaround pointers for plugins that have no clean Starlight equivalent
+
+Every rule is documented. `--explain` prints the registered description and fix for each one before you run a conversion.
+
+---
+
+## CLI reference
 
 ```
 mkdocs-material-to-starlight <project-dir> <output-dir> [options]
@@ -64,10 +176,11 @@ Convert options:
   --check                      After conversion, run `astro check` against the
                                output and surface its diagnostics.
   --check-timeout <ms>         Override the astro-check timeout (default: 5min).
-  --dry-run                    Plan only — do not write files (not yet implemented).
+  --dry-run                    Plan only, do not write files. (Not yet wired through.)
+  --yes                        Accept wizard defaults; skip interactive prompts.
 
-Compare options (visual-diff between rendered MkDocs and Starlight pages):
-  --pages a,b,c                Comma-separated list of paths to diff (default: /).
+Compare options (visual diff between rendered MkDocs and Starlight pages):
+  --pages a,b,c                Comma-separated paths to diff (default: /).
   --threshold 0.01             Mismatch ratio that still counts as a match.
   --report file.md             Write the Markdown report to a file instead of stdout.
 
@@ -76,78 +189,18 @@ Common:
   --version                    Print the version.
 ```
 
-Exit codes follow Unix convention: `0` success, `1` runtime failure, `2` usage error.
+Exit codes: `0` success, `1` runtime or check failure, `2` usage error.
 
-`compare` requires Playwright + pixelmatch (`npm install playwright pixelmatch pngjs && npx playwright install chromium`). They are intentionally optional — the converter itself doesn't depend on them.
+The `compare` subcommand requires Playwright and pixelmatch as optional peers:
 
-## What it converts
-
-| MkDocs Material feature | How it appears in Starlight output |
-|---|---|
-| `!!! note "Title"` admonitions (12 types) | `:::note[Title]` aside directives, type-mapped to Starlight's 4 |
-| `??? note` / `???+ note` collapsible | `<details><summary>Title</summary>...</details>` |
-| `=== "Tab"` content tabs | `<div class="sl-tabs"><div class="sl-tab" data-label="Tab">...</div></div>` |
-| `<div class="grid cards" markdown>` | `<div class="sl-card-grid"><div class="sl-card">...</div></div>` |
-| `<div class="grid" markdown>` | `<div class="sl-grid">...</div>` |
-| `:material-rocket:` / `:fontawesome-brands-github:` icons | `:icon[rocket]` / `:icon[github]` directives, with curated Material → Starlight name mapping and SVG fallback |
-| `--8<-- "snippet.md"` | Snippet content inlined verbatim (with cycle detection + depth limit) |
-| `==text==` highlights | `<mark>text</mark>` |
-| `H~2~O` subscripts | `H<sub>2</sub>O` |
-| `2^10^` superscripts | `2<sup>10</sup>` |
-| `++ctrl+alt+del++` keyboard keys | `<kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>Del</kbd>` |
-| Internal `[link](api/auth.md)` references | Rewritten to Starlight slugs `[link](/api/auth)` |
-| Footnotes (`[^1]`) | GFM footnotes (passthrough; remark-gfm) |
-| Math (`$inline$`, `$$block$$`) | remark-math + rehype-katex (deps added automatically) |
-| ` ```mermaid ` fenced blocks | astro-mermaid (dep added automatically) |
-| MagicLink autolinks (`@user`, `#123`) | Markdown link syntax pointing at GitHub when a `repo_url` is configured |
-| Definition lists, abbreviations, buttons, CriticMarkup, code annotations | Normalized to standard Markdown / styled HTML |
-| `mkdocs.yml` `nav` tree | Starlight `sidebar` config in `astro.config.mjs` |
-| `site_name`, `site_description`, `site_url` | `title`, `description` on the Starlight integration; `site` on Astro config |
-| `mkdocs-redirects` `redirect_maps` | `redirects: { … }` block in `astro.config.mjs` |
-| `mkdocs-static-i18n` per-locale files (`page.fr.md`) | Starlight directory-prefix layout (`fr/page.md`) + `locales: { … }` config |
-| `mkdocs-section-index` plugin | Section `index.md` hoisted to first child of its sidebar group |
-| `mkdocs-literate-nav` `SUMMARY.md` | Parsed and used as the navigation source |
-| `mkdocs-include-markdown-plugin` `{% include %}` | Resolved inline before per-file conversion |
-| `mkdocs-rss-plugin` | `@astrojs/rss` dependency + `src/pages/rss.xml.ts` endpoint scaffold |
-| `mkdocs-glightbox` | `starlight-image-zoom` dependency |
-| `mike` (versioned docs) | `starlight-versions` dependency |
-| `mkdocs-git-revision-date-localized` | Starlight built-in `lastUpdated: true` |
-| Material `blog`, `tags` plugins | `starlight-blog`, `starlight-tags` dependencies |
-| `mkdocs-macros-plugin` (Jinja2) | Per-occurrence diagnostic with file:line locator (cannot be evaluated) |
-| Unmappable plugins (`gen-files`, `print-site`, `monorepo`, `multirepo`, `social`, `meta`, `privacy`, `mkdocstrings`, `mkdocs-jupyter`) | Diagnostic in `MIGRATION_NOTES.md` with documented workaround path |
-
-Frontmatter `title` is automatically synthesized when missing — from the first H1 if present, otherwise from a humanized filename (`api/auth-tokens.md` → `Auth Tokens`, `index.md` → `Home`). Starlight requires `title`; the converter ensures every page has one.
-
-## Diagnostics
-
-Conversion is diagnostic-first: transformations that cannot complete attach a `Diagnostic` to the run report rather than throwing. The CLI prints them to stdout in unified-style format:
-
-```
-api/auth.md:12:4  warning  broken-link  link target "missing.md" was not found in the slug map
+```bash
+npm install playwright pixelmatch pngjs
+npx playwright install chromium
 ```
 
-The full per-rule breakdown also lands in `outputDir/MIGRATION_NOTES.md` along with any unmapped `mkdocs.yml` top-level fields you may want to migrate by hand.
+These are optional. The converter itself does not depend on them.
 
-## Design pillars
-
-The architectural design behind the converter is documented in detail in the research report (see `~/Documents/MkDocs_to_Starlight_Research_20260501/research_report_20260501_mkdocs_to_starlight.md` if you ran the deep-research generation).
-
-- **Plugin-isolated.** Every transform owns a disjoint MDAST `(node-type, name)` namespace. Plugins are commutative within a stage; reordering them does not change output. Adding a new construct never breaks an existing one.
-- **Idempotent.** `convert(convert(x)) === convert(x)` byte-equal. Verified at unit, composed, file, site, and CLI levels.
-- **Diagnostic-first.** Transformations that cannot complete attach a typed `Diagnostic` to the run report. They never throw — a single malformed admonition cannot abort a 2,000-page conversion.
-- **Functional core, imperative shell.** Business logic is pure functions in `domain/` and `use-cases/`. All I/O (file reads, YAML parsing, file writes) lives behind ports in `infrastructure/` and is wired into use-cases at the `interface/` boundary.
-
-## Architecture
-
-```
-src/
-├── domain/         Pure types, value objects, and ports (no I/O, no framework deps)
-├── use-cases/      Application orchestration; functional core
-├── infrastructure/ Adapters for file system, YAML, unified — the imperative shell
-└── interface/      CLI and programmatic API; the only place that wires concrete adapters
-```
-
-`CLAUDE.md` contains the complete working agreement and the 14 architectural rules every change is held to.
+---
 
 ## Programmatic API
 
@@ -157,7 +210,7 @@ import { convertSiteFromDisk } from 'mkdocs-material-to-starlight';
 const result = await convertSiteFromDisk({
   projectDir: '/path/to/mkdocs-project',
   outputDir: '/path/to/output',
-  snippetBasePaths: ['docs'], // optional — enables snippet expansion
+  snippetBasePaths: ['docs'], // optional; enables snippet expansion
 });
 
 if (!result.ok) {
@@ -170,11 +223,47 @@ for (const tagged of result.value.diagnostics) {
 }
 ```
 
-The result also exposes the generated `astroConfigSource`, `packageJsonSource`, `migrationNotesSource`, and `sidebarSource` for inspection.
+The success result also exposes `astroConfigSource`, `packageJsonSource`, `migrationNotesSource`, and `sidebarSource` for inspection or custom write strategies.
+
+---
+
+## Limitations
+
+Read these before you commit the output:
+
+- **Theme palette and custom CSS or JS** (`theme.palette`, `overrides/`, `extra_css`, `extra_javascript`) land in `MIGRATION_NOTES.md` rather than getting auto-translated. Starlight's design system has a different structure from Material's, so you will want to re-pick colors against the Starlight theme.
+- **`mkdocs-macros-plugin` Jinja2 expressions** cannot be evaluated. Each `{{ … }}` and `{% … %}` site is reported with file and line so it can be replaced by hand.
+- **`mkdocs-section-index` and `mkdocs-literate-nav`** cover the common cases. Advanced patterns (per-directory recursive `SUMMARY.md`, implicit-index injection for entries not in `nav:`) are not yet implemented.
+- **`--dry-run`** is parsed but a no-op. Use `--explain` instead.
+
+Run `--explain` first to see which features in your site will trigger diagnostics.
+
+---
+
+## How it works
+
+Built on the [unified](https://unifiedjs.com) and [remark](https://github.com/remarkjs/remark) ecosystem. Four design pillars:
+
+- **Plugin-isolated.** Every transform owns a disjoint MDAST `(node-type, name)` namespace. Plugins are commutative; reordering them does not change output.
+- **Idempotent.** `convert(convert(x)) === convert(x)` byte-equal. Verified at unit, composed, file, site, and CLI levels.
+- **Diagnostic-first.** Failures attach typed diagnostics to the report. They never throw.
+- **Functional core, imperative shell.** Pure logic in `domain/` and `use-cases/`. All I/O lives behind ports in `infrastructure/`.
+
+```
+src/
+├── domain/         Pure types, value objects, ports (no I/O, no framework deps)
+├── use-cases/      Application orchestration; functional core
+├── infrastructure/ Adapters for file system, YAML, unified; the imperative shell
+└── interface/      CLI and programmatic API; the only place that wires concrete adapters
+```
+
+The full working agreement and architectural rules live in [`CLAUDE.md`](./CLAUDE.md).
+
+---
 
 ## Development
 
-Requires Node ≥ 20.
+Requires Node 20+.
 
 ```bash
 npm install
@@ -186,20 +275,11 @@ npx vitest run path/to/file.test.ts           # single test file
 npx vitest run -t 'pattern matches subject'   # single test by title
 ```
 
-## Testing discipline
+Every commit that introduces production code includes the failing test that motivated it. The idempotency property test runs the full pipeline twice on every fixture and asserts byte-equality of the second pass.
 
-This project follows Test-Driven Development strictly. Every commit that introduces production code includes the failing test that motivated it. The discipline is documented in `CLAUDE.md`.
+Bug reports, real-world fixtures, and PRs are welcome at [github.com/sitapix/mkdocs-material-to-starlight/issues](https://github.com/sitapix/mkdocs-material-to-starlight/issues). Sites that break the converter are the most valuable contribution.
 
-The idempotency property test runs the full pipeline twice on every fixture and asserts byte-equality of the second pass. If this test fails, the pipeline has order-coupling — fix it before merging.
-
-The structural regression suite in `tests/integration/nesting-regression.test.ts` asserts that nested constructs (cards inside grids, tabs inside tab containers) appear *between* the outer wrapper's open/close tags, not as orphan siblings. This test class catches the kind of bug that "presence" assertions miss.
-
-## Limitations
-
-- `mkdocs.yml` `theme.palette` colors and custom theme overrides (`overrides/`, `extra_css`, `extra_javascript`) are surfaced in `MIGRATION_NOTES.md` rather than translated automatically.
-- `mkdocs-macros-plugin` Jinja2 expressions cannot be evaluated. Each `{{ … }}` and `{% … %}` site is reported in `MIGRATION_NOTES.md` with file and line so they can be replaced by hand.
-- The `mkdocs-section-index` and `mkdocs-literate-nav` integrations cover the common cases; advanced features (literate-nav per-directory `SUMMARY.md` recursion, section-index implicit-index injection for entries not present in `nav:`) are not yet implemented.
-- The `--dry-run` flag is not yet wired through (parsed but ignored).
+---
 
 ## License
 

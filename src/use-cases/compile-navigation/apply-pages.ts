@@ -1,22 +1,18 @@
 /**
  * Apply awesome-pages `.pages` overrides to a compiled sidebar tree.
  *
- * Pure: takes the sidebar entries and a map of `directorySlug → .pages config`
- * and returns a new sidebar with:
- *   - group labels overridden when the matching directory's `.pages` has a
- *     `title:`
- *   - groups dropped entirely when `.pages` has `hide: true`
- *   - groups marked `collapsed: true` when `.pages` has `collapse: true`
- *   - group items reordered to match the `.pages` `nav:` sequence, with the
- *     `...` rest placeholder controlling where unlisted entries land and
- *     `{ Title: file.md }` titled entries renaming the visible label
+ * Pure: takes the sidebar entries and a `directorySlug → .pages config`
+ * map. Overrides:
+ *   - `title:` overrides the group label.
+ *   - `hide: true` drops the group.
+ *   - `collapse: true` marks `collapsed: true`.
+ *   - `nav:` reorders items; `...` is the rest placeholder for unlisted
+ *     entries; `{ Title: file.md }` renames the visible label.
  *
- * Walks recursively so nested groups receive overrides from their own
- * directory's `.pages` file.
- *
- * The directory key is derived from the FIRST slug entry inside the group: a
- * group whose first slug is `api/auth` belongs to directory `api`. Groups
- * containing only nested groups or external links pass through unchanged.
+ * Recurses so nested groups get their own directory's overrides. The
+ * directory key comes from the first slug entry inside the group (a group
+ * whose first slug is `api/auth` belongs to `api`). Groups holding only
+ * nested groups or external links pass through.
  */
 
 import type {

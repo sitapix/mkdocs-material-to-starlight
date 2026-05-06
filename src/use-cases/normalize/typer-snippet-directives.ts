@@ -1,37 +1,30 @@
 /**
- * Pre-parse normalizer: convert typer-style {* path *} source-include
- * directives to HTML TODO comments and emit per-occurrence info diagnostics.
+ * Pre-parse normalizer: convert typer-style `{* path *}` source-include
+ * directives to HTML TODO comments and emit info diagnostics.
  *
- * Typer (and fastapi) use a custom MkDocs macros plugin that inlines source
- * files at build time, e.g.:
- *
+ * Typer and fastapi inline source files at build time:
  *   {* docs_src/first_steps/tutorial001.py *}
  *   {* docs_src/first_steps/tutorial001.py hl[3] *}
  *
- * The converter cannot run that plugin. Rather than wrapping the directive in
- * a code fence (which buries it and makes the output look like a broken code
- * example), we replace it with an HTML comment that:
- *   - Preserves the path so the author can find every site to inline manually.
- *   - Survives remark-parse + remark-stringify without being mangled.
- *   - Is searchable: grep 'TODO.*typer snippet' finds all occurrences.
+ * The converter cannot run that plugin. The replacement HTML comment
+ * preserves the path, survives remark round-trips, and stays grep-able
+ * (`TODO.*typer snippet`).
  *
- * Each replaced directive emits one typer-snippet-directive-detected info
- * diagnostic so the path appears in MIGRATION_NOTES.md.
+ * Each replacement emits a typer-snippet-directive-detected info diagnostic
+ * so the path lands in MIGRATION_NOTES.md. Runs at convert-site level
+ * (before convertFile) so diagnostics attach to the file path. Also
+ * prevents the mkautodoc normalizer from fencing remaining `{* ... *}`
+ * lines.
  *
- * This runs at the convert-site level (before convertFile) so diagnostics
- * can be attached to the file path. The replacement also prevents the
- * mkautodoc normalizer from fencing any remaining {* ... *} lines.
- *
- * Idempotency: the replacement starts with <!-- which does not match the
- * SNIPPET_LINE pattern, so a second pass skips it.
+ * Idempotent: the replacement starts with `<!--` and skips the SNIPPET_LINE
+ * pattern.
  */
 
 import {
   createDiagnostic,
   type Diagnostic,
 } from '../../domain/diagnostics/diagnostic.js';
-
-const FENCE = /^ {0,3}(```|~~~)/;
+import { isFenceLine } from '../../domain/syntax/fence.js';
 // A whole-line {* path *} marker. The path may include highlight hints like
 // hl[3] or hl[1,2]. Requires at least one character of payload between the
 // markers (an inline match in prose is not a real include directive).
@@ -53,7 +46,7 @@ export function normalizeTyperSnippetDirectives(
 
   for (const line of lines) {
     lineNumber += 1;
-    if (FENCE.test(line)) {
+    if (isFenceLine(line)) {
       out.push(line);
       inFence = !inFence;
       continue;

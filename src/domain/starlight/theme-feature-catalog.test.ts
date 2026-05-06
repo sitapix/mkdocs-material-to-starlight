@@ -49,15 +49,31 @@ describe('classifyThemeFeature', () => {
   });
 
   it('returns a non-empty note for every classified feature', () => {
-    for (const f of [
-      'navigation.tabs',
-      'navigation.prune',
-      'toc.follow',
-      'content.code.copy',
-    ]) {
+    for (const f of ['navigation.tabs', 'navigation.prune', 'toc.follow', 'content.code.copy']) {
       const result = classifyThemeFeature(f);
       expect(result).not.toBeNull();
       expect(result?.note.length).toBeGreaterThan(0);
     }
+  });
+
+  it('classifies Material 9.7 footnote tooltips as unsupported', () => {
+    // Material 9.7 added hover-tooltips for `[^1]` footnote references; no
+    // Starlight equivalent. Users wanting parity must build a custom MDX
+    // component or footnote-popover script. Flag name verified against the
+    // Material docs: SINGULAR `footnote`, not `footnotes`.
+    const result = classifyThemeFeature('content.footnote.tooltips');
+    expect(result).not.toBeNull();
+    expect(result?.kind).toBe('unsupported');
+    expect(result?.note).toMatch(/footnote/i);
+  });
+
+  it('does NOT register navigation.alternate (Material 9.7 stay-on-page is automatic)', () => {
+    // Verified against Material docs and issue #4835: stay-on-page when
+    // switching languages is built-in to 9.7+ and requires no theme.features
+    // flag. The behaviour activates whenever `extra.alternate:` is configured
+    // in mkdocs.yml. We deliberately do NOT register a synthetic
+    // `navigation.alternate` entry — that flag does not exist, and pretending
+    // it does would mislead users grepping diagnostics.
+    expect(classifyThemeFeature('navigation.alternate')).toBeNull();
   });
 });

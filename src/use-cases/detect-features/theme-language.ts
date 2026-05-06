@@ -69,11 +69,23 @@ const LOCALE_LABELS: ReadonlyMap<string, string> = new Map(
   }),
 );
 
+// BCP-47 language tag shape — letters/digits/hyphens, must start with a
+// letter. Real-world break (Enveloppe/mkdocs-publisher-template): the
+// boilerplate writes `theme.language: $language` expecting CI to substitute
+// the value at build time. Without substitution, the literal `$language`
+// reaches our locale extractor and surfaces as
+//   defaultLocale: '$language'
+// which Astro rejects with "Could not validate language tag '$language'".
+// Anything not matching this shape — Jinja placeholders, accidental
+// quotes — should fall back to no-op (Starlight defaults to English).
+const VALID_LANG_TAG_RE = /^[A-Za-z][A-Za-z0-9-]*$/;
+
 export function extractThemeLanguage(
   themeOptions: Readonly<Record<string, unknown>>,
 ): ThemeLanguageConfig | undefined {
   const raw = themeOptions['language'];
   if (typeof raw !== 'string') return undefined;
+  if (!VALID_LANG_TAG_RE.test(raw)) return undefined;
   if (raw === 'en') return undefined;
   return {
     code: raw,

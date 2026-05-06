@@ -1,24 +1,21 @@
 /**
  * @clack/prompts adapter implementing the Prompter port.
  *
- * Cancellation: every clack helper returns a special symbol (detected via
- * `isCancel`) on Ctrl+C; we map it to `null` per the Prompter contract.
+ * Cancellation: clack helpers return a special symbol (detected via
+ * `isCancel`) on Ctrl+C; the adapter maps it to `null` per the Prompter
+ * contract.
  *
- * Lazy-loadable: this module imports @clack/prompts at module load. Callers
- * who don't enter the wizard branch must not import this module — the launcher
- * uses dynamic `await import('./clack-prompter.js')` to keep the cold path
- * free of clack/picocolors cost.
+ * Lazy-loadable: callers outside the wizard branch must not import this
+ * module — the launcher uses `await import('./clack-prompter.js')` to keep
+ * the cold path free of clack/picocolors cost.
  *
- * Color choices: the intro banner uses bgCyan + black foreground. Cyan is one
- * of the safer hues for color-vision deficiency (it sits well clear of the
- * red/green axis that protan/deutan users struggle with). Clack itself draws
- * its prompt status with both color AND a distinct unicode glyph (✓ for
- * success, ▲ for warn, ■ for error, ◆ for active prompt), so users who can't
- * distinguish the colors can still distinguish the levels by shape.
+ * Colors: the intro banner uses bgCyan + black, safe for protan/deutan
+ * color-vision deficiency. Clack's prompt status carries both color and a
+ * distinct unicode glyph (✓ ▲ ■ ◆), so users who can't distinguish hues
+ * can read the shapes.
  *
- * Settings: we call `updateSettings` once at module load to register vim-style
- * key aliases (j/k for down/up). This is opt-in convenience for vim users and
- * doesn't take anything away from arrow-key users — clack accepts both.
+ * Settings: `updateSettings` runs once at module load to add vim-style
+ * j/k aliases. Arrow keys still work; this is additive.
  */
 
 import {

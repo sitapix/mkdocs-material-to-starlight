@@ -1,24 +1,18 @@
 /**
- * Curated mapping from Material/FontAwesome/Octicons/Simple-Icons shortcodes
- * to Starlight built-in icon names. Pure data — no logic.
+ * Curated mapping from Material / FontAwesome / Octicons / Simple-Icons
+ * shortcodes to Starlight built-in icon names. Pure data, no logic.
  *
- * Starlight ships ~250 built-in icons across UI, brand, and tech-logo
- * categories; Material ships 10,000+ icons. Mapping every Material icon is
- * neither possible nor useful. This table covers the ~250 high-frequency
- * shortcodes that appear in real-world MkDocs Material docs (per the
- * research corpus): card grids, navigation, feature blocks, and the social
- * link sets configured under `extra.social[]`.
+ * Starlight ships ~250 built-in icons; Material ships 10,000+. This table
+ * covers the high-frequency shortcodes seen in real MkDocs Material docs:
+ * card grids, navigation, feature blocks, and `extra.social[]` link sets.
  *
- * Anything outside the table falls through to the SVG-package adapter
- * (kind: 'local-svg') which copies the original SVG asset into the
- * Starlight project's `src/icons/` directory. Users can override or extend
- * this map via the converter's config; their overrides win against the
- * curated table.
+ * Misses fall through to the local-svg adapter, which copies the original
+ * SVG into `src/icons/`. User overrides via converter config win against
+ * this table.
  *
- * Coverage notes:
- *   - Material UI vocabulary: alert/check/close/etc. → closest Starlight
- *     name (sometimes 1:1, sometimes approximate — Starlight's set is the
- *     ground truth).
+ * Coverage:
+ *   - Material UI vocabulary maps to the closest Starlight name (Starlight
+ *     is the ground truth; some matches are approximate).
  *   - Brand logos use Starlight's social-icon vocabulary.
  *   - Tech logos use Starlight's icon-set vocabulary (astro, vscode, npm,
  *     node, github, gitlab, ...).
@@ -498,4 +492,21 @@ export const ICON_SET_PREFIXES = [
   'lucide',
 ] as const;
 
-export type IconSet = (typeof ICON_SET_PREFIXES)[number];
+/**
+ * The set of Starlight built-in icon names this converter knows about,
+ * derived from the values of CURATED_ICON_MAP (deduplicated). Useful as a
+ * fallback for `:shortcode:` lookups: when an emoji shortcode has no
+ * Unicode-glyph mapping in gemoji, but the bare name happens to match a
+ * Starlight icon name (e.g. `:bitbucket:`, `:cloud-download:`,
+ * `:mastodon:`), the emoji normalizer emits `<Icon name="..." />` JSX
+ * instead of leaving the shortcode as literal text. The mdx-detection
+ * step then promotes the file to .mdx and auto-injects the Icon import.
+ *
+ * Note: this set is a SUBSET of Starlight's full built-in icon list (~250
+ * entries). It captures what the curated map already maps to; if a user
+ * has a shortcode matching a Starlight icon NOT in this set, they can
+ * extend the map via the converter's config.
+ */
+export const STARLIGHT_ICON_NAMES: ReadonlySet<string> = new Set(
+  Object.values(CURATED_ICON_MAP),
+);

@@ -81,6 +81,30 @@ describe('runCli', () => {
     expect(stdout.join('\n')).toMatch(/broken-link/);
   });
 
+  it('exits 1 when conversion produces an error-severity diagnostic', async () => {
+    // Real regression: before email-autolink and other sanitizer fixes, a
+    // file could be promoted to .mdx and then fail MDX parsing, producing
+    // an `output-syntax-error` diagnostic with `severity: 'error'`. The CLI
+    // used to print the report and exit 0, hiding the broken output from
+    // CI. Force a parse error by importing a Starlight component (forces
+    // MDX) and leaving an unclosed JSX-shaped tag the sanitizer can't
+    // safely escape.
+    writeFileSync(
+      join(projectDir, 'docs', 'index.md'),
+      [
+        "import { Aside } from '@astrojs/starlight/components';",
+        '',
+        '# Title',
+        '',
+        '<Aside>oops never closed',
+        '',
+      ].join('\n'),
+    );
+    const code = await runCli([projectDir, outputDir], makeIo());
+    expect(code).toBe(1);
+    expect(stdout.join('\n')).toMatch(/error/);
+  });
+
   it('prints a per-feature explanation on --explain without writing files', async () => {
     writeFileSync(
       join(projectDir, 'mkdocs.yml'),

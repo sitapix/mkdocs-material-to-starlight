@@ -3,12 +3,22 @@ import { unified } from 'unified';
 import remarkParse from 'remark-parse';
 import remarkStringify from 'remark-stringify';
 import remarkDirective from 'remark-directive';
+import { mdxJsxToMarkdown } from 'mdast-util-mdx-jsx';
 import { transformTabDirectives, type TabTransformOptions } from './tabs.js';
+
+function remarkMdxJsxStringify(this: { data: () => { toMarkdownExtensions?: unknown[] } }): undefined {
+  const data = this.data();
+  const list = data.toMarkdownExtensions ?? (data.toMarkdownExtensions = []);
+  const full = mdxJsxToMarkdown() as { handlers: unknown };
+  (list as unknown[]).push({ handlers: full.handlers });
+  return undefined;
+}
 
 function process(source: string, options: TabTransformOptions = {}): string {
   const file = unified()
     .use(remarkParse)
     .use(remarkDirective)
+    .use(remarkMdxJsxStringify)
     .use(transformTabDirectives, options)
     .use(remarkStringify, { bullet: '-', emphasis: '_', fences: true })
     .processSync(source);

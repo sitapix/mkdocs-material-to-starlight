@@ -18,8 +18,8 @@
  * pair openings with their indented bodies.
  */
 
-export type AdmonitionMarker = '!!!' | '???' | '???+';
-export type InlineMode = 'left' | 'end';
+type AdmonitionMarker = '!!!' | '???' | '???+';
+type InlineMode = 'left' | 'end';
 
 export interface AdmonitionOpening {
   readonly marker: AdmonitionMarker;
@@ -31,8 +31,19 @@ export interface AdmonitionOpening {
 }
 
 // Strict canonical Material syntax: `!!! type [inline [end]] ["Title"]`.
+// The space between marker and type is optional — real-world content
+// frequently writes the compact form `???warning "Title"` (DDEV regression
+// in `developers/building-contributing.md`). Material's parser tolerates
+// either form, so we match it.
 const PATTERN =
-  /^(?<indent> *)(?<marker>!!!|\?\?\?\+|\?\?\?) +(?<type>[A-Za-z0-9][A-Za-z0-9_-]*)(?<modifiers>(?: +inline(?: +end)?)?)(?: +"(?<title>[^"]*)")? *$/;
+  /^(?<indent> *)(?<marker>!!!|\?\?\?\+|\?\?\?) *(?<type>[A-Za-z][A-Za-z0-9_-]*)(?<modifiers>(?: +inline(?: +end)?)?)(?: +"(?<title>[^"]*)")? *$/;
+
+// Type-less collapsible: `??? "Title"` or `???+ "Title"`. Real-world DDEV
+// regression: `users/install/ddev-installation.md` uses `??? "..."` without
+// any type, expecting Material's default. We fall back to type "note" so the
+// admonition still converts to a Starlight aside.
+const TYPELESS_COLLAPSIBLE =
+  /^(?<indent> *)(?<marker>\?\?\?\+|\?\?\?) +"(?<title>[^"]*)" *$/;
 
 // Lenient fallback used after the strict pattern fails. Captures the trailing
 // text after the type (and optional `inline [end]` modifiers) as a literal
@@ -53,6 +64,19 @@ export function parseAdmonitionLine(line: string): AdmonitionOpening | null {
       title: rawTitle === undefined || rawTitle === '' ? null : rawTitle,
       hasEmptyTitle: rawTitle === '',
       inline: parseInline(groups['modifiers'] ?? ''),
+      indent: (groups['indent'] ?? '').length,
+    };
+  }
+
+  const typeless = line.match(TYPELESS_COLLAPSIBLE);
+  if (typeless !== null && typeless.groups !== undefined) {
+    const groups = typeless.groups;
+    return {
+      marker: groups['marker'] as AdmonitionMarker,
+      type: 'note',
+      title: groups['title'] ?? null,
+      hasEmptyTitle: groups['title'] === '',
+      inline: null,
       indent: (groups['indent'] ?? '').length,
     };
   }

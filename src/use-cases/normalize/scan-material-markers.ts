@@ -19,8 +19,7 @@
  */
 
 import { createDiagnostic, type Diagnostic } from '../../domain/diagnostics/diagnostic.js';
-
-const FENCE = /^ {0,3}(```|~~~)/;
+import { isFenceLine } from '../../domain/syntax/fence.js';
 const TAGS_MARKER_RE = /<!--\s*material\/tags(?:\s*\{[^}]*\})?\s*-->/;
 const MORE_MARKER_RE = /^<!--\s*more\s*-->\s*$/;
 const FRONTMATTER_RE = /^---\n([\s\S]*?)\n---\n/;
@@ -47,7 +46,7 @@ export function scanMaterialMarkers(source: string): ReadonlyArray<Diagnostic> {
   let lineNumber = 0;
   for (const line of lines) {
     lineNumber += 1;
-    if (FENCE.test(line)) {
+    if (isFenceLine(line)) {
       inFence = !inFence;
       continue;
     }
@@ -88,7 +87,7 @@ function containsMoreMarker(source: string): boolean {
   const lines = source.split('\n');
   let inFence = false;
   for (const line of lines) {
-    if (FENCE.test(line)) {
+    if (isFenceLine(line)) {
       inFence = !inFence;
       continue;
     }

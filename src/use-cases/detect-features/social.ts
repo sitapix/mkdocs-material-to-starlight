@@ -1,24 +1,18 @@
 /**
- * Translate Material's `extra.social[]` entries into Starlight's `social[]`
- * config shape.
+ * Translate Material's `extra.social[]` entries into Starlight's `social[]`.
  *
  * Material:
  *   extra:
  *     social:
- *       - icon: fontawesome/brands/github
- *         link: https://github.com/...
- *         name: Optional accessible name
+ *       - { icon: fontawesome/brands/github, link: '...', name: '...' }
  *
  * Starlight:
  *   social: [{ icon: 'github', label: 'GitHub', href: '...' }]
  *
- * The icon vocabularies don't match: Material uses FontAwesome path-style
- * names; Starlight has its own ~30-key icon set. The mapping below covers
- * the common cases. Unknown icons fall through with the trailing path
- * segment as the icon name and a diagnostic-worthy hint surfaces from the
- * caller (Starlight will fail at build time if the icon is unknown).
- *
- * Pure: takes the raw extras dict, returns immutable entries. No I/O.
+ * Icon vocabularies differ: Material uses FontAwesome path-style names;
+ * Starlight has a ~30-key set. Unknown icons fall through with the trailing
+ * path segment as the icon name; the caller surfaces a diagnostic, and
+ * Starlight fails at build time if the name is unknown. Pure.
  */
 
 export interface StarlightSocialEntry {

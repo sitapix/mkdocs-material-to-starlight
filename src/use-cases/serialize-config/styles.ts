@@ -18,7 +18,10 @@
  * extend them in their own `src/styles/`.
  */
 
-import type { StarlightPalette } from '../../domain/starlight/palette-mapping.js';
+import type {
+  PaletteStrategy,
+  StarlightPalette,
+} from '../../domain/starlight/palette-mapping.js';
 import type { MaterialFontConfig } from '../../domain/starlight/font-mapping.js';
 
 const STYLESHEET = `/*
@@ -77,9 +80,25 @@ const STYLESHEET = `/*
   margin-bottom: 0.5rem;
   color: var(--sl-color-accent, #0070f3);
 }
-`;
 
-export type PaletteStrategy = 'translate' | 'skip' | 'custom';
+/*
+ * Inline-icon override.
+ * Starlight markdown.css sets every svg inside .sl-markdown-content to
+ * display:block so block-level images do not sit awkwardly on a baseline.
+ * That rule breaks inline icons: phrases like "click :gitlab: to file an
+ * issue" render with the icon on its own line. The converter emits
+ * class="sl-inline-icon" on every Icon JSX it generates so this rule
+ * pulls those icons back inline. customCss is loaded outside @layer
+ * wrappers so this beats the layered Starlight rule regardless of order.
+ */
+.sl-markdown-content :where(svg.sl-inline-icon) {
+  display: inline-block;
+  vertical-align: text-bottom;
+  margin: 0;
+  width: 1em;
+  height: 1em;
+}
+`;
 
 export function serializeStyleSheet(
   palette?: StarlightPalette | null,

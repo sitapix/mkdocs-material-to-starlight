@@ -153,6 +153,46 @@ describe('promoteSteps', () => {
       expect(result.promoted).toBe(false);
     });
 
+    it('inserts a blank line before `</Steps>` so the closer outdents from the list', () => {
+      // Real-world DDEV regression: `users/topics/sharing.md` ends a numbered
+      // tutorial list with `</Steps>` directly after the last item's body.
+      // Without a blank line, CommonMark parses `</Steps>` as belonging to
+      // the last list item — remark-stringify then re-emits it indented at
+      // the item's continuation column, and MDX rejects the misaligned
+      // closing tag with `Expected the closing tag </Steps> ...`.
+      const src = [
+        '## Setup Steps',
+        '',
+        '1. **First:**',
+        '',
+        '   ```bash',
+        '   first cmd',
+        '   ```',
+        '',
+        '2. **Second:**',
+        '',
+        '   ```bash',
+        '   second cmd',
+        '   ```',
+        '',
+        '3. **Third:**',
+        '',
+        '   ```bash',
+        '   third cmd',
+        '   ```',
+        '',
+        '   Trailing prose for item 3.',
+        '',
+        '## Next section',
+        '',
+      ].join('\n');
+      const result = promoteSteps(src);
+      expect(result.promoted).toBe(true);
+      // The closer must sit on its own line, with a blank line separating
+      // it from the last list-item content. Both lines must be at column 0.
+      expect(result.text).toMatch(/Trailing prose for item 3\.\n\n<\/Steps>/);
+    });
+
     it('is idempotent — does not double-wrap if <Steps> already present', () => {
       const src = [
         '## Installation Steps',

@@ -7,10 +7,8 @@ import {
   WIZARD_CANCELLED,
 } from '../../domain/wizard/answers.js';
 import { type Result, err, ok } from '../../domain/result.js';
-import { triggerSet } from './tier1-trigger.js';
-
-/** Mutable accumulator — assigned field-by-field, then frozen into Partial<WizardAnswers>. */
-type Tier1Acc = { -readonly [K in keyof WizardAnswers]?: WizardAnswers[K] };
+import { type Tier1Trigger, triggerSet } from './tier1-trigger.js';
+import { tier1DocsUrl } from './docs-links.js';
 
 /**
  * Tier 1: prompts that fire only when a related feature is detected in the
@@ -20,7 +18,27 @@ type Tier1Acc = { -readonly [K in keyof WizardAnswers]?: WizardAnswers[K] };
  *     so the primary label stays short and scannable,
  *   - has a sensible default pre-selected (so pressing Enter is the fast
  *     path for users who don't want to think).
+ *
+ * Each detection emits a uniform `Detected: <label>. Learn more: <url>` step
+ * before its prompt — keep `step()` the single emitter so the wording stays
+ * consistent across triggers.
  */
+
+/** Mutable accumulator — assigned field-by-field, then frozen into Partial<WizardAnswers>. */
+type Tier1Acc = { -readonly [K in keyof WizardAnswers]?: WizardAnswers[K] };
+
+/** Above this many options, switch from a fixed multiselect to a type-ahead
+ * autocomplete so users can filter instead of scroll. Same threshold used for
+ * locales (i18n) and extra-assets — keep them in sync. */
+const MULTISELECT_AUTOCOMPLETE_THRESHOLD = 8;
+
+/** Mike version slugs are limited to these characters; rejects pasted prose. */
+const MIKE_VERSION_PATTERN = /^[A-Za-z0-9._-]+$/;
+
+function step(prompter: Prompter, label: string, trigger: Tier1Trigger): void {
+  prompter.log.step(`Detected: ${label}. Learn more: ${tier1DocsUrl(trigger)}`);
+}
+
 export async function runTier1(
   prompter: Prompter,
   plan: ConversionPlan,
@@ -30,136 +48,197 @@ export async function runTier1(
   const acc: Tier1Acc = {};
 
   if (triggers.includes('tabs')) {
-    prompter.log.step('Detected: content.tabs.link (linked tabs).');
-    const tabs = await prompter.select<'mdx' | 'html'>({
-      message: 'Tabs output',
-      options: [
-        { value: 'mdx', label: 'MDX <Tabs syncKey>', hint: 'recommended; cross-page sync' },
-        { value: 'html', label: 'Plain HTML', hint: 'no sync, no MDX requirement' },
-      ],
-      initialValue: defaults.tabs,
-    });
-    if (tabs === null) return err(WIZARD_CANCELLED);
-    acc.tabs = tabs;
+    const r = await askTabs(prompter, defaults);
+    if (!r.ok) return r;
+    acc.tabs = r.value;
   }
-
   if (triggers.includes('sidebar-topics')) {
-    prompter.log.step('Detected: navigation.tabs (top-level grouping).');
-    const v = await prompter.confirm({
-      message: 'Split sidebar by top-level group?',
-      initialValue: defaults.sidebarTopics,
-      active: 'Yes (installs starlight-sidebar-topics)',
-      inactive: 'No (single sidebar)',
-    });
-    if (v === null) return err(WIZARD_CANCELLED);
-    acc.sidebarTopics = v;
+    const r = await askSidebarTopics(prompter, defaults);
+    if (!r.ok) return r;
+    acc.sidebarTopics = r.value;
   }
-
-  if (triggers.includes('snippets')) {
-    if (plan.snippetCandidateDirs.length > 0) {
-      prompter.log.step('Detected: pymdownx.snippets.');
-      const v = await prompter.multiselect({
-        message: 'Snippet base paths to resolve',
-        options: plan.snippetCandidateDirs.map((d) => ({ value: d, label: d })),
-        initialValues: plan.snippetCandidateDirs,
-      });
-      if (v === null) return err(WIZARD_CANCELLED);
-      acc.snippetBasePaths = v;
-    }
+  if (triggers.includes('snippets') && plan.snippetCandidateDirs.length > 0) {
+    const r = await askSnippets(prompter, plan);
+    if (!r.ok) return r;
+    acc.snippetBasePaths = r.value;
   }
-
   if (triggers.includes('rss')) {
-    prompter.log.step('Detected: rss plugin.');
-    const v = await prompter.confirm({
-      message: 'Generate src/pages/rss.xml.ts endpoint?',
-      initialValue: defaults.rss,
-    });
-    if (v === null) return err(WIZARD_CANCELLED);
-    acc.rss = v;
+    const r = await askRss(prompter, defaults);
+    if (!r.ok) return r;
+    acc.rss = r.value;
   }
-
-  if (triggers.includes('i18n')) {
-    if (plan.detectedLocales.length > 0) {
-      prompter.log.step(
-        `Detected: i18n plugin with ${String(plan.detectedLocales.length)} locale${plan.detectedLocales.length === 1 ? '' : 's'}.`,
-      );
-      // Big i18n sites (fastapi, etc.) ship with 30+ locales. Switch to the
-      // type-ahead variant once the list outgrows what fits comfortably on a
-      // single terminal screen so users can filter rather than scroll.
-      const useAutocomplete = plan.detectedLocales.length > 8;
-      const localeOptions = plan.detectedLocales.map((l) => ({ value: l, label: l }));
-      const v = useAutocomplete
-        ? await prompter.autocompleteMultiselect({
-            message: 'Locales to carry over (type to filter)',
-            options: localeOptions,
-            initialValues: plan.detectedLocales,
-            placeholder: 'e.g. en, de, fr',
-          })
-        : await prompter.multiselect({
-            message: 'Locales to carry over',
-            options: localeOptions,
-            initialValues: plan.detectedLocales,
-            maxItems: 8,
-          });
-      if (v === null) return err(WIZARD_CANCELLED);
-      acc.locales = v;
-    }
+  if (triggers.includes('i18n') && plan.detectedLocales.length > 0) {
+    const r = await askI18n(prompter, plan);
+    if (!r.ok) return r;
+    acc.locales = r.value;
   }
-
   if (triggers.includes('mike')) {
-    prompter.log.step('Detected: mike (versioned docs).');
-    const v = await prompter.text({
-      message: 'Mike versions (comma-separated slugs)',
-      placeholder: 'v1,v2,latest',
-      initialValue: defaults.mikeVersions.join(','),
-    });
-    if (v === null) return err(WIZARD_CANCELLED);
-    acc.mikeVersions = v
-      .split(',')
-      .map((s) => s.trim())
-      .filter((s) => s.length > 0);
+    const r = await askMike(prompter, defaults);
+    if (!r.ok) return r;
+    acc.mikeVersions = r.value;
   }
-
   if (triggers.includes('palette')) {
-    prompter.log.step('Detected: theme.palette.');
-    const v = await prompter.select<'translate' | 'skip' | 'custom'>({
-      message: 'Color palette',
-      options: [
-        { value: 'translate', label: 'Translate to Starlight accent', hint: 'recommended' },
-        { value: 'skip', label: 'Use Starlight default accent' },
-        { value: 'custom', label: 'I will write the accent CSS myself' },
-      ],
-      initialValue: defaults.palette,
-    });
-    if (v === null) return err(WIZARD_CANCELLED);
-    acc.palette = v;
+    const r = await askPalette(prompter, defaults);
+    if (!r.ok) return r;
+    acc.palette = r.value;
   }
-
-  if (triggers.includes('extra-assets')) {
-    const all = [...plan.detectedExtraCss, ...plan.detectedExtraJs];
-    if (all.length > 0) {
-      prompter.log.step(
-        `Detected: ${String(all.length)} extra CSS/JS asset${all.length === 1 ? '' : 's'}.`,
-      );
-      const useAutocomplete = all.length > 8;
-      const assetOptions = all.map((p) => ({ value: p, label: p }));
-      const v = useAutocomplete
-        ? await prompter.autocompleteMultiselect({
-            message: 'Carry over which extra assets? (type to filter)',
-            options: assetOptions,
-            initialValues: all,
-            placeholder: 'e.g. extra.css',
-          })
-        : await prompter.multiselect({
-            message: 'Carry over which extra assets?',
-            options: assetOptions,
-            initialValues: all,
-            maxItems: 8,
-          });
-      if (v === null) return err(WIZARD_CANCELLED);
-      acc.extraAssets = v;
-    }
+  const allAssets = [...plan.detectedExtraCss, ...plan.detectedExtraJs];
+  if (triggers.includes('extra-assets') && allAssets.length > 0) {
+    const r = await askExtraAssets(prompter, allAssets);
+    if (!r.ok) return r;
+    acc.extraAssets = r.value;
   }
 
   return ok(acc);
+}
+
+async function askTabs(
+  prompter: Prompter,
+  defaults: DefaultAnswers,
+): Promise<Result<WizardAnswers['tabs'], WizardCancelled>> {
+  step(prompter, 'content.tabs.link (linked tabs)', 'tabs');
+  const v = await prompter.select<'mdx' | 'html'>({
+    message: 'Tabs output',
+    options: [
+      { value: 'mdx', label: 'MDX <Tabs syncKey>', hint: 'recommended; cross-page sync' },
+      { value: 'html', label: 'Plain HTML', hint: 'no sync, no MDX requirement' },
+    ],
+    initialValue: defaults.tabs,
+  });
+  return v === null ? err(WIZARD_CANCELLED) : ok(v);
+}
+
+async function askSidebarTopics(
+  prompter: Prompter,
+  defaults: DefaultAnswers,
+): Promise<Result<boolean, WizardCancelled>> {
+  step(prompter, 'navigation.tabs (top-level grouping)', 'sidebar-topics');
+  const v = await prompter.confirm({
+    message: 'Split sidebar by top-level group?',
+    initialValue: defaults.sidebarTopics,
+    active: 'Yes (installs starlight-sidebar-topics)',
+    inactive: 'No (single sidebar)',
+  });
+  return v === null ? err(WIZARD_CANCELLED) : ok(v);
+}
+
+async function askSnippets(
+  prompter: Prompter,
+  plan: ConversionPlan,
+): Promise<Result<ReadonlyArray<string>, WizardCancelled>> {
+  step(prompter, 'pymdownx.snippets', 'snippets');
+  const v = await prompter.multiselect({
+    message: 'Snippet base paths to resolve',
+    options: plan.snippetCandidateDirs.map((d) => ({ value: d, label: d })),
+    initialValues: plan.snippetCandidateDirs,
+  });
+  return v === null ? err(WIZARD_CANCELLED) : ok(v);
+}
+
+async function askRss(
+  prompter: Prompter,
+  defaults: DefaultAnswers,
+): Promise<Result<boolean, WizardCancelled>> {
+  step(prompter, 'rss plugin', 'rss');
+  const v = await prompter.confirm({
+    message: 'Generate src/pages/rss.xml.ts endpoint?',
+    initialValue: defaults.rss,
+  });
+  return v === null ? err(WIZARD_CANCELLED) : ok(v);
+}
+
+async function askI18n(
+  prompter: Prompter,
+  plan: ConversionPlan,
+): Promise<Result<ReadonlyArray<string>, WizardCancelled>> {
+  const count = plan.detectedLocales.length;
+  step(prompter, `i18n plugin (${String(count)} locale${count === 1 ? '' : 's'})`, 'i18n');
+  const opts = plan.detectedLocales.map((l) => ({ value: l, label: l }));
+  const v =
+    count > MULTISELECT_AUTOCOMPLETE_THRESHOLD
+      ? await prompter.autocompleteMultiselect({
+          message: 'Locales to carry over (type to filter)',
+          options: opts,
+          initialValues: plan.detectedLocales,
+          placeholder: 'e.g. en, de, fr',
+        })
+      : await prompter.multiselect({
+          message: 'Locales to carry over',
+          options: opts,
+          initialValues: plan.detectedLocales,
+          maxItems: MULTISELECT_AUTOCOMPLETE_THRESHOLD,
+        });
+  return v === null ? err(WIZARD_CANCELLED) : ok(v);
+}
+
+async function askMike(
+  prompter: Prompter,
+  defaults: DefaultAnswers,
+): Promise<Result<ReadonlyArray<string>, WizardCancelled>> {
+  step(prompter, 'mike (versioned docs)', 'mike');
+  const v = await prompter.text({
+    message: 'Mike versions (comma-separated slugs)',
+    placeholder: 'v1,v2,latest',
+    initialValue: defaults.mikeVersions.join(','),
+    validate: (value) => {
+      const parts = value
+        .split(',')
+        .map((s) => s.trim())
+        .filter((s) => s.length > 0);
+      const bad = parts.filter((s) => !MIKE_VERSION_PATTERN.test(s));
+      if (bad.length === 0) return undefined;
+      return `Invalid version slug${bad.length === 1 ? '' : 's'}: ${bad.join(', ')}. Use letters, digits, dot, hyphen, underscore.`;
+    },
+  });
+  if (v === null) return err(WIZARD_CANCELLED);
+  return ok(
+    v
+      .split(',')
+      .map((s) => s.trim())
+      .filter((s) => s.length > 0),
+  );
+}
+
+async function askPalette(
+  prompter: Prompter,
+  defaults: DefaultAnswers,
+): Promise<Result<WizardAnswers['palette'], WizardCancelled>> {
+  step(prompter, 'theme.palette', 'palette');
+  const v = await prompter.select<'translate' | 'skip' | 'custom'>({
+    message: 'Color palette',
+    options: [
+      { value: 'translate', label: 'Translate to Starlight accent', hint: 'recommended' },
+      { value: 'skip', label: 'Use Starlight default accent' },
+      { value: 'custom', label: 'I will write the accent CSS myself' },
+    ],
+    initialValue: defaults.palette,
+  });
+  return v === null ? err(WIZARD_CANCELLED) : ok(v);
+}
+
+async function askExtraAssets(
+  prompter: Prompter,
+  all: ReadonlyArray<string>,
+): Promise<Result<ReadonlyArray<string>, WizardCancelled>> {
+  step(
+    prompter,
+    `${String(all.length)} extra CSS/JS asset${all.length === 1 ? '' : 's'}`,
+    'extra-assets',
+  );
+  const opts = all.map((p) => ({ value: p, label: p }));
+  const v =
+    all.length > MULTISELECT_AUTOCOMPLETE_THRESHOLD
+      ? await prompter.autocompleteMultiselect({
+          message: 'Carry over which extra assets? (type to filter)',
+          options: opts,
+          initialValues: all,
+          placeholder: 'e.g. extra.css',
+        })
+      : await prompter.multiselect({
+          message: 'Carry over which extra assets?',
+          options: opts,
+          initialValues: all,
+          maxItems: MULTISELECT_AUTOCOMPLETE_THRESHOLD,
+        });
+  return v === null ? err(WIZARD_CANCELLED) : ok(v);
 }

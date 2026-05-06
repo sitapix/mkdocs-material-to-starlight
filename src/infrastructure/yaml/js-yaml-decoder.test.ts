@@ -49,6 +49,27 @@ describe('createJsYamlDecoder', () => {
     }
   });
 
+  it('tolerates duplicate mapping keys (last value wins, matching PyYAML/MkDocs)', () => {
+    // Real regression: khomesh24/docs has two `palette:` keys in mkdocs.yml.
+    // PyYAML (and therefore MkDocs) silently keeps the last one. js-yaml is
+    // strict by default. Match MkDocs behavior so the converter can run on
+    // any config MkDocs would build.
+    const source = 'theme:\n  palette:\n    - scheme: default\n  palette:\n    - scheme: slate\n';
+    const result = decoder.decode(source);
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      const obj = result.value as { theme: { palette: Array<{ scheme: string }> } };
+      // Last `palette:` block wins — matches PyYAML semantics.
+      expect(obj.theme.palette).toEqual([{ scheme: 'slate' }]);
+    }
+  });
+
+  it('still rejects genuinely malformed YAML even with duplicate-key tolerance', () => {
+    // The duplicate-key escape hatch must not swallow other parse errors.
+    const result = decoder.decode('value: [unterminated\n');
+    expect(result.ok).toBe(false);
+  });
+
   it('rejects YAML with custom tags by default (safe-load semantics)', () => {
     const result = decoder.decode('value: !!js/function "function () { return 1; }"\n');
     expect(result.ok).toBe(false);

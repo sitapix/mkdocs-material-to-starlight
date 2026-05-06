@@ -67,6 +67,10 @@ describe('serializePackageJson', () => {
     const parsed = JSON.parse(out);
     expect(parsed.dependencies).toHaveProperty('remark-math');
     expect(parsed.dependencies).toHaveProperty('rehype-katex');
+    // `katex` is the source of `katex/dist/katex.min.css` that astro.config
+    // wires into customCss. rehype-katex pulls it in transitively, but we
+    // pin it explicitly so the import path resolves on a fresh install.
+    expect(parsed.dependencies).toHaveProperty('katex');
   });
 
   it('adds astro-mermaid when mermaid feature is detected', () => {

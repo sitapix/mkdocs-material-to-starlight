@@ -1,30 +1,20 @@
 /**
- * Extract redirect mappings from the `mkdocs-redirects` plugin entry in
- * `mkdocs.yml` and translate them into Starlight/Astro slug pairs.
+ * Extract redirects from the `mkdocs-redirects` plugin and translate to
+ * Astro `redirects:` pairs.
  *
- * MkDocs source shape:
- *
+ * MkDocs:
  *   plugins:
  *     - redirects:
  *         redirect_maps:
  *           old/page.md: new/page.md
  *           index.md: home/index.md
  *
- * Astro destination shape (in astro.config.mjs):
+ * Astro:
+ *   redirects: { '/old/page': '/new/page', '/': '/home' }
  *
- *   redirects: {
- *     '/old/page': '/new/page',
- *     '/': '/home',
- *   }
- *
- * Translation rules:
- *   - keys and values lose their `.md` suffix
- *   - keys/values become absolute paths (prepended with `/`)
- *   - `…/index.md` collapses to its parent directory (or `/` for top-level)
- *   - external URLs (anything starting with `http://`, `https://`, `//`) are
- *     passed through verbatim as the destination
- *
- * Pure: takes a plugin list, returns a redirect map.
+ * Rules: drop `.md`, prepend `/`, collapse `…/index.md` to its parent
+ * directory (or `/` for top-level), and pass through external URLs
+ * (`http://`, `https://`, `//`) verbatim. Pure.
  */
 
 import type { MkdocsPlugin } from '../../domain/config/mkdocs-config.js';

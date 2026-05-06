@@ -14,7 +14,7 @@
  * + `remark-directive` — Starlight's parsing pipeline.
  */
 
-export interface OutputValidationFailure {
+interface OutputValidationFailure {
   /** 1-based line number of the failure, or null if unknown. */
   readonly line: number | null;
   /** 1-based column, or null if unknown. */

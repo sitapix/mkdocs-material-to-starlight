@@ -177,4 +177,67 @@ describe('normalizeFileTrees', () => {
       expect(result.promoted).toBe(false);
     });
   });
+
+  describe('block-spacing — promoted output is unambiguously block-level JSX', () => {
+    it('inserts blank lines around <FileTree>/</FileTree> when adjacent content is non-blank', () => {
+      // Real-world: pyodide-mkdocs-theme wraps file-tree fences in Jinja
+      // raw markers without blank-line padding:
+      //   {% raw %}
+      //   ```
+      //   tree...
+      //   ```
+      //   {% endraw %}
+      // Without padding around the emitted `<FileTree>` block, MDX folds
+      // the JSX into the same paragraph as the prior inline content and
+      // raises "Expected a closing tag for <FileTree> before end of paragraph".
+      const src = [
+        '`{% raw %}`',
+        '```',
+        '.',
+        '├── one.py',
+        '└── two.py',
+        '```',
+        '`{% endraw %}`',
+        '',
+      ].join('\n');
+      const result = normalizeFileTrees(src);
+      expect(result.promoted).toBe(true);
+      const lines = result.text.split('\n');
+      const openIdx = lines.indexOf('<FileTree>');
+      const closeIdx = lines.indexOf('</FileTree>');
+      expect(openIdx).toBeGreaterThan(0);
+      expect(closeIdx).toBeGreaterThan(openIdx);
+      // Line immediately before <FileTree> must be blank.
+      expect(lines[openIdx - 1]).toBe('');
+      // Line immediately after </FileTree> must be blank.
+      expect(lines[closeIdx + 1]).toBe('');
+    });
+
+    it('does not double-blank when a blank line already exists (idempotency-friendly)', () => {
+      // A fence already preceded by a blank stays single-blank. A second
+      // normalize run must not pile up blanks.
+      const src = [
+        'Intro text.',
+        '',
+        '```',
+        '.',
+        '├── a',
+        '└── b',
+        '```',
+        '',
+        'Closing text.',
+        '',
+      ].join('\n');
+      const result = normalizeFileTrees(src);
+      expect(result.promoted).toBe(true);
+      const lines = result.text.split('\n');
+      const openIdx = lines.indexOf('<FileTree>');
+      // Only ONE blank line before — not two.
+      expect(lines[openIdx - 1]).toBe('');
+      expect(lines[openIdx - 2]).toBe('Intro text.');
+      const closeIdx = lines.indexOf('</FileTree>');
+      expect(lines[closeIdx + 1]).toBe('');
+      expect(lines[closeIdx + 2]).toBe('Closing text.');
+    });
+  });
 });

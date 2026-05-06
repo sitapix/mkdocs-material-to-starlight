@@ -16,79 +16,79 @@
  * user input; only on programmer error or OS conditions.
  */
 
-import { copyFile, mkdir, writeFile, readdir } from 'node:fs/promises';
-import { dirname, join } from 'node:path';
-import { posix } from 'node:path';
-import { ok, err, type Result } from '../../domain/result.js';
-import { planAssetCopies, type AssetCopy } from '../../use-cases/copy-assets/plan.js';
-import { buildDeferredWizardDiagnostics } from '../../use-cases/convert-site/wizard-decision-diagnostics.js';
+import { readdir } from 'node:fs/promises';
+import { join, posix } from 'node:path';
+import type { MkdocsNavEntry } from '../../domain/config/mkdocs-config.js';
+import { parseRepoUrl } from '../../domain/config/repo-context.js';
+import { createDiagnostic } from '../../domain/diagnostics/diagnostic.js';
+import type { FileSystem } from '../../domain/ports/file-system.js';
+import { err, ok, type Result } from '../../domain/result.js';
+import { mapAnalyticsToHeadEntries } from '../../domain/starlight/analytics-mapping.js';
+import { mapMaterialPaletteToStarlight } from '../../domain/starlight/palette-mapping.js';
+import { classifyThemeFeature } from '../../domain/starlight/theme-feature-catalog.js';
+import { atomicCopyFile, atomicWriteText } from '../../infrastructure/fs/atomic-write.js';
+import { createNodeConfigDiscoverer } from '../../infrastructure/fs/node-config-discoverer.js';
+import { createNodeDirectoryReader } from '../../infrastructure/fs/node-directory-reader.js';
+import { createNodeFileSystem } from '../../infrastructure/fs/node-file-system.js';
+import { createMdxOutputValidator } from '../../infrastructure/mdx/at-mdx-js-validator.js';
+import { createJsYamlDecoder } from '../../infrastructure/yaml/js-yaml-decoder.js';
+import { applyPagesOverrides } from '../../use-cases/compile-navigation/apply-pages.js';
+import { filterSidebarSlugs } from '../../use-cases/compile-navigation/filter-sidebar-slugs.js';
+import { loadAwesomePagesFiles } from '../../use-cases/config/load-awesome-pages.js';
+import { parseLiterateNav } from '../../use-cases/config/parse-literate-nav.js';
+import { compileSidebarEntries } from '../../use-cases/convert-site/compile-sidebar-entries.js';
+import { convertSite, type TaggedDiagnostic } from '../../use-cases/convert-site/convert.js';
 import {
   collectUnknownFrontmatterFieldNames,
   enrichMissingDocsDirMessage,
 } from '../../use-cases/convert-site/diagnostic-enrichment.js';
-import { compileSidebarEntries } from '../../use-cases/convert-site/compile-sidebar-entries.js';
-import { createNodeFileSystem } from '../../infrastructure/fs/node-file-system.js';
-import type { FileSystem } from '../../domain/ports/file-system.js';
-import { createNodeDirectoryReader } from '../../infrastructure/fs/node-directory-reader.js';
-import { createNodeConfigDiscoverer } from '../../infrastructure/fs/node-config-discoverer.js';
-import { resolveProjectDir } from '../../use-cases/discover-config/resolve-project-dir.js';
-import { createJsYamlDecoder } from '../../infrastructure/yaml/js-yaml-decoder.js';
-import { parseMkdocsConfig } from '../../use-cases/config/parse-mkdocs.js';
-import { expandMetaBundles } from '../../use-cases/config/expand-meta-bundles.js';
-import { preprocessMkdocsEnvTags } from '../../use-cases/config/preprocess-mkdocs-env-tags.js';
-import { preprocessMkdocsPythonTags } from '../../use-cases/config/preprocess-mkdocs-python-tags.js';
-import { resolveInherits } from '../../use-cases/config/inherit-config.js';
-import { applyPagesOverrides } from '../../use-cases/compile-navigation/apply-pages.js';
-import { filterSidebarSlugs } from '../../use-cases/compile-navigation/filter-sidebar-slugs.js';
-import { parseLiterateNav } from '../../use-cases/config/parse-literate-nav.js';
-import { createDiagnostic } from '../../domain/diagnostics/diagnostic.js';
-import type { MkdocsNavEntry } from '../../domain/config/mkdocs-config.js';
-import { loadAwesomePagesFiles } from '../../use-cases/config/load-awesome-pages.js';
-import { convertSite, type TaggedDiagnostic } from '../../use-cases/convert-site/convert.js';
-import { createMdxOutputValidator } from '../../infrastructure/mdx/at-mdx-js-validator.js';
-import { detectFeaturesFromPlugins } from '../../use-cases/detect-features/from-plugins.js';
-import { detectFeaturesFromThemeFeatures } from '../../use-cases/detect-features/from-theme-features.js';
-import { diagnosePlugins } from '../../use-cases/detect-features/diagnose-plugins.js';
-import { extractRedirects } from '../../use-cases/detect-features/redirects.js';
+import { buildDeferredWizardDiagnostics } from '../../use-cases/convert-site/wizard-decision-diagnostics.js';
+import { type AssetCopy, planAssetCopies } from '../../use-cases/copy-assets/plan.js';
 import { extractAutoAppend } from '../../use-cases/detect-features/auto-append.js';
-import { extractSocial } from '../../use-cases/detect-features/social.js';
+import { diagnosePlugins } from '../../use-cases/detect-features/diagnose-plugins.js';
+import { deriveEditLinkBaseUrl } from '../../use-cases/detect-features/edit-link.js';
+import {
+  applyExcludePatterns,
+  extractExcludePatterns,
+} from '../../use-cases/detect-features/exclude-config.js';
+import { extractExpressiveCodeConfig } from '../../use-cases/detect-features/expressive-code-config.js';
 import { extractAlternateLocales } from '../../use-cases/detect-features/extra-alternate.js';
 import { extractExtraAssets } from '../../use-cases/detect-features/extra-assets.js';
 import { detectExtraWarnings } from '../../use-cases/detect-features/extra-warnings.js';
+import { detectFeaturesFromPlugins } from '../../use-cases/detect-features/from-plugins.js';
+import { detectFeaturesFromThemeFeatures } from '../../use-cases/detect-features/from-theme-features.js';
 import { classifyHook } from '../../use-cases/detect-features/hook-archetypes.js';
-import { deriveEditLinkBaseUrl } from '../../use-cases/detect-features/edit-link.js';
-import { extractTocConfig } from '../../use-cases/detect-features/toc-config.js';
-import { extractExpressiveCodeConfig } from '../../use-cases/detect-features/expressive-code-config.js';
-import { extractThemeLanguage } from '../../use-cases/detect-features/theme-language.js';
-import { extractThemeFonts } from '../../use-cases/detect-features/theme-fonts.js';
-import { mapAnalyticsToHeadEntries } from '../../domain/starlight/analytics-mapping.js';
 import {
-  extractI18nLocales,
   extractI18nConfig,
+  extractI18nLocales,
 } from '../../use-cases/detect-features/i18n-config.js';
-import { parseRepoUrl } from '../../domain/config/repo-context.js';
-import { serializeSidebar } from '../../use-cases/serialize-config/sidebar.js';
-import { serializeAstroConfig } from '../../use-cases/serialize-config/astro-config.js';
-import { serializeContentConfig } from '../../use-cases/serialize-config/content-config.js';
-import { serializePackageJson } from '../../use-cases/serialize-config/package-json.js';
-import { serializeMigrationNotes } from '../../use-cases/serialize-config/migration-notes.js';
-import { inferFrontmatterTypes } from '../../use-cases/validate-output/infer-frontmatter-types.js';
-import { serializeRssEndpoint } from '../../use-cases/serialize-config/rss-endpoint.js';
-import { serializeOgEndpoint } from '../../use-cases/serialize-config/og-endpoint.js';
-import { serializeStyleSheet } from '../../use-cases/serialize-config/styles.js';
-import { mapMaterialPaletteToStarlight } from '../../domain/starlight/palette-mapping.js';
-import { classifyThemeFeature } from '../../domain/starlight/theme-feature-catalog.js';
-import { detectLongtailFeatures } from '../../use-cases/detect-features/theme-features-longtail.js';
 import { detectInsidersFeatures } from '../../use-cases/detect-features/insiders-features.js';
+import { extractRedirects } from '../../use-cases/detect-features/redirects.js';
 import {
-  scanTabsLinkOccurrences,
-  scanCodehiliteLinenumsOccurrences,
-  scanMetaYmlFiles,
   scanCodeBlockOptOuts,
+  scanCodehiliteLinenumsOccurrences,
   scanLatexDelimiters,
   scanMathScripts,
+  scanMetaYmlFiles,
+  scanTabsLinkOccurrences,
 } from '../../use-cases/detect-features/scan-bulk-diagnostics.js';
 import { scanMaterialCodeCssVars } from '../../use-cases/detect-features/scan-code-css-vars.js';
+import { extractSocial } from '../../use-cases/detect-features/social.js';
+import { detectLongtailFeatures } from '../../use-cases/detect-features/theme-features-longtail.js';
+import { extractThemeFonts } from '../../use-cases/detect-features/theme-fonts.js';
+import { extractThemeLanguage } from '../../use-cases/detect-features/theme-language.js';
+import { extractTocConfig } from '../../use-cases/detect-features/toc-config.js';
+import { loadMkdocsConfig } from '../../use-cases/load-config/load-mkdocs-config.js';
+import { serializeAstroConfig } from '../../use-cases/serialize-config/astro-config.js';
+import { serializeBiomeConfig } from '../../use-cases/serialize-config/biome-config.js';
+import { serializeContentConfig } from '../../use-cases/serialize-config/content-config.js';
+import { serializeMigrationNotes } from '../../use-cases/serialize-config/migration-notes.js';
+import { serializeOgEndpoint } from '../../use-cases/serialize-config/og-endpoint.js';
+import { serializePackageJson } from '../../use-cases/serialize-config/package-json.js';
+import { serializeRssEndpoint } from '../../use-cases/serialize-config/rss-endpoint.js';
+import { serializeSidebar } from '../../use-cases/serialize-config/sidebar.js';
+import { serializeStyleSheet } from '../../use-cases/serialize-config/styles.js';
+import { inferFrontmatterTypes } from '../../use-cases/validate-output/infer-frontmatter-types.js';
 
 export interface ConvertSiteFromDiskInput {
   readonly projectDir: string;
@@ -159,7 +159,9 @@ export interface ConvertSiteFromDiskInput {
    * default-wires the production `@mdx-js/mdx`-backed adapter. Pass `null`
    * to explicitly skip post-conversion syntax validation.
    */
-  readonly outputValidator?: import('../../domain/ports/output-validator.js').OutputValidator | null;
+  readonly outputValidator?:
+    | import('../../domain/ports/output-validator.js').OutputValidator
+    | null;
 }
 
 export interface ConvertSiteFromDiskOutput {
@@ -216,109 +218,17 @@ export async function convertSiteFromDisk(
   const yamlDecoder = createJsYamlDecoder();
   const configDiscoverer = createNodeConfigDiscoverer();
 
-  // Resolve the effective project directory before any other I/O. If the
-  // user pointed us at a wrapper dir (common in monorepos that put docs
-  // under `website/` or `packages/<name>/website/`), the discoverer
-  // redirects to the unique candidate; on multiple matches we surface
-  // them as `config-ambiguous` so the user can pick one explicitly.
-  const resolved = await resolveProjectDir(input.projectDir, fs, configDiscoverer);
-  if (!resolved.ok) {
-    if (resolved.error.kind === 'ambiguous') {
-      const list = resolved.error.candidates
-        .map((c, i) => `  ${String(i + 1)}. ${c}`)
-        .join('\n');
-      return err({
-        code: 'config-ambiguous',
-        message:
-          `Multiple mkdocs.yml/.yaml found under ${resolved.error.searchedDir}. ` +
-          `Re-run pointing at the intended subdirectory directly:\n${list}\n` +
-          `Example: \`mkdocs-material-to-starlight ${resolved.error.searchedDir}/${dirOfRel(resolved.error.candidates[0] ?? '')} <output-dir>\``,
-        candidates: resolved.error.candidates,
-      });
-    }
-    return err({
-      code: 'config-not-found',
-      message: `mkdocs.yml not found under ${input.projectDir} (searched the project tree to depth 4, pruning node_modules/dist/build/.git/site/...).`,
-    });
-  }
-  const projectDir = resolved.value.projectDir;
-  const autoDiscovery = resolved.value.autoDiscovery;
-
-  const configPath = join(projectDir, 'mkdocs.yml');
-  const configRead = await fs.readText(configPath);
-  if (!configRead.ok) {
-    return err({
-      code: 'config-not-found',
-      message: `mkdocs.yml not found at ${configPath}`,
-    });
-  }
-
-  const inherited = await resolveInherits(configRead.value, configPath, fs);
-  const pythonStripped = preprocessMkdocsPythonTags(
-    preprocessMkdocsEnvTags(inherited.source),
+  const loaded = await loadMkdocsConfig(
+    { inputDir: input.projectDir },
+    { fs, dirReader, yamlDecoder, configDiscoverer },
   );
-  const decoded = yamlDecoder.decode(pythonStripped.source);
-  if (!decoded.ok) {
-    return err({ code: 'yaml-decode-failed', message: decoded.error.message });
+  if (!loaded.ok) {
+    return err(translateLoadError(loaded.error, input.projectDir));
   }
-
-  const parseResult = parseMkdocsConfig(decoded.value);
-  if (!parseResult.ok) {
-    // If config-validation failed AND there were missing INHERIT targets,
-    // surface that as the likely root cause — the inherited file would have
-    // supplied the missing field (e.g. `site_name`) and its absence is what
-    // breaks parsing. Without this, users see a confusing
-    // `site_name is required` error and don't realize their submodule path
-    // is wrong / unfetched.
-    if (inherited.missing.length > 0) {
-      // Quick scan: look for any other `mkdocs.yml`/`mkdocs.yaml` files in
-      // the project that might be the actual INHERIT target the user
-      // intended (common with renamed submodules — e.g. `docs_template/`
-      // referenced but the submodule was renamed to `website-template/`).
-      // We list YAML files via DirectoryReader and filter by basename.
-      let candidatesNote = '';
-      const yamlListing = await dirReader.list(projectDir, ['.yml', '.yaml']);
-      if (yamlListing.ok) {
-        const candidates = yamlListing.value
-          .filter((p) => {
-            const base = p.split('/').pop() ?? '';
-            return base === 'mkdocs.yml' || base === 'mkdocs.yaml';
-          })
-          .filter((p) => p !== 'mkdocs.yml' && p !== 'mkdocs.yaml')
-          .slice(0, 5);
-        if (candidates.length > 0) {
-          candidatesNote =
-            ` Found ${String(candidates.length)} other mkdocs config file${candidates.length === 1 ? '' : 's'} in the project that might be the intended target: ` +
-            candidates.map((c) => `\`${c}\``).join(', ') +
-            `. Did you mean one of these? Update the \`INHERIT:\` line, or symlink the expected directory.`;
-        }
-      }
-      return err({
-        code: 'config-invalid',
-        message:
-          `${parseResult.error.message}. ` +
-          `Note: mkdocs.yml uses INHERIT but the referenced file(s) could not be read: ` +
-          inherited.missing.join(', ') +
-          `. The missing file would have supplied the field(s) the parser is rejecting. ` +
-          `Common causes: an unfetched git submodule (run \`git submodule update --init --recursive\`), ` +
-          `a stale path in the INHERIT directive, or a CI-generated symlink that doesn't exist locally.` +
-          candidatesNote,
-      });
-    }
-    return err({ code: 'config-invalid', message: parseResult.error.message });
-  }
-  // Expand `pymdownx.extra` (and the legacy `extra`) meta-bundle into its
-  // 8 component extensions so every downstream detector that matches on
-  // individual extension names sees them. Without this, a site that
-  // shortcuts via `pymdownx.extra` would silently miss footnotes,
-  // tables, attr_list, def_list, etc. coverage.
-  const config = {
-    ok: true as const,
-    value: {
-      ...parseResult.value,
-      markdownExtensions: expandMetaBundles(parseResult.value.markdownExtensions),
-    },
-  };
+  const projectDir = loaded.value.projectDir;
+  const autoDiscovery = loaded.value.autoDiscovery;
+  const strippedPythonTags = loaded.value.strippedPythonTags;
+  const config = { ok: true as const, value: loaded.value.config };
 
   // Idempotency guard: if output dir exists and is non-empty, demand --force.
   if (input.force !== true) {
@@ -337,35 +247,34 @@ export async function convertSiteFromDisk(
   }
 
   const docsDir = join(projectDir, config.value.docsDir);
-  const sourceListing = await dirReader.list(docsDir, ['.md', '.mdx']);
-  if (!sourceListing.ok) {
+  const sourceListingRaw = await dirReader.list(docsDir, ['.md', '.mdx']);
+  if (!sourceListingRaw.ok) {
     return err({
       code: 'directory-read-failed',
-      message: enrichMissingDocsDirMessage(
-        sourceListing.error.message,
-        config.value.plugins,
-      ),
+      message: enrichMissingDocsDirMessage(sourceListingRaw.error.message, config.value.plugins),
     });
   }
+  // Apply mkdocs-exclude patterns BEFORE every downstream step that walks
+  // the file list (sidebar, asset planning, slug map). Filtering here means
+  // excluded pages never appear in the output, the sidebar, or the slug
+  // map — matching mkdocs-exclude's semantics.
+  const excludePatterns = extractExcludePatterns(config.value.plugins);
+  const sourceListing = {
+    ok: true as const,
+    value: applyExcludePatterns(sourceListingRaw.value, excludePatterns),
+  };
   const allFiles = await dirReader.list(docsDir, ASSET_EXTENSIONS);
   if (!allFiles.ok) {
     return err({
       code: 'directory-read-failed',
-      message: enrichMissingDocsDirMessage(
-        allFiles.error.message,
-        config.value.plugins,
-      ),
+      message: enrichMissingDocsDirMessage(allFiles.error.message, config.value.plugins),
     });
   }
   const themeOptionsForExcludes = config.value.theme?.options ?? {};
   const logoExcludePath =
-    typeof themeOptionsForExcludes.logo === 'string'
-      ? themeOptionsForExcludes.logo
-      : null;
+    typeof themeOptionsForExcludes.logo === 'string' ? themeOptionsForExcludes.logo : null;
   const faviconExcludePath =
-    typeof themeOptionsForExcludes.favicon === 'string'
-      ? themeOptionsForExcludes.favicon
-      : null;
+    typeof themeOptionsForExcludes.favicon === 'string' ? themeOptionsForExcludes.favicon : null;
   const assetPlanExcludes = [logoExcludePath, faviconExcludePath].filter(
     (p): p is string => p !== null,
   );
@@ -388,17 +297,11 @@ export async function convertSiteFromDisk(
   );
 
   const i18nLocales = extractI18nLocales(config.value.plugins);
-  const includeMarkdownEnabled = config.value.plugins.some(
-    (p) => p.name === 'include-markdown',
-  );
-  const macrosScanEnabled = config.value.plugins.some(
-    (p) => p.name === 'macros',
-  );
+  const includeMarkdownEnabled = config.value.plugins.some((p) => p.name === 'include-markdown');
+  const macrosScanEnabled = config.value.plugins.some((p) => p.name === 'macros');
   const themeFeatures = (() => {
     const f = config.value.theme?.options.features;
-    return Array.isArray(f)
-      ? f.filter((x): x is string => typeof x === 'string')
-      : [];
+    return Array.isArray(f) ? f.filter((x): x is string => typeof x === 'string') : [];
   })();
   const hasTabsLink = themeFeatures.includes('content.tabs.link');
   const hasNavigationTabs = themeFeatures.includes('navigation.tabs');
@@ -411,9 +314,7 @@ export async function convertSiteFromDisk(
   // Default-wire the production validator. Callers can pass an explicit
   // validator (test seam) or `null` to skip validation entirely.
   const outputValidator =
-    input.outputValidator === undefined
-      ? createMdxOutputValidator()
-      : input.outputValidator;
+    input.outputValidator === undefined ? createMdxOutputValidator() : input.outputValidator;
 
   const siteResult = await convertSite({
     docsDir,
@@ -430,15 +331,15 @@ export async function convertSiteFromDisk(
     // (defaulting to `blog`) so convertSite skips the source's
     // `<blogDir>/index.md` — starlight-blog auto-generates the landing
     // page and emitting the source's index would crash `astro build`.
-    ...((() => {
+    ...(() => {
       const bp = config.value.plugins.find((p) => p.name === 'blog');
       if (bp === undefined) return {};
-      const dir = typeof bp.options['blog_dir'] === 'string' ? (bp.options['blog_dir'] as string) : 'blog';
+      const dir =
+        typeof bp.options['blog_dir'] === 'string' ? (bp.options['blog_dir'] as string) : 'blog';
       return { blogDir: dir };
-    })()),
-    snippetDedentSubsections: snippetExtensionOptions(
-      config.value.markdownExtensions,
-    )['dedent_subsections'] === true,
+    })(),
+    snippetDedentSubsections:
+      snippetExtensionOptions(config.value.markdownExtensions)['dedent_subsections'] === true,
     ...(resolvedSnippetBasePaths === undefined
       ? {}
       : { snippetBasePaths: resolvedSnippetBasePaths }),
@@ -465,9 +366,7 @@ export async function convertSiteFromDisk(
     });
   }
 
-  const sectionIndexEnabled = config.value.plugins.some(
-    (p) => p.name === 'section-index',
-  );
+  const sectionIndexEnabled = config.value.plugins.some((p) => p.name === 'section-index');
   const literateNav = await resolveLiterateNav(config.value.plugins, docsDir, fs);
   const sidebarResult = await compileSidebarEntries(
     literateNav.tree === null ? config.value.nav : null,
@@ -477,7 +376,8 @@ export async function convertSiteFromDisk(
     (() => {
       const bp = config.value.plugins.find((p) => p.name === 'blog');
       if (bp === undefined) return {};
-      const dir = typeof bp.options['blog_dir'] === 'string' ? (bp.options['blog_dir'] as string) : 'blog';
+      const dir =
+        typeof bp.options['blog_dir'] === 'string' ? (bp.options['blog_dir'] as string) : 'blog';
       return { blogDir: dir };
     })(),
   );
@@ -497,19 +397,11 @@ export async function convertSiteFromDisk(
   const droppedBlogSlugs = (() => {
     const bp = config.value.plugins.find((p) => p.name === 'blog');
     if (bp === undefined) return new Set<string>();
-    const dir = typeof bp.options['blog_dir'] === 'string'
-      ? (bp.options['blog_dir'] as string)
-      : 'blog';
-    return new Set([
-      `${dir}/posts/index`,
-      `${dir}/posts/tags`,
-      `${dir}/posts/archive`,
-    ]);
+    const dir =
+      typeof bp.options['blog_dir'] === 'string' ? (bp.options['blog_dir'] as string) : 'blog';
+    return new Set([`${dir}/posts/index`, `${dir}/posts/tags`, `${dir}/posts/archive`]);
   })();
-  const filteredSidebarEntries = filterSidebarSlugs(
-    sidebarResult.value.entries,
-    droppedBlogSlugs,
-  );
+  const filteredSidebarEntries = filterSidebarSlugs(sidebarResult.value.entries, droppedBlogSlugs);
   const sidebarWithPages = applyPagesOverrides(filteredSidebarEntries, pagesResult.value);
 
   const featuresFromPlugins = detectFeaturesFromPlugins(
@@ -538,9 +430,10 @@ export async function convertSiteFromDisk(
   // `<docs_dir>/<blog_dir>/.authors.yml`. starlight-blog needs them as
   // the `authors` field of the plugin invocation; without this, every
   // blog post fails with "Author 'X' not found in the blog configuration."
-  const blogDir = typeof blogPlugin?.options['blog_dir'] === 'string'
-    ? (blogPlugin.options['blog_dir'] as string)
-    : 'blog';
+  const blogDir =
+    typeof blogPlugin?.options['blog_dir'] === 'string'
+      ? (blogPlugin.options['blog_dir'] as string)
+      : 'blog';
   const authorsYmlPath = join(docsDir, blogDir, '.authors.yml');
   const authorsYmlRead = await fs.readText(authorsYmlPath);
   const authorsFromFile = authorsYmlRead.ok
@@ -566,16 +459,17 @@ export async function convertSiteFromDisk(
   const baseAuthors = blogOptionsBase['authors'];
   const baseAuthorsIsObjectMap =
     baseAuthors !== null && typeof baseAuthors === 'object' && !Array.isArray(baseAuthors);
-  const blogOptions = blogPlugin !== undefined && (
-    Object.keys(blogOptionsBase).length > 0 || authorsFromFile !== undefined
-  )
-    ? (authorsFromFile !== undefined && !baseAuthorsIsObjectMap
+  const blogOptions =
+    blogPlugin !== undefined &&
+    (Object.keys(blogOptionsBase).length > 0 || authorsFromFile !== undefined)
+      ? authorsFromFile !== undefined && !baseAuthorsIsObjectMap
         ? { ...blogOptionsBase, authors: authorsFromFile }
-        : blogOptionsBase)
-    : undefined;
-  const tagsOptions = tagsPlugin !== undefined && Object.keys(tagsPlugin.options).length > 0
-    ? tagsPlugin.options
-    : undefined;
+        : blogOptionsBase
+      : undefined;
+  const tagsOptions =
+    tagsPlugin !== undefined && Object.keys(tagsPlugin.options).length > 0
+      ? tagsPlugin.options
+      : undefined;
   const rawSocialLayout = socialPlugin?.options['cards_layout_options'];
   const socialCardsLayoutOptions =
     rawSocialLayout !== null && typeof rawSocialLayout === 'object'
@@ -616,9 +510,7 @@ export async function convertSiteFromDisk(
       ]
     : [];
 
-  const palette = mapMaterialPaletteToStarlight(
-    config.value.theme?.options.palette ?? null,
-  );
+  const palette = mapMaterialPaletteToStarlight(config.value.theme?.options.palette ?? null);
   const paletteRaw = config.value.theme?.options.palette;
   const paletteSpecified = paletteRaw !== undefined && paletteRaw !== null;
   const paletteDiagnostics: Array<{
@@ -707,7 +599,7 @@ export async function convertSiteFromDisk(
         ruleId: 'feature-tabs-link-detected',
         source: 'mkdocs-material-to-starlight',
         message:
-          'theme.features `content.tabs.link` detected. Generated `<Tabs>` components include a derived `syncKey` so identically-labelled tab groups stay synchronised across pages, matching Material\'s behaviour.',
+          "theme.features `content.tabs.link` detected. Generated `<Tabs>` components include a derived `syncKey` so identically-labelled tab groups stay synchronised across pages, matching Material's behaviour.",
       }),
     });
   }
@@ -768,7 +660,7 @@ export async function convertSiteFromDisk(
         ruleId: 'theme-direction-rtl',
         source: 'mkdocs-material-to-starlight',
         message:
-          'theme.direction `rtl` detected. Add `dir: \'rtl\'` to the relevant Starlight `locales: { <code>: { label, lang, dir: \'rtl\' } }` entry so the layout flips for right-to-left languages. Starlight has no top-level direction switch — the setting is per-locale.',
+          "theme.direction `rtl` detected. Add `dir: 'rtl'` to the relevant Starlight `locales: { <code>: { label, lang, dir: 'rtl' } }` entry so the layout flips for right-to-left languages. Starlight has no top-level direction switch — the setting is per-locale.",
       }),
     });
   }
@@ -855,7 +747,7 @@ export async function convertSiteFromDisk(
     }),
   }));
 
-  const pythonTagDiagnostics = pythonStripped.stripped.map((tag) => ({
+  const pythonTagDiagnostics = strippedPythonTags.map((tag) => ({
     sourcePath: 'mkdocs.yml',
     diagnostic: createDiagnostic({
       severity: 'info' as const,
@@ -865,9 +757,7 @@ export async function convertSiteFromDisk(
     }),
   }));
 
-  const expressiveCodeConfig = extractExpressiveCodeConfig(
-    config.value.markdownExtensions,
-  );
+  const expressiveCodeConfig = extractExpressiveCodeConfig(config.value.markdownExtensions);
   const expressiveCodeDiagnostics: Array<{
     sourcePath: string;
     diagnostic: ReturnType<typeof createDiagnostic>;
@@ -910,9 +800,8 @@ export async function convertSiteFromDisk(
 
   const redirects = extractRedirects(config.value.plugins);
   const i18nFromPlugin = extractI18nConfig(config.value.plugins);
-  const i18nFromAlternate = i18nFromPlugin === null
-    ? extractAlternateLocales(config.value.extras)
-    : null;
+  const i18nFromAlternate =
+    i18nFromPlugin === null ? extractAlternateLocales(config.value.extras) : null;
   const themeLanguage =
     i18nFromPlugin === null && i18nFromAlternate === null
       ? extractThemeLanguage(config.value.theme?.options ?? {})
@@ -989,9 +878,12 @@ export async function convertSiteFromDisk(
 
   // Per-occurrence scans for the three previously bulk-emitted diagnostics.
   // Reads source files to find per-file occurrences of the affected patterns.
-  const bulkOccurrenceDiagnostics: Array<{ sourcePath: string; diagnostic: ReturnType<typeof createDiagnostic> }> = [];
+  const bulkOccurrenceDiagnostics: Array<{
+    sourcePath: string;
+    diagnostic: ReturnType<typeof createDiagnostic>;
+  }> = [];
   const hasCodehilite = config.value.markdownExtensions.some(
-    (ext) => (typeof ext === 'string' ? ext : Object.keys(ext)[0] ?? '') === 'codehilite',
+    (ext) => (typeof ext === 'string' ? ext : (Object.keys(ext)[0] ?? '')) === 'codehilite',
   );
   const hasMetaPlugin = config.value.plugins.some((p) => p.name === 'meta');
   // Read all source files once. The opt-out / no-copy scan always runs (it
@@ -1080,9 +972,10 @@ export async function convertSiteFromDisk(
   // Surface diagnostics for `extra:` keys with no Starlight equivalent
   // (consent dialog, lifecycle status dictionary, non-Google analytics
   // providers). Pure detection — does not affect other branches.
-  const extraWarningDiagnostics = detectExtraWarnings(config.value.extras).map(
-    (d) => ({ sourcePath: 'mkdocs.yml', diagnostic: d }),
-  );
+  const extraWarningDiagnostics = detectExtraWarnings(config.value.extras).map((d) => ({
+    sourcePath: 'mkdocs.yml',
+    diagnostic: d,
+  }));
 
   // Surface the auto-discovery redirect (when it fired) in the diagnostic
   // stream so it lands in CI logs and `MIGRATION_NOTES.md` next to every
@@ -1143,10 +1036,7 @@ export async function convertSiteFromDisk(
         };
   const i18n = i18nFromPlugin ?? i18nFromAlternate ?? i18nFromThemeLanguage;
   const social = extractSocial(config.value.extras);
-  const editLinkBaseUrl = deriveEditLinkBaseUrl(
-    config.value.repoUrl,
-    config.value.editUri,
-  );
+  const editLinkBaseUrl = deriveEditLinkBaseUrl(config.value.repoUrl, config.value.editUri);
   const tableOfContents = extractTocConfig(config.value.markdownExtensions);
   // Split extra CSS into two buckets:
   //   - external URLs (e.g. https://fonts.…/foo.css) pass through to
@@ -1171,13 +1061,12 @@ export async function convertSiteFromDisk(
   const fontCssImports: string[] = [];
   if (themeFonts?.text !== undefined) fontCssImports.push(themeFonts.text.package);
   if (themeFonts?.code !== undefined) fontCssImports.push(themeFonts.code.package);
-  const fontDependencies: ReadonlyArray<readonly [string, string]> =
-    fontCssImports.map((p) => [p, 'latest'] as const);
+  const fontDependencies: ReadonlyArray<readonly [string, string]> = fontCssImports.map(
+    (p) => [p, 'latest'] as const,
+  );
   const extraJsEntries = extraAssets.js.map((js) => ({
     ...js,
-    src: /^[a-z][a-z0-9+\-.]*:\/\//i.test(js.src)
-      ? js.src
-      : `/${js.src.replace(/^\/+/, '')}`,
+    src: /^[a-z][a-z0-9+\-.]*:\/\//i.test(js.src) ? js.src : `/${js.src.replace(/^\/+/, '')}`,
   }));
   const themeOptions = config.value.theme?.options ?? {};
   // Starlight's `logo.src` and `favicon` accept ONLY local file paths
@@ -1215,9 +1104,7 @@ export async function convertSiteFromDisk(
   const faviconExtensionRejected =
     faviconRawCandidate !== null && !FAVICON_ACCEPTED_EXT.test(faviconRawCandidate);
   const faviconRawAccepted =
-    faviconRawCandidate !== null && !faviconExtensionRejected
-      ? faviconRawCandidate
-      : null;
+    faviconRawCandidate !== null && !faviconExtensionRejected ? faviconRawCandidate : null;
   const faviconRaw = (await checkLocalAssetExists(faviconRawAccepted)) ? faviconRawAccepted : null;
   // starlight-links-validator: opt-in (default OFF) since 2026-05-05.
   //
@@ -1265,7 +1152,7 @@ export async function convertSiteFromDisk(
     ...(expressiveCodeConfig === undefined
       ? {}
       : { expressiveCode: { themes: expressiveCodeConfig.themes } }),
-    ...((analytics !== null || extraCssPublicHrefs.length > 0)
+    ...(analytics !== null || extraCssPublicHrefs.length > 0
       ? {
           extraHeadEntries: [
             ...(analytics?.headEntries ?? []),
@@ -1318,11 +1205,19 @@ export async function convertSiteFromDisk(
   const isValidSiteUrl =
     config.value.siteUrl !== null &&
     /^https?:\/\//i.test(config.value.siteUrl) &&
-    (() => { try { return Boolean(new URL(config.value.siteUrl ?? '')); } catch { return false; } })();
+    (() => {
+      try {
+        return Boolean(new URL(config.value.siteUrl ?? ''));
+      } catch {
+        return false;
+      }
+    })();
   const rssEnabled =
-    input.rss === false ? false :
-    input.rss === true ? isValidSiteUrl :
-    (allFeatures.includes('rss') && isValidSiteUrl);
+    input.rss === false
+      ? false
+      : input.rss === true
+        ? isValidSiteUrl
+        : allFeatures.includes('rss') && isValidSiteUrl;
   const rssEndpointSource = rssEnabled
     ? serializeRssEndpoint({
         siteName: config.value.siteName,
@@ -1345,6 +1240,17 @@ export async function convertSiteFromDisk(
   const tagsYmlSource = allFeatures.includes('tags')
     ? '# starlight-tags configuration. Each tag must declare a `label` (display\n# name); other fields (description, color, icon, permalink, etc.) are\n# optional. Tag IDs must be lowercase letters/digits/hyphens/underscores.\n# See https://frostybee.github.io/starlight-tags/ for the full schema.\ntags:\n  example:\n    label: Example\n    description: An example tag — replace with your own definitions.\n'
     : null;
+  // Auto-apply Starlight 0.35+'s `docsLoader({ generateId })` when any source
+  // path has segments github-slugger would reshape. Replaces the historic
+  // `slug-incompatible-path` *warning* with an actual fix: the emitted
+  // content.config.ts overrides the default sluggifier so paths like
+  // `1.0/configuration.md` and `c++-primer.md` resolve verbatim and the
+  // converter's emitted sidebar entries match. The warning still fires (so
+  // users see what happened in MIGRATION_NOTES.md) but the build no longer
+  // breaks.
+  const preserveSlugs = siteResult.value.diagnostics.some(
+    (d) => d.diagnostic.ruleId === 'slug-incompatible-path',
+  );
   const writeResult = await writeOutputs({
     outputDir: input.outputDir,
     files: siteResult.value.files,
@@ -1357,15 +1263,12 @@ export async function convertSiteFromDisk(
     tagsYmlSource,
     configFormat: input.configFormat ?? 'mjs',
     extendedFrontmatterFields,
+    preserveSlugs,
   });
   if (!writeResult.ok) {
     return err({ code: 'file-write-failed', message: writeResult.error });
   }
-  const assetCopyResult = await copyAssetsToPublic(
-    docsDir,
-    input.outputDir,
-    assetPlan,
-  );
+  const assetCopyResult = await copyAssetsToPublic(docsDir, input.outputDir, assetPlan);
   if (!assetCopyResult.ok) {
     return err({ code: 'file-write-failed', message: assetCopyResult.error });
   }
@@ -1435,31 +1338,23 @@ export async function convertSiteFromDisk(
     const extraSection =
       '\n## logo / favicon assets\n\n' +
       assetPostDiagnostics
-        .map(
-          (d) =>
-            `- **${d.sourcePath}** — ${d.diagnostic.ruleId}: ${d.diagnostic.message}`,
-        )
+        .map((d) => `- **${d.sourcePath}** — ${d.diagnostic.ruleId}: ${d.diagnostic.message}`)
         .join('\n') +
       '\n';
-    try {
-      await writeFile(
-        join(input.outputDir, 'MIGRATION_NOTES.md'),
-        migrationNotesSource + extraSection,
-        'utf8',
-      );
-    } catch {
-      // Non-fatal — the original notes file already exists.
-    }
+    // Best-effort atomic re-write of MIGRATION_NOTES.md with the appended
+    // post-write section. Failures here are non-fatal — the original notes
+    // file is already on disk.
+    await atomicWriteText(
+      join(input.outputDir, 'MIGRATION_NOTES.md'),
+      migrationNotesSource + extraSection,
+    );
   }
 
   return ok({
     // Include site-conversion + auto-discovery + plugin-level diagnostics
     // so callers see every signal — auto-discovery in particular surfaces
     // a redirect message when we found mkdocs.yml in a nested folder.
-    diagnostics: [
-      ...autoDiscoveryDiagnostics,
-      ...siteResult.value.diagnostics,
-    ],
+    diagnostics: [...autoDiscoveryDiagnostics, ...siteResult.value.diagnostics],
     sidebarSource: serializeSidebar(sidebarWithPages),
     astroConfigSource,
     packageJsonSource,
@@ -1472,27 +1367,51 @@ function dirOfRel(relPath: string): string {
   return idx === -1 ? '' : relPath.slice(0, idx);
 }
 
+function translateLoadError(
+  error: import('../../use-cases/load-config/load-mkdocs-config.js').LoadMkdocsConfigError,
+  inputDir: string,
+): ConvertSiteFromDiskError {
+  switch (error.kind) {
+    case 'config-ambiguous': {
+      const list = error.candidates.map((c, i) => `  ${String(i + 1)}. ${c}`).join('\n');
+      return {
+        code: 'config-ambiguous',
+        message:
+          `Multiple mkdocs.yml/.yaml found under ${error.searchedDir}. ` +
+          `Re-run pointing at the intended subdirectory directly:\n${list}\n` +
+          `Example: \`mkdocs-material-to-starlight ${error.searchedDir}/${dirOfRel(error.candidates[0] ?? '')} <output-dir>\``,
+        candidates: error.candidates,
+      };
+    }
+    case 'config-not-found':
+      return {
+        code: 'config-not-found',
+        message: `mkdocs.yml not found under ${inputDir} (searched the project tree to depth 4, pruning node_modules/dist/build/.git/site/...).`,
+      };
+    case 'yaml-decode-failed':
+      return { code: 'yaml-decode-failed', message: error.message };
+    case 'config-invalid':
+      return { code: 'config-invalid', message: error.message };
+  }
+}
+
 function snippetExtensionOptions(
-  exts: ReadonlyArray<{ readonly name: string; readonly options: Readonly<Record<string, unknown>> }>,
+  exts: ReadonlyArray<{
+    readonly name: string;
+    readonly options: Readonly<Record<string, unknown>>;
+  }>,
 ): Readonly<Record<string, unknown>> {
   const entry = exts.find((e) => e.name === 'pymdownx.snippets');
   return entry?.options ?? {};
 }
 
 async function copyOne(source: string, target: string): Promise<Result<true, string>> {
-  try {
-    await mkdir(dirname(target), { recursive: true });
-    await copyFile(source, target);
-    return ok(true);
-  } catch (cause) {
-    const message = cause instanceof Error ? cause.message : String(cause);
-    return err(`failed to copy ${source} → ${target}: ${message}`);
-  }
+  // Atomic: write to a sibling tmp, then rename. Prevents partial-output
+  // corruption if the process is interrupted mid-copy.
+  return atomicCopyFile(source, target);
 }
 
-function collectCandidateDirectories(
-  sourcePaths: ReadonlyArray<string>,
-): ReadonlyArray<string> {
+function collectCandidateDirectories(sourcePaths: ReadonlyArray<string>): ReadonlyArray<string> {
   const set = new Set<string>(['']);
   for (const path of sourcePaths) {
     let cursor = path.lastIndexOf('/');
@@ -1512,12 +1431,9 @@ async function copyAssetsToPublic(
   for (const entry of plan) {
     const source = join(docsDir, entry.sourceRelative);
     const target = join(outputDir, 'public', entry.destRelative);
-    try {
-      await mkdir(dirname(target), { recursive: true });
-      await copyFile(source, target);
-    } catch (cause) {
-      const message = cause instanceof Error ? cause.message : String(cause);
-      return err(`failed to copy ${source} → ${target}: ${message}`);
+    const copied = await atomicCopyFile(source, target);
+    if (!copied.ok) {
+      return copied;
     }
   }
   return ok(true);
@@ -1579,6 +1495,13 @@ interface WriteOutputsInput {
   readonly tagsYmlSource: string | null;
   readonly configFormat: 'mjs' | 'ts';
   readonly extendedFrontmatterFields: Readonly<Record<string, string>>;
+  /**
+   * When true, emit `docsLoader({ generateId })` so source paths with
+   * github-slugger-incompatible segments (`1.0/`, `c++-primer.md`) survive
+   * verbatim. Set by the caller when any `slug-incompatible-path` diagnostic
+   * fired during site conversion.
+   */
+  readonly preserveSlugs: boolean;
 }
 
 async function writeOutputs(input: WriteOutputsInput): Promise<Result<true, string>> {
@@ -1593,8 +1516,14 @@ async function writeOutputs(input: WriteOutputsInput): Promise<Result<true, stri
   const scaffold: Array<readonly [ReadonlyArray<string>, string]> = [
     [[astroConfigFilename], input.astroConfigSource],
     [['package.json'], input.packageJsonSource],
+    [['biome.json'], serializeBiomeConfig()],
     [['MIGRATION_NOTES.md'], input.migrationNotesSource],
-    [['src', 'content.config.ts'], serializeContentConfig(input.extendedFrontmatterFields)],
+    [
+      ['src', 'content.config.ts'],
+      serializeContentConfig(input.extendedFrontmatterFields, {
+        preserveSlugs: input.preserveSlugs,
+      }),
+    ],
     [['src', 'styles', 'mkdocs-migration.css'], input.stylesheetSource],
   ];
   if (input.rssEndpointSource !== null) {
@@ -1616,14 +1545,11 @@ async function writeOutputs(input: WriteOutputsInput): Promise<Result<true, stri
 }
 
 async function writeOne(target: string, content: string): Promise<Result<true, string>> {
-  try {
-    await mkdir(dirname(target), { recursive: true });
-    await writeFile(target, content, 'utf8');
-    return ok(true);
-  } catch (cause) {
-    const message = cause instanceof Error ? cause.message : String(cause);
-    return err(`failed to write ${target}: ${message}`);
-  }
+  // Atomic: write to a sibling tmp, then rename. Prevents partial-output
+  // corruption if the process is interrupted mid-write (Ctrl-C, EIO, EBUSY,
+  // OOM during astro check). The file is either the previous content or
+  // the full new content, never half-written.
+  return atomicWriteText(target, content);
 }
 
 async function readAutoAppendContent(

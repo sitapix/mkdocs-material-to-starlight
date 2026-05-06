@@ -42,6 +42,9 @@ function fixtureFs(): FileSystem {
     async exists() {
       return false;
     },
+    async realpath(path) {
+      return ok(path);
+    },
   };
 }
 

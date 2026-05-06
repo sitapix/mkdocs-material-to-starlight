@@ -20,8 +20,7 @@
 
 import { resolveIcon } from '../transform/resolve-icon.js';
 import { createDiagnostic, type Diagnostic } from '../../domain/diagnostics/diagnostic.js';
-
-const FENCE = /^ {0,3}(```|~~~)/;
+import { isFenceLine } from '../../domain/syntax/fence.js';
 const BUTTON_LINE_RE =
   /\[(?<label>[^\]\n]+)\]\([^)\n]+\)\{ *\.md-button(?: +\.md-button--[a-z0-9-]+)* *\}/g;
 const SHORTCODE_RE = /:([a-z][a-z0-9-]*[a-z0-9]):/g;
@@ -33,7 +32,7 @@ export function scanButtonIcons(source: string): ReadonlyArray<Diagnostic> {
   let inFence = false;
 
   for (const line of lines) {
-    if (FENCE.test(line)) {
+    if (isFenceLine(line)) {
       inFence = !inFence;
       continue;
     }

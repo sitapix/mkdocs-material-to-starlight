@@ -14,7 +14,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { getMappingRow } from './table.js';
+import { getMappingRow, getAllMappingRows, getTranslationDepth, type TranslationDepth } from './table.js';
 import { getRegisteredRuleId } from '../diagnostics/registry.js';
 
 const SETUP_PAIRS: ReadonlyArray<{ featureId: string; ruleId: string }> = [
@@ -46,4 +46,45 @@ describe('Material Setup section coverage', () => {
       expect(entry?.relatedFeatureId).toBe(featureId);
     });
   }
+});
+
+/**
+ * Architectural invariant: every mapping row must have a discoverable
+ * translation depth. Either the row carries an explicit `translationDepth`
+ * field, or `getTranslationDepth` derives one from `conversionType`. The
+ * field is what `--explain` and the wizard will use to communicate
+ * conversion fidelity to users; a missing depth would silently default
+ * to "full" and mislead the user about lossy / manual rows.
+ */
+describe('Mapping table translation-depth coverage', () => {
+  const VALID_DEPTHS: ReadonlySet<TranslationDepth> = new Set([
+    'full',
+    'lossy-named',
+    'passthrough',
+    'recommend-dep',
+    'manual',
+  ]);
+
+  it('every row has a derivable translation depth', () => {
+    for (const row of getAllMappingRows()) {
+      const depth = getTranslationDepth(row);
+      expect(VALID_DEPTHS.has(depth), `${row.featureId} → ${depth}`).toBe(true);
+    }
+  });
+
+  it('rows with `recommended-dep` conversionType derive `recommend-dep` depth', () => {
+    for (const row of getAllMappingRows()) {
+      if (row.conversionType === 'recommended-dep' && row.translationDepth === undefined) {
+        expect(getTranslationDepth(row)).toBe('recommend-dep');
+      }
+    }
+  });
+
+  it('rows with `passthrough` conversionType derive `passthrough` depth', () => {
+    for (const row of getAllMappingRows()) {
+      if (row.conversionType === 'passthrough' && row.translationDepth === undefined) {
+        expect(getTranslationDepth(row)).toBe('passthrough');
+      }
+    }
+  });
 });

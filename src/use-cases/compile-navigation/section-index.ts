@@ -90,6 +90,14 @@ function reorderingDiagnostic(
     severity: 'info',
     ruleId: 'plugin-section-index-applied',
     source: SOURCE,
-    message: `mkdocs-section-index: hoisted "${index.path}" to the top of the "${section.title}" group so the index page is reachable as the first child.`,
+    message:
+      `mkdocs-section-index: hoisted "${index.path}" to the top of the "${section.title}" group ` +
+      `so the index page stays reachable. UX gap: in Material, the section header itself was a ` +
+      `clickable link to this index page (one click). Starlight has no clickable group label, so ` +
+      `users must now expand the group AND click the first child (two clicks). If this matters ` +
+      `for your site, the workarounds are: (a) keep the page accessible via the in-content links ` +
+      `you already have, (b) duplicate the index page as a top-level entry, or (c) author a small ` +
+      `Starlight sidebar override component. Run \`/explain plugin-section-index-applied\` for ` +
+      `the canonical fix language.`,
   });
 }

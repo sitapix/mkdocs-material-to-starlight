@@ -15,45 +15,42 @@
  * through `diagnostics`, not the error channel.
  */
 
-import { ok, err, type Result } from '../../domain/result.js';
-import type { FileSystem } from '../../domain/ports/file-system.js';
-import { createDiagnostic, type Diagnostic } from '../../domain/diagnostics/diagnostic.js';
 import type { RepoContext } from '../../domain/config/repo-context.js';
+import { createDiagnostic, type Diagnostic } from '../../domain/diagnostics/diagnostic.js';
+import type { FileSystem } from '../../domain/ports/file-system.js';
+import { err, ok, type Result } from '../../domain/result.js';
+import { findSlugIncompatibleSegments } from '../../domain/starlight/slug-compat.js';
 import { buildSlugMap, type SlugMap } from '../../domain/starlight/slug-map.js';
-import {
-  expectedAstroSlug,
-  findSlugIncompatibleSegments,
-} from '../../domain/starlight/slug-compat.js';
-import { rewriteReadmePaths } from './rename-readme.js';
 // renameI18nPath is now consumed inside rewriteReadmePaths.
 import { convertFile } from '../convert-file/convert.js';
 import { detectFeatures } from '../detect-features/detect.js';
+import { scanMacroOccurrences } from '../detect-macros/scan.js';
+import { scanMacroExpressions } from '../detect-macros/scan-expressions.js';
 import { expandSnippets } from '../expand-snippets/expand.js';
+import { expandIncludeMarkdown } from '../include-markdown/expand.js';
+import { normalizeContentTabs } from '../normalize/content-tabs.js';
+import { normalizeFileTrees } from '../normalize/file-tree.js';
+import { normalizeLinkAttrLists } from '../normalize/link-attr-list.js';
+import { normalizeMkdocstringsCrossRefs } from '../normalize/mkdocstrings-crossref.js';
+import { normalizePackageManagerTabs } from '../normalize/package-manager-tabs.js';
+import { scanButtonIcons } from '../normalize/scan-button-icons.js';
+import { scanCodeFenceFlags } from '../normalize/scan-code-fence-flags.js';
+import { scanFrontmatterFields } from '../normalize/scan-frontmatter-fields.js';
+import { scanGithubAlerts } from '../normalize/scan-github-alerts.js';
+import { scanHeadingAnchors } from '../normalize/scan-heading-anchors.js';
+import { scanHeadingBadges } from '../normalize/scan-heading-badges.js';
+import { scanInlineAdmonitions } from '../normalize/scan-inline-admonitions.js';
+import { scanMaterialMarkers } from '../normalize/scan-material-markers.js';
+import { scanPlaceholderPage } from '../normalize/scan-placeholder-pages.js';
+import { scanTabAnchors } from '../normalize/scan-tab-anchors.js';
+import { normalizeTyperSnippetDirectives } from '../normalize/typer-snippet-directives.js';
 import type { DetectedFeature } from '../serialize-config/package-json.js';
+import { promoteSteps } from '../transform/ast/steps.js';
+import { detectLandingPage } from '../transform/landing-page.js';
 import { validateFrontmatter } from '../validate-output/frontmatter.js';
 import { validateJsxComponents } from '../validate-output/jsx-components.js';
 import { validateOutput } from '../validate-output/validate.js';
-import { expandIncludeMarkdown } from '../include-markdown/expand.js';
-import { scanMacroOccurrences } from '../detect-macros/scan.js';
-import { scanMacroExpressions } from '../detect-macros/scan-expressions.js';
-import { normalizeTyperSnippetDirectives } from '../normalize/typer-snippet-directives.js';
-import { scanHeadingAnchors } from '../normalize/scan-heading-anchors.js';
-import { scanGithubAlerts } from '../normalize/scan-github-alerts.js';
-import { scanHeadingBadges } from '../normalize/scan-heading-badges.js';
-import { scanInlineAdmonitions } from '../normalize/scan-inline-admonitions.js';
-import { scanCodeFenceFlags } from '../normalize/scan-code-fence-flags.js';
-import { scanPlaceholderPage } from '../normalize/scan-placeholder-pages.js';
-import { scanTabAnchors } from '../normalize/scan-tab-anchors.js';
-import { scanButtonIcons } from '../normalize/scan-button-icons.js';
-import { scanMaterialMarkers } from '../normalize/scan-material-markers.js';
-import { scanFrontmatterFields } from '../normalize/scan-frontmatter-fields.js';
-import { normalizeMkdocstringsCrossRefs } from '../normalize/mkdocstrings-crossref.js';
-import { normalizeLinkAttrLists } from '../normalize/link-attr-list.js';
-import { normalizeContentTabs } from '../normalize/content-tabs.js';
-import { normalizePackageManagerTabs } from '../normalize/package-manager-tabs.js';
-import { detectLandingPage } from '../transform/landing-page.js';
-import { promoteSteps } from '../transform/ast/steps.js';
-import { normalizeFileTrees } from '../normalize/file-tree.js';
+import { rewriteReadmePaths } from './rename-readme.js';
 
 export interface ConvertSiteInput {
   readonly docsDir: string;
@@ -152,10 +149,7 @@ export async function convertSite(
   // Pass i18n locales so the rewrite handles `page.fr.md` → `fr/page.md`
   // before the dot-slugify step (without this, the locale dot gets eaten
   // and the file becomes `page-fr.md`).
-  const readmeRename = rewriteReadmePaths(
-    input.sourcePaths,
-    input.i18nLocales ?? [],
-  );
+  const readmeRename = rewriteReadmePaths(input.sourcePaths, input.i18nLocales ?? []);
   // When the blog plugin is enabled, drop landing pages that
   // starlight-blog auto-generates. We map Material's `<blogDir>/posts/*`
   // posts convention onto starlight-blog's `prefix: '<blogDir>/posts'`,
@@ -164,22 +158,23 @@ export async function convertSite(
   // `<blogDir>/index.md`, `<blogDir>/get-help.md`) are real nav pages
   // OUTSIDE the prefix and stay. Real-world (percona/docs-home):
   // `new/get-help.md` is a help-link page, not a blog post.
-  const blogIndexPaths = input.blogDir !== undefined
-    ? new Set([
-        // The blog landing in Material is `<blogDir>/index.md`, but we
-        // moved posts under `<blogDir>/posts/`, so starlight-blog now
-        // auto-generates the landing at `<blogDir>/posts/`. The source's
-        // own `<blogDir>/index.md` (if any) becomes a regular nav page.
-        // Drop only files that actually CONFLICT with starlight-blog's
-        // auto-gen at `<blogDir>/posts/{index,tags,archive}.md`.
-        `${input.blogDir}/posts/index.md`,
-        `${input.blogDir}/posts/index.mdx`,
-        `${input.blogDir}/posts/tags.md`,
-        `${input.blogDir}/posts/tags.mdx`,
-        `${input.blogDir}/posts/archive.md`,
-        `${input.blogDir}/posts/archive.mdx`,
-      ])
-    : new Set<string>();
+  const blogIndexPaths =
+    input.blogDir !== undefined
+      ? new Set([
+          // The blog landing in Material is `<blogDir>/index.md`, but we
+          // moved posts under `<blogDir>/posts/`, so starlight-blog now
+          // auto-generates the landing at `<blogDir>/posts/`. The source's
+          // own `<blogDir>/index.md` (if any) becomes a regular nav page.
+          // Drop only files that actually CONFLICT with starlight-blog's
+          // auto-gen at `<blogDir>/posts/{index,tags,archive}.md`.
+          `${input.blogDir}/posts/index.md`,
+          `${input.blogDir}/posts/index.mdx`,
+          `${input.blogDir}/posts/tags.md`,
+          `${input.blogDir}/posts/tags.mdx`,
+          `${input.blogDir}/posts/archive.md`,
+          `${input.blogDir}/posts/archive.mdx`,
+        ])
+      : new Set<string>();
   const emitPaths = readmeRename.paths.filter((p) => !blogIndexPaths.has(p));
 
   // Build the slug map keyed by ORIGINAL disk paths (so the link rewriter
@@ -215,20 +210,21 @@ export async function convertSite(
   for (const emitPath of emitPaths) {
     const incompatible = findSlugIncompatibleSegments(emitPath);
     if (incompatible.length === 0) continue;
-    const expected = expectedAstroSlug(emitPath);
     diagnostics.push({
       sourcePath: emitPath,
       diagnostic: createDiagnostic({
-        severity: 'warning',
+        severity: 'info',
         ruleId: 'slug-incompatible-path',
         source: 'convert-site/slug-compat',
         message:
-          `Source path \`${emitPath}\` contains segment(s) ` +
-          `Astro's slug normaliser will reshape: ${incompatible.map((s) => `\`${s}\``).join(', ')}. ` +
-          `Astro will register this entry under slug \`${expected}\`, but the converter's emitted ` +
-          `sidebar refers to the original path. Either rename the offending segment(s) on disk ` +
-          `(e.g. \`1.0/\` → \`1-0/\`, \`c++-primer.md\` → \`cpp-primer.md\`) and re-run the converter, ` +
-          `or hand-edit \`astro.config.mjs\` so each affected sidebar entry uses \`${expected}\`.`,
+          `Source path \`${emitPath}\` contains segment(s) Astro's default ` +
+          `github-slugger would reshape: ${incompatible.map((s) => `\`${s}\``).join(', ')}. ` +
+          `Auto-fixed: the emitted \`src/content.config.ts\` overrides ` +
+          `\`docsLoader\` with a path-preserving \`generateId\` (Starlight 0.35+), ` +
+          `so the slug stays as the original path and the sidebar entry resolves. ` +
+          `If you'd rather rename to a slug-clean form (\`1.0/\` → \`1-0/\`, ` +
+          `\`c++-primer.md\` → \`cpp-primer.md\`), do that on disk and re-run; ` +
+          `the override drops away once no incompatible paths remain.`,
       }),
     });
   }
@@ -482,9 +478,7 @@ export async function convertSite(
     // file's MDX promotion by swapping `.md` → `.mdx` if convertFile
     // detected the file needed JSX components.
     const outputPath =
-      converted.extension === 'mdx'
-        ? sourcePath.replace(/\.md$/, '.mdx')
-        : sourcePath;
+      converted.extension === 'mdx' ? sourcePath.replace(/\.md$/, '.mdx') : sourcePath;
     files[outputPath] = converted.text;
     for (const diagnostic of converted.diagnostics) {
       diagnostics.push({ sourcePath, diagnostic });

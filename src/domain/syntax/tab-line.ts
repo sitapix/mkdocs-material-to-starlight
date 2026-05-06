@@ -11,7 +11,7 @@
  * Pure: takes a string, returns a record or null.
  */
 
-export type TabMarker = '===' | '===!';
+type TabMarker = '===' | '===!';
 
 export interface TabOpening {
   readonly marker: TabMarker;

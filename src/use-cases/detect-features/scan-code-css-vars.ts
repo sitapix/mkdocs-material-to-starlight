@@ -1,25 +1,19 @@
 /**
- * Scan user-authored extra CSS for Material code-block customization that
- * does not survive the move from Pygments to ExpressiveCode.
+ * Scan user-authored extra CSS for Material code-block customizations that
+ * don't survive the move from Pygments to ExpressiveCode.
  *
- * Material exposes two layers of code-block theming through CSS:
- *
- *   1. Token-class selectors (`.highlight .sb`, `.highlight .nf`, etc.) —
- *      driven by Pygments class output. ExpressiveCode renders via Shiki and
- *      uses `<span style="color:#hex">` inline styles, so these selectors no
- *      longer match anything in the rendered HTML.
- *
+ * Two layers of theming:
+ *   1. Token-class selectors (`.highlight .sb`, `.highlight .nf`, ...) —
+ *      driven by Pygments class output. ExpressiveCode renders via Shiki
+ *      with inline `<span style="color:#hex">` styles, so these selectors
+ *      stop matching anything.
  *   2. CSS variables (`--md-code-hl-string-color`, `--md-code-fg-color`,
- *      `--md-code-bg-color`, `--md-code-hl-color`, etc.) — read by Material's
- *      stylesheet but unknown to Starlight/ExpressiveCode. They are dropped.
+ *      `--md-code-bg-color`, ...) — read by Material's stylesheet but
+ *      unknown to Starlight/ExpressiveCode. Dropped.
  *
- * The user authored these in `extra_css` files; the converter copies the
- * files through unchanged (they may also contain valid CSS unrelated to
- * code blocks). This scanner inspects the file content, lists which
- * customizations were detected, and emits one diagnostic per file so the
- * user knows their tweaks need to migrate to a custom Shiki theme.
- *
- * Pure: takes (path, content) pairs, returns Diagnostic[]. No I/O.
+ * `extra_css` files copy through verbatim (they may also hold unrelated
+ * CSS); this scanner emits one diagnostic per file so users know to
+ * migrate tweaks to a custom Shiki theme. Pure.
  */
 
 import { createDiagnostic } from '../../domain/diagnostics/diagnostic.js';

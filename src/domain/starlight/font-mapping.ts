@@ -1,21 +1,24 @@
 /**
  * Translate Material's `theme.font.{text,code}` (Google Font family names)
- * into Fontsource npm package identifiers + the CSS family string used to
- * override Starlight's `--sl-font` and `--sl-font-mono` custom properties.
+ * into Fontsource npm package IDs and the CSS family string overriding
+ * Starlight's `--sl-font` and `--sl-font-mono` custom properties.
  *
  * Fontsource (https://fontsource.org) self-hosts every Google Font as an npm
- * package whose name is the family-name lowercased with spaces replaced by
- * hyphens — so `Roboto Mono` → `@fontsource/roboto-mono`. Vite resolves the
- * package's CSS export when it is listed in starlight's `customCss` array, so
- * adding the package to `package.json` and the import to `customCss` is all
- * the user has to do. The `serializeStyleSheet` shim still emits the
- * `--sl-font` overrides so the family actually takes effect.
+ * package: `Roboto Mono` becomes `@fontsource/roboto-mono`. Listing the
+ * package in starlight's `customCss` and adding it to `package.json` is the
+ * user's whole task; `serializeStyleSheet` emits the `--sl-font` overrides.
  *
- * Pure: takes a parsed `theme.font` value, returns the converter shape (or
- * null when nothing maps). Family names with non-ASCII characters or symbols
- * Fontsource cannot accept are rejected — the caller emits a fallback
- * diagnostic so the user knows to install the font manually.
+ * Pure. Family names with non-ASCII characters or symbols Fontsource cannot
+ * accept are rejected so the caller can emit a fallback diagnostic.
+ *
+ * Mapping is gated by the canonical Fontsource list
+ * (`fontsource-families.ts`, snapshot of `api.fontsource.org/v1/fonts`).
+ * Without the gate, proprietary names (`Gotham SSM A`, `IBM Plex Mono`
+ * typo'd as `IMB Plex Mono`, `Arial`) emit a `latest` dep on a non-existent
+ * package and `npm install` 404s the build.
  */
+
+import { FONTSOURCE_FAMILIES } from './fontsource-families.js';
 
 export interface MaterialFontConfig {
   /** Text font (`theme.font.text`) — drives `--sl-font`. */
@@ -73,5 +76,11 @@ function mapOne(
     return out;
   })();
   const slug = trimmed.join(' ').toLowerCase().replace(/ /g, '-');
+  // Reject anything not in the canonical Fontsource family snapshot. A
+  // missing slug means npm install would fail with a 404 (e.g. proprietary
+  // fonts like `Gotham SSM A`, common typos like `IMB Plex Mono`, or system
+  // fonts like `Arial`). Returning null lets the caller surface a
+  // diagnostic and skip the dep entirely; the user can install manually.
+  if (!FONTSOURCE_FAMILIES.has(slug)) return null;
   return { family: trimmed.join(' '), package: `@fontsource/${slug}` };
 }

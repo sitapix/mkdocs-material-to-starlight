@@ -197,7 +197,7 @@ function tryPromotePackageManagerBlock(
     diagnostics.push(
       createDiagnostic({
         severity: 'warning',
-        ruleId: 'package-managers-tabs-promoted',
+        ruleId: 'package-managers-tabs-fallback',
         source: SOURCE,
         message: `Package-manager tab group detected in "${sourcePath}" but the package name could not be extracted from the install command. Falling back to plain <Tabs>. Manually replace with <PackageManagers pkg="your-package"> from starlight-package-managers.`,
       }),
