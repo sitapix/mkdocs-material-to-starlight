@@ -2,9 +2,15 @@ import { describe, expect, it } from 'vitest';
 import { translateBlogOptions } from './blog-options.js';
 
 describe('translateBlogOptions', () => {
-  it('returns empty string when no recognizable Material options are present', () => {
-    expect(translateBlogOptions({})).toBe('');
-    expect(translateBlogOptions({ unknown_key: 'x' })).toBe('');
+  it('emits the default `blog/posts` prefix when options are empty (Material default blog_dir)', () => {
+    // The function is only invoked when `plugins.blog` is enabled in
+    // mkdocs.yml. Material's default `blog_dir` is `'blog'`, with posts
+    // under `blog/posts/`. starlight-blog's own default `'blog'` is
+    // wrong for any Material site that has non-post files (index, tags)
+    // alongside the posts subdirectory — so we emit the correct mapping
+    // even when the user didn't override `blog_dir` explicitly.
+    expect(translateBlogOptions({})).toBe("{ prefix: 'blog/posts' }");
+    expect(translateBlogOptions({ unknown_key: 'x' })).toBe("{ prefix: 'blog/posts' }");
   });
 
   it('translates blog_dir to a navigation prefix with `/posts` appended', () => {

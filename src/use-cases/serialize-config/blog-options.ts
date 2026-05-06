@@ -29,18 +29,25 @@ export function translateBlogOptions(
 ): string {
   const parts: string[] = [];
 
-  if (typeof options['blog_dir'] === 'string' && options['blog_dir'].length > 0) {
-    // Material's blog plugin treats `<blog_dir>/posts/*` as the actual
-    // posts (each requires `date:` frontmatter). Files directly under
-    // `<blog_dir>/` (e.g. `<blog_dir>/get-help.md`) are sibling
-    // navigation pages, NOT posts. starlight-blog's `prefix:` option
-    // marks every file under that directory as a post — so we need to
-    // point it at `<blog_dir>/posts` to match Material's convention.
-    // Without this, real-world (percona/docs-home) breaks at build
-    // time with "Missing date for blog entry 'new/get-help'."
-    const blogDir = options['blog_dir'].replace(/\/+$/, '');
-    parts.push(`prefix: ${quote(`${blogDir}/posts`)}`);
-  }
+  // Material's blog plugin treats `<blog_dir>/posts/*` as the actual
+  // posts (each requires `date:` frontmatter). Files directly under
+  // `<blog_dir>/` (e.g. `<blog_dir>/get-help.md`, `<blog_dir>/index.md`)
+  // are sibling navigation pages, NOT posts. starlight-blog's `prefix:`
+  // option marks every file under that directory as a post — so we need
+  // to point it at `<blog_dir>/posts` to match Material's convention.
+  // Without this, real-world breaks: percona/docs-home (`new/get-help`)
+  // and ksaaskil/kimmosaaskilahti.fi (`blog/index.md` is a stub label
+  // page, not a post).
+  //
+  // Material's default `blog_dir` is `'blog'`, so we emit `'blog/posts'`
+  // even when the option is omitted from mkdocs.yml — the plugin being
+  // enabled is enough signal. starlight-blog's own default `'blog'` is
+  // wrong for every Material site that has any non-post under blog/.
+  const blogDirRaw = typeof options['blog_dir'] === 'string' && options['blog_dir'].length > 0
+    ? options['blog_dir']
+    : 'blog';
+  const blogDir = blogDirRaw.replace(/\/+$/, '');
+  parts.push(`prefix: ${quote(`${blogDir}/posts`)}`);
   if (typeof options['pagination_per_page'] === 'number') {
     parts.push(`postsPerPage: ${String(options['pagination_per_page'])}`);
   }
