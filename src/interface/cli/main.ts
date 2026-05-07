@@ -142,13 +142,16 @@ export async function runCli(
       return 2;
     }
     const { runWizardFlow } = await import('./wizard-runner.js');
-    const wizard = await runWizardFlow(process.cwd(), io);
+    // Pass a converter callback so the wizard can wrap conversion in a clack
+    // spinner inside the rail. The callback returns the rendered report
+    // (instead of writing it directly), so the wizard can stop the spinner
+    // before stdout takes over.
+    const wizard = await runWizardFlow(process.cwd(), io, (cmd) =>
+      runConvertCompute(cmd, overrides),
+    );
     if (wizard.kind === 'cancelled') return 130;
     if (wizard.kind === 'non-interactive') return 2;
-    // The equivalent command is rendered inside the wizard via prompter.note,
-    // so the user sees it framed with the rest of the wizard output instead of
-    // mixed with the diagnostic report.
-    return runConvert(wizard.command, io, overrides);
+    return wizard.exitCode;
   }
 
   const command = parseArgs(argv);
@@ -328,9 +331,36 @@ async function runConvert(
   io: CliIo,
   overrides: CliOverrides,
 ): Promise<number> {
-  if (command.dryRun) {
-    io.stderr('--dry-run is not yet supported in this build');
+  const computed = await runConvertCompute(command, overrides);
+  if (computed.kind === 'fatal') {
+    io.stderr(computed.message);
     return 1;
+  }
+  io.stdout(computed.report);
+  return computed.exitCode;
+}
+
+/**
+ * Run a conversion to completion and return the rendered report as a string
+ * — instead of writing it to stdout. Lets the wizard wrap conversion in a
+ * clack spinner without having stdout text fight the spinner animation; the
+ * caller stops the spinner first, then prints the report.
+ *
+ * Fatal errors (config not found, output dir not empty, etc.) come back as
+ * a `kind: 'fatal'` record so callers can decide how to surface them — the
+ * wizard wants the error inside its rail; the bare-CLI path writes to
+ * stderr.
+ */
+type ComputedConversion =
+  | { readonly kind: 'ok'; readonly exitCode: number; readonly report: string }
+  | { readonly kind: 'fatal'; readonly message: string };
+
+export async function runConvertCompute(
+  command: ConvertCommand,
+  overrides: CliOverrides,
+): Promise<ComputedConversion> {
+  if (command.dryRun) {
+    return { kind: 'fatal', message: '--dry-run is not yet supported in this build' };
   }
   const input = {
     projectDir: command.projectDir,
@@ -366,18 +396,21 @@ async function runConvert(
   };
   const result = await convertSiteFromDisk(input);
   if (!result.ok) {
-    io.stderr(`error: ${result.error.code}: ${result.error.message}`);
-    return 1;
+    return { kind: 'fatal', message: `error: ${result.error.code}: ${result.error.message}` };
   }
   const conversionDiagnostics = result.value.diagnostics;
   const checkDiagnostics = command.check ? await runCheckPass(command, overrides) : [];
   const allDiagnostics = [...conversionDiagnostics, ...checkDiagnostics];
-  io.stdout(formatReport(allDiagnostics, command.outputDir));
   // CI-meaningful exit code: any error-severity diagnostic — whether emitted
   // by the converter (e.g. output-syntax-error after MDX validation) or by
   // astro check — means the generated project will not build. A clean exit 0
   // here would silently ship broken output to consumers.
-  return allDiagnostics.some((d) => d.diagnostic.severity === 'error') ? 1 : 0;
+  const exitCode = allDiagnostics.some((d) => d.diagnostic.severity === 'error') ? 1 : 0;
+  return {
+    kind: 'ok',
+    exitCode,
+    report: formatReport(allDiagnostics, command.outputDir),
+  };
 }
 
 interface CompareCommand {

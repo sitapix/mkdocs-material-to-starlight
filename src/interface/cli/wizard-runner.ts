@@ -7,6 +7,7 @@
  * CI never load @clack/prompts or picocolors.
  */
 
+import { attentionSummary } from '../../domain/conversion-mapping/attention-summary.js';
 import { getTranslationDepth } from '../../domain/conversion-mapping/table.js';
 import type { ConversionPlan } from '../../domain/wizard/plan.js';
 import { resolveInteractivity } from '../../infrastructure/env/tty-detection.js';
@@ -32,6 +33,8 @@ export interface WizardRunResult {
   readonly kind: 'success';
   readonly command: Extract<Command, { kind: 'convert' }>;
   readonly equivalentFlags: ReadonlyArray<string>;
+  /** Process exit code from the conversion the wizard ran inline. */
+  readonly exitCode: number;
 }
 export interface WizardRunCancelled {
   readonly kind: 'cancelled';
@@ -40,9 +43,23 @@ export interface WizardRunNonInteractive {
   readonly kind: 'non-interactive';
 }
 
+/**
+ * Conversion callback the wizard runs inside a clack spinner. Returns the
+ * rendered diagnostic report (instead of writing it directly) so the wizard
+ * can stop the spinner and outro the rail before stdout takes over —
+ * otherwise the spinner animation fights with the report's stdout writes.
+ */
+export type WizardConverter = (
+  command: Extract<Command, { kind: 'convert' }>,
+) => Promise<
+  | { readonly kind: 'ok'; readonly exitCode: number; readonly report: string }
+  | { readonly kind: 'fatal'; readonly message: string }
+>;
+
 export async function runWizardFlow(
   projectDirHint: string,
   io: CliIo,
+  converter: WizardConverter,
 ): Promise<WizardRunResult | WizardRunCancelled | WizardRunNonInteractive> {
   const env = process.env;
   const decision = resolveInteractivity({
@@ -81,8 +98,28 @@ export async function runWizardFlow(
         formatEquivalentCommand(restored, undefined, { binary: prompter.highlight.name }),
         'Re-running with your saved answers',
       );
-      prompter.outro('Converting…');
-      return { kind: 'success', command: reparsedRestored, equivalentFlags: restored };
+      // Same spinner-then-print pattern as the full wizard path below.
+      const spin = prompter.spinner({ initialMessage: 'Converting…', indicator: 'timer' });
+      const converted = await converter(reparsedRestored);
+      if (converted.kind === 'fatal') {
+        spin.error(converted.message);
+        prompter.cancel('Conversion failed.');
+        return {
+          kind: 'success',
+          command: reparsedRestored,
+          equivalentFlags: restored,
+          exitCode: 1,
+        };
+      }
+      spin.stop(converted.exitCode === 0 ? 'Converted' : 'Converted with errors');
+      prompter.outro(converted.exitCode === 0 ? 'All done.' : 'Done with diagnostics.');
+      io.stdout(converted.report);
+      return {
+        kind: 'success',
+        command: reparsedRestored,
+        equivalentFlags: restored,
+        exitCode: converted.exitCode,
+      };
     }
     // Saved flags failed to re-parse (CLI surface drift since they were
     // written). Fall through to the normal wizard rather than blocking.
@@ -141,7 +178,7 @@ export async function runWizardFlow(
   if (lossyRows.length > 0) {
     prompter.note(
       formatAttentionLines(
-        lossyRows.map((r) => ({ name: r.featureId, description: r.starlightOutput })),
+        lossyRows.map((r) => ({ name: r.featureId, description: attentionSummary(r) })),
         { name: hlName },
       ),
       `${hlCount(String(lossyRows.length))} lossy translation${lossyRows.length === 1 ? '' : 's'}`,
@@ -150,7 +187,7 @@ export async function runWizardFlow(
   if (manualRows.length > 0) {
     prompter.note(
       formatAttentionLines(
-        manualRows.map((r) => ({ name: r.featureId, description: r.starlightOutput })),
+        manualRows.map((r) => ({ name: r.featureId, description: attentionSummary(r) })),
         { name: hlName },
       ),
       `${hlCount(String(manualRows.length))} manual remediation${manualRows.length === 1 ? '' : 's'}`,
@@ -219,18 +256,32 @@ export async function runWizardFlow(
   if (!written.ok) {
     prompter.log.warn(`Could not save answers for next run: ${written.error.message}`);
   }
-  // Set expectations before the frame closes: when astro check was opted into,
-  // the user is about to wait 30-60s for conversion + check to finish, and the
-  // results appear OUTSIDE the rail (formatReport prints to plain stdout). A
-  // one-line heads-up beats a silent pause.
-  if (reparsed.check) {
-    prompter.log.info(
-      `${prompter.highlight.value('astro check')} runs after conversion. Results appear below.`,
-    );
+  // Run conversion inside a spinner so the user has live feedback during the
+  // long compute step (mkdocs.yml parse → file walk → AST passes → write).
+  // The converter callback returns the report as a string instead of writing
+  // it directly: we stop the spinner FIRST (so the rail terminates cleanly),
+  // outro, THEN print the report — that way stdout text never collides with
+  // the spinner's single-line animation.
+  const spin = prompter.spinner({ initialMessage: 'Converting…', indicator: 'timer' });
+  const converted = await converter(reparsed);
+  if (converted.kind === 'fatal') {
+    spin.error(converted.message);
+    prompter.cancel('Conversion failed.');
+    return { kind: 'success', command: reparsed, equivalentFlags: flags, exitCode: 1 };
   }
-  // Close the frame with a proper outro so the rail visually terminates before
-  // the diagnostic report dumps to stdout. Without this, the rail's vertical
-  // bar trails into ungated text and the visual handoff is messy.
-  prompter.outro('Converting…');
-  return { kind: 'success', command: reparsed, equivalentFlags: flags };
+  const verb = converted.exitCode === 0 ? 'Converted' : 'Converted with errors';
+  spin.stop(verb);
+  if (reparsed.check) {
+    prompter.log.info(`${prompter.highlight.value('astro check')} ran. Results appear below.`);
+  }
+  prompter.outro(
+    converted.exitCode === 0 ? 'All done.' : 'Done with diagnostics — see report below.',
+  );
+  io.stdout(converted.report);
+  return {
+    kind: 'success',
+    command: reparsed,
+    equivalentFlags: flags,
+    exitCode: converted.exitCode,
+  };
 }

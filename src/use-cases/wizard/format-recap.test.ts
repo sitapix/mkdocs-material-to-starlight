@@ -44,6 +44,33 @@ describe('formatRecap — Tier 0 mandatory choices', () => {
   });
 });
 
+describe('formatRecap — friendly enum labels', () => {
+  // Regression: the recap used to print raw enum strings (`palette: translate`,
+  // `tabs: mdx`) which mismatched the option labels the user just answered
+  // ("Translate to Starlight accent", "Promote to MDX as needed"). The recap
+  // should mirror what the user just confirmed, not the internal value.
+  it('renders palette enum as a human phrase', () => {
+    const text = formatRecap(recapWith({ tier1: { palette: 'translate' } }));
+    expect(text).toMatch(/palette:\s*translate Material accent/i);
+  });
+
+  it('renders palette `skip` and `custom` with friendly phrases too', () => {
+    const skipped = formatRecap(recapWith({ tier1: { palette: 'skip' } }));
+    expect(skipped).toMatch(/palette:\s*Starlight default accent/i);
+
+    const custom = formatRecap(recapWith({ tier1: { palette: 'custom' } }));
+    expect(custom).toMatch(/palette:\s*custom CSS/i);
+  });
+
+  it('renders tabs enum as a human phrase', () => {
+    const mdx = formatRecap(recapWith({ tier1: { tabs: 'mdx' } }));
+    expect(mdx).toMatch(/tabs:\s*promote to MDX/i);
+
+    const md = formatRecap(recapWith({ tier1: { tabs: 'html' } }));
+    expect(md).toMatch(/tabs:\s*raw HTML/i);
+  });
+});
+
 describe('formatRecap — Tier 1 conditional decisions', () => {
   it('lists tabs strategy when tier1.tabs is set', () => {
     const text = formatRecap(recapWith({ tier1: { tabs: 'mdx' } }));
@@ -107,13 +134,15 @@ describe('formatRecap — highlighter', () => {
     expect(text).toContain('from: <</abs/project>>');
     expect(text).toContain('to:   <<./my-docs-starlight>>');
     expect(text).toContain('package manager: <<pnpm>>');
-    expect(text).toContain('tabs: <<mdx>>');
+    // The value is rendered as a friendly phrase, not the raw enum, but the
+    // highlighter still wraps the whole thing.
+    expect(text).toMatch(/tabs:\s*<<promote to MDX[^>]*>>/);
     expect(text).not.toContain('<<from:');
   });
 
   it('defaults to identity when no highlighter is provided (plain output)', () => {
     const text = formatRecap(recapWith({ tier1: { tabs: 'mdx' } }));
-    expect(text).toContain('tabs: mdx');
+    expect(text).toMatch(/tabs:\s*promote to MDX/);
     expect(text).not.toContain('<<');
   });
 });

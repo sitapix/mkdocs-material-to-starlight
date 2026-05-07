@@ -61,6 +61,13 @@ export interface MappingRow {
   readonly requiredThemeOptions?: ReadonlyArray<string>;
   /** Human-readable description of the Starlight output. */
   readonly starlightOutput: string;
+  /**
+   * Short one-liner used in the wizard pre-flight notes (lossy translations,
+   * manual remediations). When omitted, the wizard falls back to
+   * `starlightOutput`. Keep to ~80–100 chars and lead with the action — no
+   * rationale, no parentheticals, no "diagnostic confirms…" tails.
+   */
+  readonly summary?: string;
   /** Output file extension required for this transform's emit. */
   readonly fileExt: FileExtension;
   /** Conversion mechanism. */
@@ -249,6 +256,7 @@ const TABLE: ReadonlyArray<MappingRow> = [
     requiredExtensions: ['pymdownx.keys'],
     starlightOutput:
       '<kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>Del</kbd> per-key splitting; `key_map` (custom key index) and `camel_case` PyMdown options are dropped',
+    summary: 'Splits to per-key <kbd> tags; key_map and camel_case options dropped.',
     fileExt: 'md',
     conversionType: 'text-pre-parse',
     risk: 'medium',
@@ -280,6 +288,8 @@ const TABLE: ReadonlyArray<MappingRow> = [
     requiredExtensions: ['pymdownx.emoji', 'attr_list'],
     starlightOutput:
       '<Icon name="..."> with fallback chain → npm-package SVG → diagnostic placeholder. Material has 10K+ icons; Starlight\'s built-in set is ~250 — unmapped icons emit `icon-unmapped` diagnostic',
+    summary:
+      'Rewrites to <Icon>; Material ships 10K+ icons but Starlight bundles ~250, unmapped ones emit a diagnostic.',
     fileExt: 'mdx',
     conversionType: 'ast-transform',
     risk: 'high',
@@ -329,6 +339,8 @@ const TABLE: ReadonlyArray<MappingRow> = [
     requiredPlugins: ['mike'],
     starlightOutput:
       'starlight-versions Starlight plugin auto-wired (versions list left as a stub); starlight-changelogs companion package added to package.json deps so users can publish release notes alongside the version switcher',
+    summary:
+      'Adds starlight-versions (versions list left as a stub) plus starlight-changelogs companion package.',
     fileExt: 'md',
     conversionType: 'recommended-dep',
     risk: 'medium',
@@ -340,6 +352,7 @@ const TABLE: ReadonlyArray<MappingRow> = [
     requiredExtensions: ['attr_list', 'md_in_html', 'pymdownx.superfences'],
     starlightOutput:
       'rewritten as footnote refs/defs ([^anno-block-N]); remark-gfm renders the popovers',
+    summary: 'Rewrites (N) markers as footnote refs/defs; remark-gfm renders the popovers.',
     fileExt: 'md',
     conversionType: 'text-pre-parse',
     risk: 'high',
@@ -352,6 +365,8 @@ const TABLE: ReadonlyArray<MappingRow> = [
     requiredExtensions: ['attr_list', 'pymdownx.superfences', 'pymdownx.highlight'],
     starlightOutput:
       'fence info string stripped of `.annotate`; (N)! markers downgraded to (N); trailing list left as a regular legend (popover UX is lost — diagnostic surfaces it)',
+    summary:
+      'Strips .annotate and downgrades (N)! to (N); trailing list kept as a plain legend (popover UX lost).',
     fileExt: 'md',
     conversionType: 'text-pre-parse',
     risk: 'high',
@@ -394,6 +409,8 @@ const TABLE: ReadonlyArray<MappingRow> = [
     requiredExtensions: ['attr_list'],
     starlightOutput:
       "raw <img> HTML preserving align (as md-align-* class), width, loading; #only-light/dark hash promoted to class for CSS-driven theme swap (Astro's image-pipeline optimization is bypassed for the swap variants)",
+    summary:
+      'Emits raw <img> with align/width/loading; #only-light/dark moves to a class for CSS theme swap (image pipeline bypassed).',
     fileExt: 'md',
     conversionType: 'text-pre-parse',
     risk: 'medium',
@@ -550,6 +567,8 @@ const TABLE: ReadonlyArray<MappingRow> = [
       'mkdocs.yml `theme.logo`, `theme.favicon`, and `theme.icon.{logo,repo,edit,view,admonition,tag,previous,next}` keys',
     starlightOutput:
       'logo asset copied into src/assets/ and wired as `logo: { src, alt }`; favicon copied into public/ and linked via `head: [{ tag: "link", attrs: { rel: "icon", href: "..." } }]`; `theme.icon.repo` mapped to `social: [{ icon }]`; remaining `theme.icon.*` keys (admonition, tag, previous, next, edit, view) are dropped with a diagnostic — Starlight has no equivalent first-party override surface, but `starlight-plugin-icons` provides PARTIAL coverage (sidebar, codeblock, and filetree icon customization). Admonition / page-action icon overrides remain unmapped and require component overrides.',
+    summary:
+      'Copies logo to src/assets and favicon to public/; theme.icon.repo → social entry; other theme.icon.* keys dropped.',
     requiredExtensions: [],
     fileExt: 'md',
     conversionType: 'recommended-dep',
@@ -564,6 +583,8 @@ const TABLE: ReadonlyArray<MappingRow> = [
     requiredPlugins: ['privacy'],
     starlightOutput:
       'no automatic conversion — Astro has no equivalent build-time external-asset rewriter; diagnostic surfaces the manual remediation path (use @fontsource for fonts, copy external images into src/assets/, or write an integration that mirrors privacy-plugin behavior)',
+    summary:
+      'No equivalent. Use @fontsource for fonts, copy external images into src/assets/, or write a build integration.',
     fileExt: 'md',
     conversionType: 'recommended-dep',
     risk: 'high',
@@ -576,6 +597,8 @@ const TABLE: ReadonlyArray<MappingRow> = [
     requiredExtensions: [],
     starlightOutput:
       'per-feature mapping: navigation.indexes → starlight `pagefind` + group index pages (no-op, on by default); navigation.instant → no-op (Astro view transitions handle this via `<ClientRouter />`); content.action.edit → starlight `editLink: { baseUrl }`; content.action.view → `starlight-page-actions` (auto-installed); announce.dismiss → `starlight-announcement` (auto-installed); navigation.tabs → top-level sidebar groups (Starlight default); toc.integrate, toc.follow, header.autohide, navigation.prune → diagnostic-only (no Starlight equivalent); search.* → replaced by Pagefind defaults',
+    summary:
+      'Maps each feature flag to its Starlight equivalent; toc.integrate, toc.follow, header.autohide, navigation.prune drop with a diagnostic.',
     fileExt: 'md',
     conversionType: 'recommended-dep',
     risk: 'medium',
@@ -599,6 +622,8 @@ const TABLE: ReadonlyArray<MappingRow> = [
     requiredExtensions: [],
     starlightOutput:
       '@astrojs/partytown dependency + a `<script type="text/partytown">` Google Analytics snippet injected via starlight `head: [...]` config; `extra.analytics.feedback` (Was-this-page-helpful widget) is dropped with a diagnostic — no equivalent in Starlight',
+    summary:
+      'Adds @astrojs/partytown + a Google Analytics snippet via head; extra.analytics.feedback widget dropped.',
     fileExt: 'md',
     conversionType: 'recommended-dep',
     risk: 'medium',
@@ -623,6 +648,8 @@ const TABLE: ReadonlyArray<MappingRow> = [
     requiredExtensions: [],
     starlightOutput:
       'announcement → starlight `banner: { content }`; repo_url/repo_name → `social: [{ icon: "github" | "gitlab" | "bitbucket", label, href }]`; edit_uri → `editLink: { baseUrl }`; announce.dismiss → `starlight-announcement` (auto-installed); header.autohide has no Starlight equivalent (diagnostic)',
+    summary:
+      'announcement → banner; repo_url → social entry; edit_uri → editLink; header.autohide has no equivalent.',
     fileExt: 'md',
     conversionType: 'recommended-dep',
     risk: 'medium',
@@ -635,6 +662,8 @@ const TABLE: ReadonlyArray<MappingRow> = [
     requiredExtensions: [],
     starlightOutput:
       'extra.social → starlight `social: [...]` (icon mapped per platform); `copyright` → custom `Footer.astro` component override under src/components/overrides/; `extra.generator: false` → no-op (Astro never emits a generator footer); `extra.consent` is dropped with a diagnostic — no Starlight equivalent, recommend a community plugin or manual cookie banner',
+    summary:
+      'extra.social → social config; copyright → custom Footer.astro override; extra.consent dropped (no equivalent).',
     fileExt: 'md',
     conversionType: 'recommended-dep',
     risk: 'medium',
@@ -648,6 +677,8 @@ const TABLE: ReadonlyArray<MappingRow> = [
     requiredThemeOptions: ['custom_dir'],
     starlightOutput:
       'no automatic conversion — recommendation surfaced as a diagnostic to install `starlight-giscus` (or write a `Comments.astro` component override); the partial-override HTML itself is left in the project for manual porting',
+    summary:
+      'No equivalent. Install starlight-giscus or write a Comments.astro override; the override HTML is left for manual porting.',
     fileExt: 'md',
     conversionType: 'recommended-dep',
     risk: 'high',
@@ -673,6 +704,8 @@ const TABLE: ReadonlyArray<MappingRow> = [
     requiredPlugins: ['offline'],
     starlightOutput:
       'no automatic conversion — Astro has no equivalent file:// bundler. Diagnostic recommends a manual remediation: build with `astro build`, then either ship the `dist/` directory verbatim or wrap it in a service worker via `@vite-pwa/astro` for offline PWA delivery',
+    summary:
+      'No equivalent. Run astro build, then ship dist/ verbatim or wrap it in @vite-pwa/astro for offline PWA delivery.',
     fileExt: 'md',
     conversionType: 'recommended-dep',
     risk: 'high',
@@ -708,6 +741,8 @@ const TABLE: ReadonlyArray<MappingRow> = [
     requiredPlugins: ['swagger-ui-tag'],
     starlightOutput:
       '`starlight-openapi` Starlight plugin auto-wired in astro.config.mjs; each `<swagger-ui>` tag must be manually replaced with the appropriate Starlight Openapi route or component',
+    summary:
+      'Adds starlight-openapi; each <swagger-ui> tag must be replaced with the matching Starlight Openapi route or component.',
     fileExt: 'md',
     conversionType: 'recommended-dep',
     risk: 'high',
@@ -894,6 +929,8 @@ const TABLE: ReadonlyArray<MappingRow> = [
     requiredPlugins: ['encryptcontent'],
     starlightOutput:
       'no automatic conversion — Astro outputs static HTML with no client-side decryption layer. Recommend a deployment-level auth gate (Cloudflare Access, Netlify password) or removing protected content from the public site',
+    summary:
+      'No equivalent. Use a deployment-level auth gate (Cloudflare Access, Netlify password) or drop protected content.',
     fileExt: 'md',
     conversionType: 'recommended-dep',
     risk: 'high',
@@ -906,6 +943,8 @@ const TABLE: ReadonlyArray<MappingRow> = [
     requiredPlugins: ['charts'],
     starlightOutput:
       'no first-class equivalent — recommend a custom MDX `<VegaChart>` component using vega-embed, or pre-render charts to SVG/PNG ahead of conversion',
+    summary:
+      'No first-class equivalent. Add a custom MDX <VegaChart> using vega-embed, or pre-render charts to SVG/PNG.',
     fileExt: 'mdx',
     conversionType: 'recommended-dep',
     risk: 'high',
@@ -919,6 +958,8 @@ const TABLE: ReadonlyArray<MappingRow> = [
     requiredPlugins: ['monorepo'],
     starlightOutput:
       "no automatic conversion — the plugin's build-time fetch is not replicated. Source-side placeholder pages render with their stub text only. Recommended migration: clone external content locally before conversion, OR replace placeholder pages with links to the external docs sites, OR use Astro content collections + a custom loader",
+    summary:
+      'Build-time fetch not replicated. Clone external content locally first, link out, or use Astro content collections.',
     fileExt: 'md',
     conversionType: 'recommended-dep',
     risk: 'high',
@@ -932,6 +973,8 @@ const TABLE: ReadonlyArray<MappingRow> = [
     requiredPlugins: ['multirepo'],
     starlightOutput:
       'same as `plugin-monorepo` — no automatic conversion; placeholder pages must be fetched, removed, or replaced manually',
+    summary:
+      'Same as plugin-monorepo: clone external content locally first, link out, or use Astro content collections.',
     fileExt: 'md',
     conversionType: 'recommended-dep',
     risk: 'high',
@@ -945,6 +988,8 @@ const TABLE: ReadonlyArray<MappingRow> = [
     requiredPlugins: ['markdownextradata'],
     starlightOutput:
       'no automatic conversion — bare `{{ }}` conflicts with MDX expressions. Recommend Astro `import.meta.env.PUBLIC_*` env vars in MDX',
+    summary:
+      'Bare {{ }} conflicts with MDX. Replace with Astro `import.meta.env.PUBLIC_*` env vars in MDX.',
     fileExt: 'mdx',
     conversionType: 'recommended-dep',
     risk: 'high',

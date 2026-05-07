@@ -207,12 +207,19 @@ async function askPalette(
   defaults: DefaultAnswers,
 ): Promise<Result<WizardAnswers['palette'], WizardCancelled>> {
   step(prompter, 'theme.palette', 'palette');
+  // The "accent" is Starlight's single brand color: links, active sidebar
+  // items, callout borders, focus rings. Spelling that out beats the bare
+  // word "accent" — most users won't know Starlight's terminology yet.
   const v = await prompter.select<'translate' | 'skip' | 'custom'>({
-    message: 'Color palette',
+    message: 'Brand color (used for links, active nav, callouts, focus rings)',
     options: [
-      { value: 'translate', label: 'Translate to Starlight accent', hint: 'recommended' },
-      { value: 'skip', label: 'Use Starlight default accent' },
-      { value: 'custom', label: 'I will write the accent CSS myself' },
+      {
+        value: 'translate',
+        label: 'Use your Material primary color',
+        hint: 'recommended; reads from theme.palette.primary',
+      },
+      { value: 'skip', label: "Use Starlight's default purple" },
+      { value: 'custom', label: "I'll write the accent CSS myself" },
     ],
     initialValue: defaults.palette,
   });

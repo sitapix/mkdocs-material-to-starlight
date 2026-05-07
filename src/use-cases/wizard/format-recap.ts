@@ -43,7 +43,7 @@ export function formatRecap(input: RecapInput, highlighter: RecapHighlighter = {
   }
 
   if (input.tier1.tabs !== undefined) {
-    lines.push(`tabs: ${v(input.tier1.tabs)}`);
+    lines.push(`tabs: ${v(tabsLabel(input.tier1.tabs))}`);
   }
   if (input.tier1.sidebarTopics === true) {
     lines.push(`sidebar: ${v('split by top-level group (starlight-sidebar-topics)')}`);
@@ -52,7 +52,7 @@ export function formatRecap(input: RecapInput, highlighter: RecapHighlighter = {
     lines.push(`rss: ${v('src/pages/rss.xml.ts')}`);
   }
   if (input.tier1.palette !== undefined) {
-    lines.push(`palette: ${v(input.tier1.palette)}`);
+    lines.push(`palette: ${v(paletteLabel(input.tier1.palette))}`);
   }
   if (input.tier1.mikeVersions !== undefined && input.tier1.mikeVersions.length > 0) {
     lines.push(`mike versions: ${v(input.tier1.mikeVersions.join(', '))}`);
@@ -76,4 +76,28 @@ export function formatRecap(input: RecapInput, highlighter: RecapHighlighter = {
 
 function identity(text: string): string {
   return text;
+}
+
+// Recap entries should mirror what the user just confirmed in the prompt, not
+// the internal enum value. clack's submit-state still shows the chosen option's
+// label dimmed above the recap, so a raw `palette: translate` line right below
+// reads as a disconnected slug. These mappers keep the recap human-scannable.
+function paletteLabel(value: 'translate' | 'skip' | 'custom'): string {
+  switch (value) {
+    case 'translate':
+      return 'translate Material accent';
+    case 'skip':
+      return 'Starlight default accent';
+    case 'custom':
+      return 'custom CSS (write my own)';
+  }
+}
+
+function tabsLabel(value: 'mdx' | 'html'): string {
+  switch (value) {
+    case 'mdx':
+      return 'promote to MDX (cross-page sync)';
+    case 'html':
+      return 'raw HTML (no sync)';
+  }
 }
