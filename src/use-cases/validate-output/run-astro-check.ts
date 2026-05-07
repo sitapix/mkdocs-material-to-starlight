@@ -26,6 +26,7 @@ const NOT_INSTALLED_SIGNATURES: ReadonlyArray<string> = [
   'Cannot find module',
   'npm ERR! 404',
   'command not found: astro',
+  'npx canceled due to missing packages',
 ];
 
 export interface RunAstroCheckOptions {
@@ -37,7 +38,7 @@ export interface RunAstroCheckOptions {
 export async function runAstroCheck(
   options: RunAstroCheckOptions,
 ): Promise<ReadonlyArray<Diagnostic>> {
-  const result = await options.runner.run('npx', ['--no-install', 'astro', 'check'], {
+  const result = await options.runner.run('npx', ['--yes', 'astro', 'check'], {
     cwd: options.outputDir,
     timeoutMs: options.timeoutMs ?? DEFAULT_TIMEOUT_MS,
   });
@@ -58,9 +59,9 @@ export async function runAstroCheck(
     return [
       {
         ruleId: 'astro-check-not-installed',
-        severity: 'warning',
+        severity: 'error',
         message:
-          'astro check could not run — astro is not installed in the output project. Run `npm install` in the output directory or skip build validation.',
+          'astro check could not run — astro is not installed in the output project. Run `npm install` in the output directory and re-invoke with `--check`, or drop `--check` to skip build validation.',
         source: SOURCE,
       },
     ];

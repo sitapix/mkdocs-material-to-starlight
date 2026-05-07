@@ -27,13 +27,21 @@ import { needsAttentionPreview } from '../../use-cases/wizard/needs-attention-pr
 import { restorePrefs } from '../../use-cases/wizard/restore-prefs.js';
 import { runWizard } from '../../use-cases/wizard/run-wizard.js';
 import { validateProjectPreflight } from '../../use-cases/wizard/validate-project-preflight.js';
+import { welcomeBanner } from '../../use-cases/wizard/welcome-banner.js';
 import { withForceFlag } from '../../use-cases/wizard/with-force-flag.js';
 import type { CliIo } from './main.js';
 import { type Command, parseArgs } from './parse-args.js';
 import { readProjectDirInteractively } from './wizard-project-dir.js';
 
 export interface WizardRunResult {
-  readonly kind: 'success';
+  /**
+   * The wizard finished and the converter ran. `exitCode` carries whether the
+   * convert itself was clean (0) or had error-severity diagnostics (1) — the
+   * discriminator is intentionally NOT named `'success'` because a `kind`
+   * matching `'success'` while `exitCode === 1` is misleading at the call
+   * site.
+   */
+  readonly kind: 'completed';
   readonly command: Extract<Command, { kind: 'convert' }>;
   readonly equivalentFlags: ReadonlyArray<string>;
   /** Process exit code from the conversion the wizard ran inline. */
@@ -44,6 +52,18 @@ export interface WizardRunCancelled {
 }
 export interface WizardRunNonInteractive {
   readonly kind: 'non-interactive';
+}
+
+/**
+ * Single source of truth for the goodbye banner shown when the user cancels
+ * (Ctrl+C, Esc, or a "no" at a destructive-action gate). Kept as a constant so
+ * tone stays uniform across every cancellation path.
+ */
+const WIZARD_CANCEL_MESSAGE = 'Cancelled. Nothing changed.';
+
+function cancelAndReturn(prompter: Prompter): WizardRunCancelled {
+  prompter.cancel(WIZARD_CANCEL_MESSAGE);
+  return { kind: 'cancelled' };
 }
 
 /**
@@ -77,15 +97,17 @@ export async function runWizardFlow(
   const { createClackPrompter } = await import('../../infrastructure/prompts/clack-prompter.js');
   const prompter = createClackPrompter();
 
-  prompter.intro('mkdocs-material-to-starlight');
-  prompter.log.info('Convert your MkDocs Material site to Astro Starlight.');
+  // Banner sits ABOVE clack's intro rail, written via io.stdout (the same
+  // channel used for the diagnostic report). Once `prompter.intro(...)` runs,
+  // the rail starts and subsequent stdout writes would collide with it.
+  io.stdout(welcomeBanner(prompter.highlight));
+  prompter.intro('Setup');
 
   // Step 1: project dir — re-prompt on missing/invalid mkdocs.yml so a typo
   // doesn't drop the user back to the shell.
   const loaded = await readProjectDirInteractively(prompter, projectDirHint);
   if (loaded === 'cancelled') {
-    prompter.cancel('Cancelled. Nothing changed.');
-    return { kind: 'cancelled' };
+    return cancelAndReturn(prompter);
   }
   const { projectDir, configValue } = loaded;
 
@@ -108,8 +130,7 @@ export async function runWizardFlow(
         reparsedRestored.outputDir,
       );
       if (overwrite === 'cancelled') {
-        prompter.cancel('Cancelled. Nothing changed.');
-        return { kind: 'cancelled' };
+        return cancelAndReturn(prompter);
       }
       const finalFlags = overwrite === 'confirmed' ? withForceFlag(restored) : restored;
       const finalCommand = overwrite === 'confirmed' ? parseArgs(finalFlags) : reparsedRestored;
@@ -130,13 +151,21 @@ export async function runWizardFlow(
           indicator: 'timer',
         });
         const phaseTimer = startPhaseRotation(spin, finalCommand.check);
-        const converted = await converter(finalCommand);
-        clearInterval(phaseTimer);
+        // try/finally guarantees the phase-rotation interval is cleared even
+        // if the converter throws (defense in depth — converter follows the
+        // diagnostics-over-throws contract today, but a future bug shouldn't
+        // leak a setInterval onto the event loop).
+        let converted;
+        try {
+          converted = await converter(finalCommand);
+        } finally {
+          clearInterval(phaseTimer);
+        }
         if (converted.kind === 'fatal') {
           spin.error(converted.message);
           prompter.cancel('Conversion failed.');
           return {
-            kind: 'success',
+            kind: 'completed',
             command: finalCommand,
             equivalentFlags: finalFlags,
             exitCode: 1,
@@ -146,7 +175,7 @@ export async function runWizardFlow(
         prompter.outro(converted.exitCode === 0 ? 'All done.' : 'Done with diagnostics.');
         io.stdout(converted.report);
         return {
-          kind: 'success',
+          kind: 'completed',
           command: finalCommand,
           equivalentFlags: finalFlags,
           exitCode: converted.exitCode,
@@ -248,8 +277,7 @@ export async function runWizardFlow(
   // for "where will this land?"
   const result = await runWizard({ projectDir, cwd: process.cwd(), plan, defaults, prompter });
   if (!result.ok) {
-    prompter.cancel('Cancelled. Nothing changed.');
-    return { kind: 'cancelled' };
+    return cancelAndReturn(prompter);
   }
 
   // Safety net: outputDir is a destructive write target. If it already exists
@@ -262,8 +290,7 @@ export async function runWizardFlow(
     result.value.outputDir,
   );
   if (overwrite === 'cancelled') {
-    prompter.cancel('Cancelled. Nothing changed.');
-    return { kind: 'cancelled' };
+    return cancelAndReturn(prompter);
   }
 
   const baseFlags = answersToFlags(result.value);
@@ -271,8 +298,7 @@ export async function runWizardFlow(
   const reparsed = parseArgs(flags);
   if (reparsed.kind !== 'convert') {
     io.stderr(`error: wizard produced an invalid command: ${JSON.stringify(reparsed)}`);
-    prompter.cancel('Cancelled. Nothing changed.');
-    return { kind: 'cancelled' };
+    return cancelAndReturn(prompter);
   }
   // Show the equivalent CLI invocation as a framed note so the user can save
   // it for unattended re-runs. Rendered while the prompter session is still
@@ -301,12 +327,18 @@ export async function runWizardFlow(
     indicator: 'timer',
   });
   const phaseTimer = startPhaseRotation(spin, reparsed.check);
-  const converted = await converter(reparsed);
-  clearInterval(phaseTimer);
+  // try/finally guarantees the phase-rotation interval is cleared even if the
+  // converter throws — see the note on the saved-prefs path above.
+  let converted;
+  try {
+    converted = await converter(reparsed);
+  } finally {
+    clearInterval(phaseTimer);
+  }
   if (converted.kind === 'fatal') {
     spin.error(converted.message);
     prompter.cancel('Conversion failed.');
-    return { kind: 'success', command: reparsed, equivalentFlags: flags, exitCode: 1 };
+    return { kind: 'completed', command: reparsed, equivalentFlags: flags, exitCode: 1 };
   }
   const verb = converted.exitCode === 0 ? 'Converted' : 'Converted with errors';
   spin.stop(verb);
@@ -318,7 +350,7 @@ export async function runWizardFlow(
   );
   io.stdout(converted.report);
   return {
-    kind: 'success',
+    kind: 'completed',
     command: reparsed,
     equivalentFlags: flags,
     exitCode: converted.exitCode,

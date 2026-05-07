@@ -114,13 +114,16 @@ export interface Logger {
 
 /**
  * A controllable progress indicator. Started with a message, updated in place
- * via `message`, ended with `stop` (success), `error` (failure), or `cancel`.
- * Used to give the user feedback during operations that take >100ms.
+ * via `message`, ended with `stop` (success), `error` (failure), or `cancel`
+ * (user-initiated abort — different from `error` so the rail glyph reads as
+ * "stopped on purpose" instead of "blew up"). Used to give the user feedback
+ * during operations that take >100ms.
  */
 export interface SpinnerHandle {
   message(text: string): void;
   stop(text?: string): void;
   error(text?: string): void;
+  cancel(text?: string): void;
 }
 
 export interface SpinnerOptions {
@@ -146,6 +149,12 @@ export interface Highlighter {
   value(text: string): string;
   /** Numeric counts in note titles ("7 lossy translations") — bold. */
   count(text: string): string;
+  /**
+   * Atmospheric / muted text — banner sparkles, breadcrumbs, secondary cues
+   * the eye should treat as background. Picocolors `dim`; degrades to
+   * identity under NO_COLOR / non-TTY automatically.
+   */
+  dim(text: string): string;
 }
 
 export interface Prompter {

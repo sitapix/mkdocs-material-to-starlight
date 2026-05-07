@@ -205,6 +205,10 @@ export function createClackPrompter(): Prompter {
         message: (text: string) => s.message(text),
         stop: (text?: string) => s.stop(text),
         error: (text?: string) => s.error(text),
+        // Clack ships a dedicated `cancel(msg?)` that uses the cancel glyph
+        // (■), distinct from `error` (▲). Lets the rail read as
+        // "stopped on purpose" rather than "blew up".
+        cancel: (text?: string) => s.cancel(text),
       };
     },
     // Picocolors auto-honors NO_COLOR and disables on non-TTY, so these
@@ -214,6 +218,7 @@ export function createClackPrompter(): Prompter {
       url: (text: string) => pc.cyan(pc.underline(text)),
       value: (text: string) => pc.bold(text),
       count: (text: string) => pc.bold(text),
+      dim: (text: string) => pc.dim(text),
     },
   };
 }

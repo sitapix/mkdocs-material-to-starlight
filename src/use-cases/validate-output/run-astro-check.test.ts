@@ -68,7 +68,7 @@ describe('runAstroCheck', () => {
     const runner = fakeRunner({ capture });
     await runAstroCheck({ runner, outputDir: '/converted/site' });
     expect(capture.command).toBe('npx');
-    expect(capture.args).toEqual(['--no-install', 'astro', 'check']);
+    expect(capture.args).toEqual(['--yes', 'astro', 'check']);
     expect(capture.options?.cwd).toBe('/converted/site');
   });
 
@@ -100,6 +100,39 @@ describe('runAstroCheck', () => {
         exitCode: 1,
         stdout: '',
         stderr: 'npm ERR! could not determine executable to run\n',
+        timedOut: false,
+      }),
+    });
+    const diagnostics = await runAstroCheck({ runner, outputDir: '/out' });
+    const not_installed = diagnostics.find((d) => d.ruleId === 'astro-check-not-installed');
+    expect(not_installed).toBeDefined();
+    // The user opted in to `--check`; if we can't run it, that's a failed
+    // contract and must surface as exit 1 (severity: error), not a silent
+    // pass with a warning.
+    expect(not_installed?.severity).toBe('error');
+  });
+
+  it('ignores npm install noise on the success path', async () => {
+    const runner = fakeRunner({
+      result: ok({
+        exitCode: 0,
+        stdout:
+          'added 312 packages in 14s\n\nGetting diagnostics for Astro files...\n0 errors, 0 warnings, 0 hints.\n',
+        stderr: 'npm warn deprecated foo@1.0.0: use bar instead\n',
+        timedOut: false,
+      }),
+    });
+    const diagnostics = await runAstroCheck({ runner, outputDir: '/out' });
+    expect(diagnostics).toEqual([]);
+  });
+
+  it('emits astro-check-not-installed when npx canceled due to missing packages and no YES option', async () => {
+    const runner = fakeRunner({
+      result: ok({
+        exitCode: 1,
+        stdout: '',
+        stderr:
+          'npm error npx canceled due to missing packages and no YES option: ["astro@6.3.0"]\n',
         timedOut: false,
       }),
     });

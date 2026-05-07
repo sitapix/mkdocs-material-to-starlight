@@ -194,6 +194,7 @@ export function createFakePrompter(script: ScriptedAnswers = {}): FakePrompter {
       url: (text: string) => text,
       value: (text: string) => text,
       count: (text: string) => text,
+      dim: (text: string) => text,
     },
     spinner: (o: SpinnerOptions): SpinnerHandle => {
       const record = {
@@ -201,6 +202,7 @@ export function createFakePrompter(script: ScriptedAnswers = {}): FakePrompter {
         messages: [] as string[],
         stoppedWith: null as string | null,
         erroredWith: null as string | null,
+        cancelledWith: null as string | null,
       };
       spinnersImpl.push(record);
       return {
@@ -212,6 +214,9 @@ export function createFakePrompter(script: ScriptedAnswers = {}): FakePrompter {
         },
         error: (text?: string) => {
           record.erroredWith = text ?? '';
+        },
+        cancel: (text?: string) => {
+          record.cancelledWith = text ?? '';
         },
       };
     },

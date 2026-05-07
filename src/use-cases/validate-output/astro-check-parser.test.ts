@@ -117,7 +117,10 @@ describe('parseAstroCheckOutput', () => {
     const diags = parseAstroCheckOutput(out);
     expect(diags).toHaveLength(1);
     expect(diags[0]?.ruleId).toBe('astro-check-unparsed-output');
-    expect(diags[0]?.severity).toBe('warning');
+    // Exit non-zero means astro check itself signaled failure; not being able
+    // to parse it doesn't downgrade that — the user's `--check` request did
+    // not pass, so this surfaces as error (exit 1).
+    expect(diags[0]?.severity).toBe('error');
     expect(diags[0]?.message).toContain('unrecognized failure spew');
   });
 

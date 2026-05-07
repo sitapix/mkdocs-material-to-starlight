@@ -28,11 +28,10 @@ describe('formatReport', () => {
     expect(out).toContain('target not found');
   });
 
-  it('puts severity before the file path so the column lines up across rows', () => {
-    // Regression: file-path-first made severity column jagged because path
-    // lengths vary wildly (`mkdocs.yml` vs `architecture/decisions/0001-...md`).
-    // Ordering severity → locator → ruleId → message keeps `error`, `warning`,
-    // `info` in a fixed column and the eye can scan severity vertically.
+  it('writes the ruleId, severity, and count once per group as a header line', () => {
+    // The per-row severity column was removed because every row in a group
+    // shares the same severity — repeating it on every line was pure noise.
+    // The header now states ruleId + severity + count once per chunk.
     const out = formatReport([
       {
         sourcePath: 'a-very-long-path/with/many/segments/page.md',
@@ -63,21 +62,46 @@ describe('formatReport', () => {
         }),
       },
     ]);
+    expect(out).toMatch(/^r\s+\(error,\s*1\)/m);
+    expect(out).toMatch(/^r2\s+\(warning,\s*1\)/m);
+    expect(out).toMatch(/^r3\s+\(info,\s*1\)/m);
+  });
+
+  it('pads locators within a group so messages align in a column', () => {
+    // Inside a single rule group, the right edge of the locator column is the
+    // longest path in the group. That puts the message column at one stable
+    // offset for the chunk so the eye can scan messages vertically.
+    const out = formatReport([
+      {
+        sourcePath: 'a-very-long-path/with/many/segments/page.md',
+        diagnostic: createDiagnostic({
+          severity: 'warning',
+          ruleId: 'shared',
+          message: 'ALPHA',
+          source: 'mkdocs-material-to-starlight',
+          place: { line: 1, column: 1 },
+        }),
+      },
+      {
+        sourcePath: 'short.md',
+        diagnostic: createDiagnostic({
+          severity: 'warning',
+          ruleId: 'shared',
+          message: 'BRAVO',
+          source: 'mkdocs-material-to-starlight',
+          place: { line: 2, column: 3 },
+        }),
+      },
+    ]);
     const bodyLines = out
       .split('\n')
-      .filter((l) => l.startsWith('•'))
-      .map((l) => l.slice(2)); // drop bullet + space
-    // Each line starts with a severity word (right-padded to a fixed width)
-    // — meaning the file-path token is at the same column on every line.
-    expect(bodyLines[0]).toMatch(/^error\s+a-very-long-path\/with\/many\/segments\/page\.md/);
-    expect(bodyLines[1]).toMatch(/^warning\s+short\.md/);
-    expect(bodyLines[2]).toMatch(/^info\s+mid\/page\.md/);
-    // Severity column has width = length of `warning` (the longest token), so
-    // the next column always begins at the same offset.
-    const severityColumnEnd = 'warning'.length;
-    for (const line of bodyLines) {
-      expect(line[severityColumnEnd]).toBe(' ');
-    }
+      .filter((l) => l.includes('•'))
+      .map((l) => l.replace(/\u001b\[[0-9;]*m/g, '')); // strip ANSI for column math
+    expect(bodyLines).toHaveLength(2);
+    const alphaCol = bodyLines.find((l) => l.includes('ALPHA'))?.indexOf('ALPHA') ?? -1;
+    const bravoCol = bodyLines.find((l) => l.includes('BRAVO'))?.indexOf('BRAVO') ?? -1;
+    expect(alphaCol).toBeGreaterThan(0);
+    expect(alphaCol).toBe(bravoCol);
   });
 
   it('formats diagnostics without a place using just the source path', () => {
@@ -211,6 +235,64 @@ describe('formatReport', () => {
     expect(out).toContain('b1.md');
     expect(out).toMatch(/7 more.*unknown-frontmatter-field/i);
     expect(out).not.toMatch(/more.*broken-link/i);
+  });
+
+  it('truncates long messages to their first sentence with an ellipsis hint', () => {
+    // Real regression: long-form diagnostic messages (tab-anchors, blog-config)
+    // wrap to column zero in the terminal and shred the visual columns. The
+    // CLI shows the punchline; MIGRATION_NOTES.md carries the full detail.
+    const out = formatReport([
+      {
+        sourcePath: 'elements/codehilite.md',
+        diagnostic: createDiagnostic({
+          severity: 'info',
+          ruleId: 'tab-anchors-not-preserved',
+          message:
+            "Content tabs detected. Material auto-generates an anchor link for each tab (e.g. `#linux`) so external pages can deep-link to a specific tab. Starlight's `<TabItem>` has no `id`/anchor prop, so any in-page or cross-page links targeting a tab anchor will resolve to nothing after migration.",
+          source: 'mkdocs-material-to-starlight',
+        }),
+      },
+    ]);
+    expect(out).toContain('Content tabs detected.');
+    expect(out).toContain('…');
+    expect(out).not.toContain('resolve to nothing after migration');
+  });
+
+  it('does not split at digit-preceded periods (e.g. quoted "1." ordinals)', () => {
+    // Real regression: ADR titles like "1. Record architecture decisions"
+    // contain `1. ` mid-message, which earlier truncated the punchline to
+    // `Body H1 "1. …`. Sentence boundary detection must skip digit-preceded
+    // periods.
+    const out = formatReport([
+      {
+        sourcePath: 'architecture/decisions/0001.md',
+        diagnostic: createDiagnostic({
+          severity: 'info',
+          ruleId: 'duplicate-h1-stripped',
+          message:
+            'Body H1 "1. Record architecture decisions" was stripped because it duplicates the frontmatter title ("1. Record architecture decisions"). Starlight auto-renders the frontmatter title.',
+          source: 'mkdocs-material-to-starlight',
+        }),
+      },
+    ]);
+    expect(out).toContain('was stripped because it duplicates the frontmatter title');
+    expect(out).not.toMatch(/Body H1 "1\. …/);
+  });
+
+  it('keeps a message that is already short verbatim (no ellipsis)', () => {
+    const out = formatReport([
+      {
+        sourcePath: 'a.md',
+        diagnostic: createDiagnostic({
+          severity: 'warning',
+          ruleId: 'r',
+          message: 'target not found',
+          source: 'mkdocs-material-to-starlight',
+        }),
+      },
+    ]);
+    expect(out).toContain('target not found');
+    expect(out).not.toContain('…');
   });
 
   it('summarizes counts by severity at the end', () => {

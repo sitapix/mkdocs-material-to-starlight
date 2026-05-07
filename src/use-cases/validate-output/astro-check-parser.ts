@@ -117,7 +117,7 @@ function unparsedOutputDiagnostic(combined: string): Diagnostic {
   const trimmed = combined.trim().slice(0, 500);
   return {
     ruleId: 'astro-check-unparsed-output',
-    severity: 'warning',
+    severity: 'error',
     message: `astro check exited non-zero but no individual diagnostics could be parsed. Raw output: ${trimmed}`,
     source: SOURCE,
   };

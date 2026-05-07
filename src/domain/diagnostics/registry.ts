@@ -228,10 +228,10 @@ const REGISTRY_ENTRIES: ReadonlyArray<DiagnosticEntry> = [
   },
   {
     id: 'astro-check-not-installed',
-    severity: 'warning',
+    severity: 'error',
     description:
-      '`astro check` could not run because `astro` is not installed in the output project (no `node_modules` or missing dependency).',
-    fix: 'Run `npm install` in the output directory and re-invoke the converter with `--check`, or skip build validation if intentional.',
+      '`astro check` could not run because `astro` is not installed in the output project (no `node_modules`, install failed, or astro missing from `package.json`). The user requested build validation via `--check` and the converter could not deliver a verdict.',
+    fix: 'Run `npm install` in the output directory and re-invoke the converter with `--check`, or drop `--check` to skip build validation if intentional.',
   },
   {
     id: 'astro-check-timeout',
@@ -249,9 +249,9 @@ const REGISTRY_ENTRIES: ReadonlyArray<DiagnosticEntry> = [
   },
   {
     id: 'astro-check-unparsed-output',
-    severity: 'warning',
+    severity: 'error',
     description:
-      '`astro check` exited non-zero but no individual diagnostic lines could be parsed from its output.',
+      '`astro check` exited non-zero but no individual diagnostic lines could be parsed from its output. The non-zero exit means validation failed; we just could not say where.',
     fix: 'Inspect the raw output (printed with the diagnostic) and run `astro check` manually in the output directory to reproduce.',
   },
   {

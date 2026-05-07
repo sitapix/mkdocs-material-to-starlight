@@ -66,8 +66,14 @@ export function formatReport(
     const { ruleId, items } = group;
     const collapse = items.length > COLLAPSE_AT;
     const visible = collapse ? items.slice(0, SHOW_FIRST) : items;
+    // Group header pulls the ruleId out of each row so the rows can be tighter
+    // and ruleId/severity/count are stated once for the chunk.
+    lines.push(formatGroupHeader(ruleId, items));
+    // Pad locators within the group so message text starts at the same
+    // column on every line of the group.
+    const pathPad = Math.max(...visible.map((t) => locatorWidth(t)));
     for (const tagged of visible) {
-      lines.push(formatOne(tagged));
+      lines.push(formatOne(tagged, pathPad));
     }
     if (collapse) {
       const hidden = items.length - SHOW_FIRST;
@@ -120,27 +126,62 @@ function groupByRuleId(diagnostics: ReadonlyArray<TaggedDiagnostic>): ReadonlyAr
   return order.map((id) => ({ ruleId: id, items: buckets.get(id) ?? [] }));
 }
 
-// Width of the longest severity word ('warning' = 7). Right-padding every
-// severity to this width keeps the next column's left edge at a fixed offset,
-// so the eye scans severity, file path, and ruleId in straight columns
-// regardless of how long an individual file path runs.
-const SEVERITY_COLUMN_WIDTH = 'warning'.length;
+// Above this length, fall back to the punchline (first sentence) and let
+// MIGRATION_NOTES.md carry the elaboration. Long prose wraps to column zero in
+// most terminals and shreds the visual column layout (real regression: the
+// `tab-anchors-not-preserved` and `plugin-blog-custom-config` rows visibly
+// bled into adjacent diagnostics).
+const MESSAGE_SOFT_LIMIT = 120;
+// Hard cap used when the first sentence itself runs long. Keeps a single very
+// long sentence from sprawling across multiple wrapped lines.
+const MESSAGE_HARD_LIMIT = 200;
 
-function formatOne(tagged: TaggedDiagnostic): string {
+function truncateMessage(message: string): string {
+  if (message.length <= MESSAGE_SOFT_LIMIT) return message;
+  // First sentence boundary: `.`, `!`, or `?` followed by whitespace or EOL.
+  // The lookbehind skips cases where the period follows a digit — those are
+  // typically list ordinals (`1.`, `2.`) or version numbers embedded in a
+  // quoted title inside the message, not real sentence endings.
+  const m = message.match(/(?<![0-9])[.!?](?=\s|$)/);
+  if (m !== null && m.index !== undefined) {
+    const end = m.index + 1;
+    if (end <= MESSAGE_HARD_LIMIT) return `${message.slice(0, end)} …`;
+  }
+  return `${message.slice(0, MESSAGE_HARD_LIMIT - 1).trimEnd()}…`;
+}
+
+function locatorOf(tagged: TaggedDiagnostic): string {
   const safePath = sanitizeForSingleLine(tagged.sourcePath);
-  const safeRuleId = sanitizeForSingleLine(tagged.diagnostic.ruleId);
-  const safeMessage = sanitizeForSingleLine(tagged.diagnostic.message);
   const place = tagged.diagnostic.place;
-  const locator =
-    place === undefined ? safePath : `${safePath}:${String(place.line)}:${String(place.column)}`;
-  // Bullet · colored severity (column-padded) · dim path · bold-cyan ruleId ·
-  // plain message. Severity-first so `error`/`warning`/`info` line up in a
-  // fixed column even when file paths vary wildly in length. Padding is
-  // applied to the unstyled token so the column width is correct regardless
-  // of whether picocolors is emitting ANSI.
-  const severity = tagged.diagnostic.severity;
-  const severityCol = colorSeverity(severity, severity.padEnd(SEVERITY_COLUMN_WIDTH));
-  return `${pc.dim('•')} ${severityCol}  ${pc.dim(locator)}  ${pc.bold(pc.cyan(safeRuleId))}  ${safeMessage}`;
+  return place === undefined
+    ? safePath
+    : `${safePath}:${String(place.line)}:${String(place.column)}`;
+}
+
+function locatorWidth(tagged: TaggedDiagnostic): number {
+  return locatorOf(tagged).length;
+}
+
+function formatGroupHeader(ruleId: string, items: ReadonlyArray<TaggedDiagnostic>): string {
+  const safeRuleId = sanitizeForSingleLine(ruleId);
+  const severity = items[0]?.diagnostic.severity ?? 'info';
+  const severityTag = colorSeverity(severity, severity);
+  // ruleId is the section title (bold cyan); the parens give severity + count
+  // dimly so the eye reads the ruleId first and uses the meta as a sub-cue.
+  const meta = `${pc.dim('(')}${severityTag}${pc.dim(`, ${String(items.length)})`)}`;
+  return `${pc.bold(pc.cyan(safeRuleId))}  ${meta}`;
+}
+
+function formatOne(tagged: TaggedDiagnostic, pathPad: number): string {
+  const safeMessage = truncateMessage(sanitizeForSingleLine(tagged.diagnostic.message));
+  const locator = locatorOf(tagged);
+  // Indented bullet · dim path (right-padded so messages align inside the
+  // group) · plain message. Severity moved to the group header — every row
+  // in a group shares the same severity, so repeating it on every line was
+  // pure noise. Padding is applied to the unstyled string so coloring does
+  // not affect column width.
+  const locatorPadded = locator.padEnd(pathPad);
+  return `  ${pc.dim('•')} ${pc.dim(locatorPadded)}  ${safeMessage}`;
 }
 
 function summarize(diagnostics: ReadonlyArray<TaggedDiagnostic>): string {
