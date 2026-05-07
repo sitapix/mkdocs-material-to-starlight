@@ -56,7 +56,14 @@ export function formatReport(
 
   const groups = groupByRuleId(diagnostics);
   const lines: string[] = [];
-  for (const { ruleId, items } of groups) {
+  for (let g = 0; g < groups.length; g += 1) {
+    const group = groups[g];
+    if (group === undefined) continue;
+    // Blank line between rule groups so the eye can chunk the report by
+    // ruleId. The first group needs no leading blank — that's reserved for
+    // the gap before the summary.
+    if (g > 0) lines.push('');
+    const { ruleId, items } = group;
     const collapse = items.length > COLLAPSE_AT;
     const visible = collapse ? items.slice(0, SHOW_FIRST) : items;
     for (const tagged of visible) {
@@ -120,10 +127,12 @@ function formatOne(tagged: TaggedDiagnostic): string {
   const place = tagged.diagnostic.place;
   const locator =
     place === undefined ? safePath : `${safePath}:${String(place.line)}:${String(place.column)}`;
-  // Path dim, severity colored by level, ruleId bold-cyan, message normal.
-  // Two spaces between fields stay so existing grep / awk pipelines keep working.
+  // Bullet · dim path · colored severity · bold-cyan ruleId · plain message.
+  // The leading bullet acts as a visual anchor so a wall of similar lines
+  // chunks naturally; severity color is the primary triage signal so it
+  // stays the brightest token on the row.
   const severity = tagged.diagnostic.severity;
-  return `${pc.dim(locator)}  ${colorSeverity(severity, severity)}  ${pc.bold(pc.cyan(safeRuleId))}  ${safeMessage}`;
+  return `${pc.dim('•')} ${pc.dim(locator)}  ${colorSeverity(severity, severity)}  ${pc.bold(pc.cyan(safeRuleId))}  ${safeMessage}`;
 }
 
 function summarize(diagnostics: ReadonlyArray<TaggedDiagnostic>): string {

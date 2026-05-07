@@ -78,8 +78,10 @@ describe('formatReport', () => {
         }),
       },
     ]);
-    // Each diagnostic must be exactly one report line so grep / sort still work.
-    const reportLine = out.split('\n').find((l) => l.startsWith('x.md'));
+    // Each diagnostic stays on a single output line so grep / sort still
+    // work. Lines are bullet-prefixed for visual chunking, so we locate the
+    // diagnostic line by its sourcePath rather than column-zero anchor.
+    const reportLine = out.split('\n').find((l) => l.includes('x.md'));
     expect(reportLine).toBeDefined();
     expect(reportLine).toContain('first line second line third');
   });
