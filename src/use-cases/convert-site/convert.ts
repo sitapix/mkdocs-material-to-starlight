@@ -33,6 +33,7 @@ import { normalizeFileTrees } from '../normalize/file-tree.js';
 import { normalizeLinkAttrLists } from '../normalize/link-attr-list.js';
 import { normalizeMkdocstringsCrossRefs } from '../normalize/mkdocstrings-crossref.js';
 import { normalizePackageManagerTabs } from '../normalize/package-manager-tabs.js';
+import { runWholeSourceScanners } from '../../domain/scanners/whole-source-scanner.js';
 import { scanButtonIcons } from '../normalize/scan-button-icons.js';
 import { scanCodeFenceFlags } from '../normalize/scan-code-fence-flags.js';
 import { scanFrontmatterFields } from '../normalize/scan-frontmatter-fields.js';
@@ -310,53 +311,38 @@ export async function convertSite(
       // next to the heading text — recreating Material's idiom.
       featureUnion.add('heading-badges');
     }
-    // Per-occurrence diagnostic for Material's `!!! note inline` / `inline
-    // end` admonition modifier. Starlight's `<Aside>` doesn't honor float
-    // positioning, so these get rendered as standard block-level asides.
-    for (const diagnostic of scanInlineAdmonitions(read.value)) {
-      diagnostics.push({ sourcePath, diagnostic });
-    }
-    // Per-occurrence info diagnostic for Material `.copy` / `.no-copy` fence
-    // flags. The code-block-meta normalizer strips the attr-list silently;
-    // this scanner names each fence so users can audit which blocks relied
-    // on the per-block toggle.
-    for (const diagnostic of scanCodeFenceFlags(read.value)) {
-      diagnostics.push({ sourcePath, diagnostic });
-    }
-    // Single per-file warning for monorepo/multirepo placeholder pages.
-    // The converter still scaffolds the page so the site builds and the
-    // sidebar structure stays intact; users see exactly which pages need
-    // their actual content fetched (or removed).
-    const placeholderDiag = scanPlaceholderPage(read.value);
-    if (placeholderDiag !== null) {
-      diagnostics.push({ sourcePath, diagnostic: placeholderDiag });
-    }
-    // Single diagnostic per file when content tabs are present, flagging
-    // the per-tab anchor-link gap (Material auto-generates `#tab-label`
-    // anchors; Starlight's `<TabItem>` has no equivalent).
-    for (const diagnostic of scanTabAnchors(read.value)) {
-      diagnostics.push({ sourcePath, diagnostic });
-    }
-    // Single diagnostic per file when a Material `.md-button` label carried
-    // an icon shortcode that the curated map can't translate to a Starlight
-    // built-in. The button still renders correctly with a clean label; only
-    // the icon glyph is lost. Lists every unmapped shortcode for traceability.
-    for (const diagnostic of scanButtonIcons(read.value)) {
-      diagnostics.push({ sourcePath, diagnostic });
-    }
-    // Per-file scanner for Material-specific in-source markers that have
-    // no Starlight equivalent: `<!-- material/tags -->` index markers and
-    // `comments: true` frontmatter (the latter routes users to
-    // `starlight-giscus`).
-    for (const diagnostic of scanMaterialMarkers(read.value)) {
-      diagnostics.push({ sourcePath, diagnostic });
-    }
-    // Per-file scanner for Material-specific frontmatter fields with no
-    // direct Starlight equivalent: search controls (`search.boost`,
-    // `search.exclude`) and blog post fields (`categories`, `pin`, `links`).
-    for (const diagnostic of scanFrontmatterFields(read.value)) {
-      diagnostics.push({ sourcePath, diagnostic });
-    }
+    // Whole-source scanners — each owns its internal loop (per-line +
+    // fence-shielded, line-walk without fence-shielding, whole-source
+    // regex, frontmatter-only, accumulating dedupe set, etc.). The
+    // shared abstraction lives at the runner / call-site level: each
+    // scanner takes a source string and returns 0..N diagnostics, the
+    // runner tags them with sourcePath. See domain/scanners/whole-source-scanner.ts.
+    diagnostics.push(
+      ...runWholeSourceScanners(read.value, sourcePath, [
+        // Per-occurrence: Material's `!!! note inline` / `inline end`
+        // admonition modifier. Starlight's `<Aside>` doesn't honor float
+        // positioning so these render as block-level asides.
+        { name: 'inline-admonitions', scan: scanInlineAdmonitions },
+        // Per-occurrence: Material `.copy` / `.no-copy` fence flags.
+        // The code-block-meta normalizer strips them silently; this names
+        // each fence so users can audit which blocks relied on the toggle.
+        { name: 'code-fence-flags', scan: scanCodeFenceFlags },
+        // Per-file warning: monorepo/multirepo placeholder pages.
+        { name: 'placeholder-pages', scan: scanPlaceholderPage },
+        // Per-file: per-tab anchor-link gap (Material auto-generates
+        // `#tab-label` anchors; Starlight's `<TabItem>` has no equivalent).
+        { name: 'tab-anchors', scan: scanTabAnchors },
+        // Per-file: Material `.md-button` label icon shortcode that the
+        // curated map can't translate. Lists every unmapped shortcode.
+        { name: 'button-icons', scan: scanButtonIcons },
+        // Per-file: Material in-source markers (`<!-- material/tags -->`
+        // index markers; `comments: true` frontmatter → starlight-giscus).
+        { name: 'material-markers', scan: scanMaterialMarkers },
+        // Per-file: Material-specific frontmatter (search controls;
+        // blog post fields like `categories`, `pin`, `links`).
+        { name: 'frontmatter-fields', scan: scanFrontmatterFields },
+      ]),
+    );
     // Reduce mkdocstrings [`X`][] and [`X`][module.Path] cross-references to
     // plain inline code `X`. This must run before remark sees the source,
     // because remark-stringify would otherwise escape the brackets to \[ \].
