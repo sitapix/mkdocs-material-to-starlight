@@ -355,7 +355,7 @@ type ComputedConversion =
   | { readonly kind: 'ok'; readonly exitCode: number; readonly report: string }
   | { readonly kind: 'fatal'; readonly message: string };
 
-export async function runConvertCompute(
+async function runConvertCompute(
   command: ConvertCommand,
   overrides: CliOverrides,
 ): Promise<ComputedConversion> {

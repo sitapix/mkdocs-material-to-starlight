@@ -9,6 +9,13 @@ permissions:
   contents: write
   id-token: write
 
+# Serialize releases so two tag pushes don't race on `npm publish`. Don't
+# cancel in flight: an in-progress publish that gets cancelled mid-step can
+# leave npm and the GitHub release out of sync.
+concurrency:
+  group: release
+  cancel-in-progress: false
+
 jobs:
   publish:
     name: Publish to npm
@@ -56,7 +63,12 @@ jobs:
         run: npm run audit:release
 
       - name: Publish to npm
-        run: npm publish --access public --provenance
+        # --ignore-scripts skips `prepublishOnly`, which would otherwise re-run
+        # every gate above (typecheck, check:ci, knip, test, audit, build) for
+        # the second time. The dedicated steps above are the source of truth
+        # in CI; `prepublishOnly` is the local safety net for accidental
+        # `npm publish` from a developer machine.
+        run: npm publish --ignore-scripts --access public --provenance
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 

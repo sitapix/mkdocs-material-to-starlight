@@ -54,5 +54,14 @@ jobs:
       - name: Build
         run: npm run build
 
+      - name: Pack smoke (verify tarball would publish cleanly)
+        # `npm pack --dry-run` lists what `npm publish` would ship, without
+        # creating the tarball. We assert the bin entry is present so a
+        # `bin` / `files` drift fails on every PR — instead of surfacing
+        # only at release tag push.
+        run: |
+          npm pack --dry-run 2>&1 | tee /tmp/pack.txt
+          grep -q 'dist/interface/cli/bin.js' /tmp/pack.txt
+
       - name: Audit (production deps, moderate+)
         run: npm run audit:release

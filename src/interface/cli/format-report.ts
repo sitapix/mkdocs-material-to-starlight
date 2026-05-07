@@ -120,6 +120,12 @@ function groupByRuleId(diagnostics: ReadonlyArray<TaggedDiagnostic>): ReadonlyAr
   return order.map((id) => ({ ruleId: id, items: buckets.get(id) ?? [] }));
 }
 
+// Width of the longest severity word ('warning' = 7). Right-padding every
+// severity to this width keeps the next column's left edge at a fixed offset,
+// so the eye scans severity, file path, and ruleId in straight columns
+// regardless of how long an individual file path runs.
+const SEVERITY_COLUMN_WIDTH = 'warning'.length;
+
 function formatOne(tagged: TaggedDiagnostic): string {
   const safePath = sanitizeForSingleLine(tagged.sourcePath);
   const safeRuleId = sanitizeForSingleLine(tagged.diagnostic.ruleId);
@@ -127,12 +133,14 @@ function formatOne(tagged: TaggedDiagnostic): string {
   const place = tagged.diagnostic.place;
   const locator =
     place === undefined ? safePath : `${safePath}:${String(place.line)}:${String(place.column)}`;
-  // Bullet · dim path · colored severity · bold-cyan ruleId · plain message.
-  // The leading bullet acts as a visual anchor so a wall of similar lines
-  // chunks naturally; severity color is the primary triage signal so it
-  // stays the brightest token on the row.
+  // Bullet · colored severity (column-padded) · dim path · bold-cyan ruleId ·
+  // plain message. Severity-first so `error`/`warning`/`info` line up in a
+  // fixed column even when file paths vary wildly in length. Padding is
+  // applied to the unstyled token so the column width is correct regardless
+  // of whether picocolors is emitting ANSI.
   const severity = tagged.diagnostic.severity;
-  return `${pc.dim('•')} ${pc.dim(locator)}  ${colorSeverity(severity, severity)}  ${pc.bold(pc.cyan(safeRuleId))}  ${safeMessage}`;
+  const severityCol = colorSeverity(severity, severity.padEnd(SEVERITY_COLUMN_WIDTH));
+  return `${pc.dim('•')} ${severityCol}  ${pc.dim(locator)}  ${pc.bold(pc.cyan(safeRuleId))}  ${safeMessage}`;
 }
 
 function summarize(diagnostics: ReadonlyArray<TaggedDiagnostic>): string {

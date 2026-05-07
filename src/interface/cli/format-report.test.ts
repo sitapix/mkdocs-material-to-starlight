@@ -28,6 +28,58 @@ describe('formatReport', () => {
     expect(out).toContain('target not found');
   });
 
+  it('puts severity before the file path so the column lines up across rows', () => {
+    // Regression: file-path-first made severity column jagged because path
+    // lengths vary wildly (`mkdocs.yml` vs `architecture/decisions/0001-...md`).
+    // Ordering severity → locator → ruleId → message keeps `error`, `warning`,
+    // `info` in a fixed column and the eye can scan severity vertically.
+    const out = formatReport([
+      {
+        sourcePath: 'a-very-long-path/with/many/segments/page.md',
+        diagnostic: createDiagnostic({
+          severity: 'error',
+          ruleId: 'r',
+          message: 'm',
+          source: 'mkdocs-material-to-starlight',
+          place: { line: 1, column: 1 },
+        }),
+      },
+      {
+        sourcePath: 'short.md',
+        diagnostic: createDiagnostic({
+          severity: 'warning',
+          ruleId: 'r2',
+          message: 'm2',
+          source: 'mkdocs-material-to-starlight',
+        }),
+      },
+      {
+        sourcePath: 'mid/page.md',
+        diagnostic: createDiagnostic({
+          severity: 'info',
+          ruleId: 'r3',
+          message: 'm3',
+          source: 'mkdocs-material-to-starlight',
+        }),
+      },
+    ]);
+    const bodyLines = out
+      .split('\n')
+      .filter((l) => l.startsWith('•'))
+      .map((l) => l.slice(2)); // drop bullet + space
+    // Each line starts with a severity word (right-padded to a fixed width)
+    // — meaning the file-path token is at the same column on every line.
+    expect(bodyLines[0]).toMatch(/^error\s+a-very-long-path\/with\/many\/segments\/page\.md/);
+    expect(bodyLines[1]).toMatch(/^warning\s+short\.md/);
+    expect(bodyLines[2]).toMatch(/^info\s+mid\/page\.md/);
+    // Severity column has width = length of `warning` (the longest token), so
+    // the next column always begins at the same offset.
+    const severityColumnEnd = 'warning'.length;
+    for (const line of bodyLines) {
+      expect(line[severityColumnEnd]).toBe(' ');
+    }
+  });
+
   it('formats diagnostics without a place using just the source path', () => {
     const out = formatReport([
       {

@@ -10,6 +10,7 @@
 import { attentionSummary } from '../../domain/conversion-mapping/attention-summary.js';
 import { getTranslationDepth } from '../../domain/conversion-mapping/table.js';
 import type { ConversionPlan } from '../../domain/wizard/plan.js';
+import type { Prompter, SpinnerHandle } from '../../domain/wizard/ports/prompter.js';
 import { resolveInteractivity } from '../../infrastructure/env/tty-detection.js';
 import { createNodeDirInspector } from '../../infrastructure/fs/dir-inspector.js';
 import { createNodeDirectoryReader } from '../../infrastructure/fs/node-directory-reader.js';
@@ -18,6 +19,7 @@ import { extractSnippetBasePaths } from '../../use-cases/config/snippet-base-pat
 import { explainConversion } from '../../use-cases/explain-conversion/explain.js';
 import { answersToFlags } from '../../use-cases/wizard/answers-to-flags.js';
 import { confirmOverwriteIfNeeded } from '../../use-cases/wizard/confirm-overwrite.js';
+import { convertPhaseMessage } from '../../use-cases/wizard/convert-phase-message.js';
 import { deriveDefaults } from '../../use-cases/wizard/derive-defaults.js';
 import { formatAttentionLines } from '../../use-cases/wizard/format-attention-lines.js';
 import { formatEquivalentCommand } from '../../use-cases/wizard/format-equivalent-command.js';
@@ -25,6 +27,7 @@ import { needsAttentionPreview } from '../../use-cases/wizard/needs-attention-pr
 import { restorePrefs } from '../../use-cases/wizard/restore-prefs.js';
 import { runWizard } from '../../use-cases/wizard/run-wizard.js';
 import { validateProjectPreflight } from '../../use-cases/wizard/validate-project-preflight.js';
+import { withForceFlag } from '../../use-cases/wizard/with-force-flag.js';
 import type { CliIo } from './main.js';
 import { type Command, parseArgs } from './parse-args.js';
 import { readProjectDirInteractively } from './wizard-project-dir.js';
@@ -94,39 +97,66 @@ export async function runWizardFlow(
   if (restored !== null) {
     const reparsedRestored = parseArgs(restored);
     if (reparsedRestored.kind === 'convert') {
-      prompter.note(
-        formatEquivalentCommand(restored, undefined, { binary: prompter.highlight.name }),
-        'Re-running with your saved answers',
+      // Saved-prefs path bypasses the full wizard, so it has to run the same
+      // overwrite guard the wizard normally fires before convert. Without
+      // this, a re-run against an existing non-empty output dir errors out
+      // with "output-not-empty" *after* the spinner starts, with no way to
+      // recover from inside the wizard.
+      const overwrite = await confirmOverwriteIfNeeded(
+        prompter,
+        createNodeDirInspector(),
+        reparsedRestored.outputDir,
       );
-      // Same spinner-then-print pattern as the full wizard path below.
-      const spin = prompter.spinner({
-        initialMessage: 'Converting your site… this might take a minute',
-        indicator: 'timer',
-      });
-      const converted = await converter(reparsedRestored);
-      if (converted.kind === 'fatal') {
-        spin.error(converted.message);
-        prompter.cancel('Conversion failed.');
+      if (overwrite === 'cancelled') {
+        prompter.cancel('Cancelled. Nothing changed.');
+        return { kind: 'cancelled' };
+      }
+      const finalFlags = overwrite === 'confirmed' ? withForceFlag(restored) : restored;
+      const finalCommand = overwrite === 'confirmed' ? parseArgs(finalFlags) : reparsedRestored;
+      if (finalCommand.kind !== 'convert') {
+        // Defensive: withForceFlag only appends --force, which is a known
+        // valid flag. If parseArgs disagrees, fall through to the full wizard
+        // instead of crashing.
+        prompter.log.warn("Saved answers don't match the current CLI. Starting fresh.");
+      } else {
+        prompter.note(
+          formatEquivalentCommand(finalFlags, undefined, { binary: prompter.highlight.name }),
+          'Re-running with your saved answers',
+        );
+        renderConvertAnnouncement(prompter, finalCommand.check);
+        // Same spinner-then-print pattern as the full wizard path below.
+        const spin = prompter.spinner({
+          initialMessage: 'Walking files…',
+          indicator: 'timer',
+        });
+        const phaseTimer = startPhaseRotation(spin, finalCommand.check);
+        const converted = await converter(finalCommand);
+        clearInterval(phaseTimer);
+        if (converted.kind === 'fatal') {
+          spin.error(converted.message);
+          prompter.cancel('Conversion failed.');
+          return {
+            kind: 'success',
+            command: finalCommand,
+            equivalentFlags: finalFlags,
+            exitCode: 1,
+          };
+        }
+        spin.stop(converted.exitCode === 0 ? 'Converted' : 'Converted with errors');
+        prompter.outro(converted.exitCode === 0 ? 'All done.' : 'Done with diagnostics.');
+        io.stdout(converted.report);
         return {
           kind: 'success',
-          command: reparsedRestored,
-          equivalentFlags: restored,
-          exitCode: 1,
+          command: finalCommand,
+          equivalentFlags: finalFlags,
+          exitCode: converted.exitCode,
         };
       }
-      spin.stop(converted.exitCode === 0 ? 'Converted' : 'Converted with errors');
-      prompter.outro(converted.exitCode === 0 ? 'All done.' : 'Done with diagnostics.');
-      io.stdout(converted.report);
-      return {
-        kind: 'success',
-        command: reparsedRestored,
-        equivalentFlags: restored,
-        exitCode: converted.exitCode,
-      };
+    } else {
+      // Saved flags failed to re-parse (CLI surface drift since they were
+      // written). Fall through to the normal wizard rather than blocking.
+      prompter.log.warn("Saved answers don't match the current CLI. Starting fresh.");
     }
-    // Saved flags failed to re-parse (CLI surface drift since they were
-    // written). Fall through to the normal wizard rather than blocking.
-    prompter.log.warn("Saved answers don't match the current CLI. Starting fresh.");
   }
 
   // Preflight: validate `docs_dir` resolves before asking any prompt. Mirrors
@@ -265,11 +295,14 @@ export async function runWizardFlow(
   // it directly: we stop the spinner FIRST (so the rail terminates cleanly),
   // outro, THEN print the report — that way stdout text never collides with
   // the spinner's single-line animation.
+  renderConvertAnnouncement(prompter, reparsed.check);
   const spin = prompter.spinner({
-    initialMessage: 'Converting your site… this might take a minute',
+    initialMessage: 'Walking files…',
     indicator: 'timer',
   });
+  const phaseTimer = startPhaseRotation(spin, reparsed.check);
   const converted = await converter(reparsed);
+  clearInterval(phaseTimer);
   if (converted.kind === 'fatal') {
     spin.error(converted.message);
     prompter.cancel('Conversion failed.');
@@ -290,4 +323,35 @@ export async function runWizardFlow(
     equivalentFlags: flags,
     exitCode: converted.exitCode,
   };
+}
+
+/**
+ * Render a multi-line note immediately above the convert spinner. The spinner
+ * itself is a single tiny glyph; without something prominent above it, a
+ * 30–90s convert reads as "did the wizard hang?". The note explains the
+ * phases and rough duration so the user knows what to expect, and the
+ * spinner below it serves only as a "still alive" pulse.
+ */
+function renderConvertAnnouncement(prompter: Prompter, withAstroCheck: boolean): void {
+  const lines = ['Typical run: 5–30 seconds.', 'Phases: walk files → transform AST → write output'];
+  if (withAstroCheck) {
+    lines.push(
+      'Then: astro check (this is the slowest phase — can take 30–60s on a fresh install).',
+    );
+  }
+  prompter.note(lines.join('\n'), 'Converting your site');
+}
+
+/**
+ * Rotate the spinner's status message through phase guesses on a 2s cadence
+ * so the line advances visibly during a long convert. The phase boundaries
+ * are time-based approximations because the converter doesn't emit phase
+ * events — accurate enough to keep the user oriented; not load-bearing for
+ * correctness. Caller is responsible for `clearInterval` in every exit path.
+ */
+function startPhaseRotation(spin: SpinnerHandle, withAstroCheck: boolean): NodeJS.Timeout {
+  const startedAt = Date.now();
+  return setInterval(() => {
+    spin.message(convertPhaseMessage(Date.now() - startedAt, { withAstroCheck }));
+  }, 2_000);
 }
