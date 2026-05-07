@@ -16,39 +16,29 @@
  */
 
 import { createDiagnostic, type Diagnostic } from '../../domain/diagnostics/diagnostic.js';
-import { isFenceLine } from '../../domain/syntax/fence.js';
+import { type LineScanner, runLineScanners } from '../../domain/scanners/line-scanner.js';
 
 const INLINE_RE = /^\s*(?:!!!|\?\?\?\+?)\s+\S+(?:\s+\S+)*\s+inline(\s+end)?\b/;
 
-export function scanInlineAdmonitions(source: string): ReadonlyArray<Diagnostic> {
-  const diagnostics: Diagnostic[] = [];
-  const lines = source.split('\n');
-  let inFence = false;
-  let lineNumber = 0;
-
-  for (const line of lines) {
-    lineNumber += 1;
-    if (isFenceLine(line)) {
-      inFence = !inFence;
-      continue;
-    }
-    if (inFence) continue;
-
+const inlineAdmonitionScanner: LineScanner = {
+  ruleId: 'inline-admonition-modifier-dropped',
+  scan: (line, lineNumber) => {
     const match = INLINE_RE.exec(line);
-    if (match === null) continue;
-
+    if (match === null) return null;
     const variant = match[1] !== undefined ? 'inline end' : 'inline';
-    diagnostics.push(
-      createDiagnostic({
-        severity: 'info',
-        ruleId: 'inline-admonition-modifier-dropped',
-        source: 'normalize/scan-inline-admonitions',
-        message:
-          'Material admonition with the `' + variant + '` modifier detected. The float layout (left/right alignment + width constraint) is not preserved by Starlight\'s `<Aside>` component. The aside will render as a standard block-level element. To recreate, see the registry\'s `inline-admonition-modifier-dropped` fix.',
-        place: { line: lineNumber, column: 1 },
-      }),
-    );
-  }
+    return createDiagnostic({
+      severity: 'info',
+      ruleId: 'inline-admonition-modifier-dropped',
+      source: 'normalize/scan-inline-admonitions',
+      message:
+        'Material admonition with the `' +
+        variant +
+        "` modifier detected. The float layout (left/right alignment + width constraint) is not preserved by Starlight's `<Aside>` component. The aside will render as a standard block-level element. To recreate, see the registry's `inline-admonition-modifier-dropped` fix.",
+      place: { line: lineNumber, column: 1 },
+    });
+  },
+};
 
-  return diagnostics;
+export function scanInlineAdmonitions(source: string): ReadonlyArray<Diagnostic> {
+  return runLineScanners(source, [inlineAdmonitionScanner]);
 }

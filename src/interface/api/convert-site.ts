@@ -18,7 +18,6 @@
 
 import { readdir } from 'node:fs/promises';
 import { join, posix } from 'node:path';
-import type { MkdocsNavEntry } from '../../domain/config/mkdocs-config.js';
 import { parseRepoUrl } from '../../domain/config/repo-context.js';
 import { createDiagnostic } from '../../domain/diagnostics/diagnostic.js';
 import type { FileSystem } from '../../domain/ports/file-system.js';
@@ -31,11 +30,6 @@ import { createNodeDirectoryReader } from '../../infrastructure/fs/node-director
 import { createNodeFileSystem } from '../../infrastructure/fs/node-file-system.js';
 import { createMdxOutputValidator } from '../../infrastructure/mdx/at-mdx-js-validator.js';
 import { createJsYamlDecoder } from '../../infrastructure/yaml/js-yaml-decoder.js';
-import { applyPagesOverrides } from '../../use-cases/compile-navigation/apply-pages.js';
-import { filterSidebarSlugs } from '../../use-cases/compile-navigation/filter-sidebar-slugs.js';
-import { loadAwesomePagesFiles } from '../../use-cases/config/load-awesome-pages.js';
-import { parseLiterateNav } from '../../use-cases/config/parse-literate-nav.js';
-import { compileSidebarEntries } from '../../use-cases/convert-site/compile-sidebar-entries.js';
 import { convertSite, type TaggedDiagnostic } from '../../use-cases/convert-site/convert.js';
 import {
   collectUnknownFrontmatterFieldNames,
@@ -68,6 +62,7 @@ import { diagnoseAnalytics } from '../../use-cases/detect-features/diagnose-anal
 import { diagnoseThemeFonts } from '../../use-cases/detect-features/diagnose-theme-fonts.js';
 import { resolveThemeAssets } from '../../use-cases/detect-features/resolve-theme-assets.js';
 import { extractPluginOptions } from '../../use-cases/detect-features/extract-plugin-options.js';
+import { buildSidebar } from '../../use-cases/compile-navigation/build-sidebar.js';
 import {
   extractI18nConfig,
   extractI18nLocales,
@@ -353,57 +348,19 @@ export async function convertSiteFromDisk(
     });
   }
 
-  const candidateDirectories = collectCandidateDirectories(sourceListing.value);
-  const pagesResult = await loadAwesomePagesFiles({
+  const sidebarBuilt = await buildSidebar({
     docsDir,
-    candidateDirectories,
     fs,
     yaml: yamlDecoder,
+    plugins: config.value.plugins,
+    nav: config.value.nav,
+    slugMap: siteResult.value.slugMap,
+    sourcePaths: sourceListing.value,
   });
-  if (!pagesResult.ok) {
-    return err({
-      code: 'config-invalid',
-      message: `.pages parse failed in "${pagesResult.error.directory}": ${pagesResult.error.message}`,
-    });
+  if (!sidebarBuilt.ok) {
+    return err({ code: sidebarBuilt.error.kind, message: sidebarBuilt.error.message });
   }
-
-  const sectionIndexEnabled = config.value.plugins.some((p) => p.name === 'section-index');
-  const literateNav = await resolveLiterateNav(config.value.plugins, docsDir, fs);
-  const sidebarResult = await compileSidebarEntries(
-    literateNav.tree === null ? config.value.nav : null,
-    literateNav.tree,
-    siteResult.value.slugMap,
-    sectionIndexEnabled,
-    (() => {
-      const bp = config.value.plugins.find((p) => p.name === 'blog');
-      if (bp === undefined) return {};
-      const dir =
-        typeof bp.options['blog_dir'] === 'string' ? (bp.options['blog_dir'] as string) : 'blog';
-      return { blogDir: dir };
-    })(),
-  );
-  if (!sidebarResult.ok) {
-    return err({ code: 'nav-compile-failed', message: sidebarResult.error });
-  }
-
-  // When the blog plugin is enabled, the converter drops auto-generated
-  // landing pages (`<blogDir>/posts/{index,tags,archive}.md`) from
-  // emitPaths so starlight-blog can render them itself. The sidebar
-  // compiler hasn't seen that drop — any `nav:` entry referencing those
-  // files would survive into astro.config.mjs and crash the build with
-  // "AstroUserError: The slug '<…>' does not exist." Filter them here,
-  // before applyPagesOverrides locks the entry shape in. Sibling files
-  // OUTSIDE `<blogDir>/posts/` (e.g. `<blogDir>/index.md`) are real nav
-  // pages and stay in both emitPaths and the sidebar.
-  const droppedBlogSlugs = (() => {
-    const bp = config.value.plugins.find((p) => p.name === 'blog');
-    if (bp === undefined) return new Set<string>();
-    const dir =
-      typeof bp.options['blog_dir'] === 'string' ? (bp.options['blog_dir'] as string) : 'blog';
-    return new Set([`${dir}/posts/index`, `${dir}/posts/tags`, `${dir}/posts/archive`]);
-  })();
-  const filteredSidebarEntries = filterSidebarSlugs(sidebarResult.value.entries, droppedBlogSlugs);
-  const sidebarWithPages = applyPagesOverrides(filteredSidebarEntries, pagesResult.value);
+  const sidebarWithPages = sidebarBuilt.value.sidebar;
 
   const featuresFromPlugins = detectFeaturesFromPlugins(
     config.value.plugins,
@@ -442,14 +399,8 @@ export async function convertSiteFromDisk(
     sourcePath: 'mkdocs.yml',
     diagnostic: d,
   }));
-  const sectionIndexDiagnostics = sidebarResult.value.diagnostics.map((d) => ({
-    sourcePath: 'mkdocs.yml',
-    diagnostic: d,
-  }));
-  const literateNavDiagnostics = literateNav.diagnostics.map((d) => ({
-    sourcePath: literateNav.tree === null ? 'mkdocs.yml' : 'SUMMARY.md',
-    diagnostic: d,
-  }));
+  const sectionIndexDiagnostics = sidebarBuilt.value.sectionIndexDiagnostics;
+  const literateNavDiagnostics = sidebarBuilt.value.literateNavDiagnostics;
   const includeMarkdownAppliedDiagnostic = includeMarkdownEnabled
     ? [
         {
@@ -867,18 +818,6 @@ function snippetExtensionOptions(
   return entry?.options ?? {};
 }
 
-function collectCandidateDirectories(sourcePaths: ReadonlyArray<string>): ReadonlyArray<string> {
-  const set = new Set<string>(['']);
-  for (const path of sourcePaths) {
-    let cursor = path.lastIndexOf('/');
-    while (cursor !== -1) {
-      set.add(path.slice(0, cursor));
-      cursor = path.lastIndexOf('/', cursor - 1);
-    }
-  }
-  return [...set];
-}
-
 async function copyAssetsToPublic(
   docsDir: string,
   outputDir: string,
@@ -893,50 +832,6 @@ async function copyAssetsToPublic(
     }
   }
   return ok(true);
-}
-
-interface LiterateNavResult {
-  readonly tree: ReadonlyArray<MkdocsNavEntry> | null;
-  readonly diagnostics: ReadonlyArray<import('../../domain/diagnostics/diagnostic.js').Diagnostic>;
-}
-
-async function resolveLiterateNav(
-  plugins: ReadonlyArray<{ readonly name: string }>,
-  docsDir: string,
-  fs: FileSystem,
-): Promise<LiterateNavResult> {
-  const enabled = plugins.some((p) => p.name === 'literate-nav');
-  if (!enabled) {
-    return { tree: null, diagnostics: [] };
-  }
-  const summaryPath = join(docsDir, 'SUMMARY.md');
-  const read = await fs.readText(summaryPath);
-  if (!read.ok) {
-    return {
-      tree: null,
-      diagnostics: [
-        createDiagnostic({
-          severity: 'warning',
-          ruleId: 'plugin-literate-nav-no-summary',
-          source: 'config/literate-nav',
-          message: `mkdocs-literate-nav plugin enabled but ${summaryPath} could not be read; falling back to nav: in mkdocs.yml.`,
-        }),
-      ],
-    };
-  }
-  const parsed = parseLiterateNav(read.value);
-  return {
-    tree: parsed.nav,
-    diagnostics: [
-      createDiagnostic({
-        severity: 'info',
-        ruleId: 'plugin-literate-nav-applied',
-        source: 'config/literate-nav',
-        message: `mkdocs-literate-nav: SUMMARY.md parsed (${parsed.nav.length} top-level entries) and used as the navigation source.`,
-      }),
-      ...parsed.diagnostics,
-    ],
-  };
 }
 
 interface WriteOutputsInput {

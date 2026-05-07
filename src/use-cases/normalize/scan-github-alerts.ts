@@ -14,12 +14,9 @@
  */
 
 import { createDiagnostic, type Diagnostic } from '../../domain/diagnostics/diagnostic.js';
+import { type LineScanner, runLineScanners } from '../../domain/scanners/line-scanner.js';
 import { isFenceLine } from '../../domain/syntax/fence.js';
-// Case-insensitive: matches both GitHub-flavored (`> [!NOTE]`) and the
-// PyMdown `quotes` callouts (`> [!note]`, with optional `-`/`+` collapse
-// suffix and inline title text). The collapse suffix and title are
-// preserved by the rendering plugin (`starlight-github-alerts`); we only
-// detect-and-flag here so the converter installs the plugin dep.
+
 const ALERT_RE = /^>\s*\[!(NOTE|TIP|IMPORTANT|WARNING|CAUTION)\][-+]?(?:\s+.*)?\s*$/i;
 
 function asideTypeFor(githubType: string): string {
@@ -29,37 +26,25 @@ function asideTypeFor(githubType: string): string {
   return upper.toLowerCase();
 }
 
-export function scanGithubAlerts(source: string): ReadonlyArray<Diagnostic> {
-  const diagnostics: Diagnostic[] = [];
-  const lines = source.split('\n');
-  let inFence = false;
-  let lineNumber = 0;
-
-  for (const line of lines) {
-    lineNumber += 1;
-    if (isFenceLine(line)) {
-      inFence = !inFence;
-      continue;
-    }
-    if (inFence) continue;
-
+const githubAlertScanner: LineScanner = {
+  ruleId: 'github-alert-detected',
+  scan: (line, lineNumber) => {
     const match = ALERT_RE.exec(line);
-    if (match === null) continue;
-
+    if (match === null) return null;
     const type = match[1] ?? '';
     const aside = asideTypeFor(type);
-    diagnostics.push(
-      createDiagnostic({
-        severity: 'info',
-        ruleId: 'github-alert-detected',
-        source: 'normalize/scan-github-alerts',
-        message: `GitHub-style alert blockquote \`[!${type}]\` detected. Install \`starlight-github-alerts\` (added to package.json automatically) for native rendering, or convert manually to a Starlight aside (\`:::${aside}\`).`,
-        place: { line: lineNumber, column: 1 },
-      }),
-    );
-  }
+    return createDiagnostic({
+      severity: 'info',
+      ruleId: 'github-alert-detected',
+      source: 'normalize/scan-github-alerts',
+      message: `GitHub-style alert blockquote \`[!${type}]\` detected. Install \`starlight-github-alerts\` (added to package.json automatically) for native rendering, or convert manually to a Starlight aside (\`:::${aside}\`).`,
+      place: { line: lineNumber, column: 1 },
+    });
+  },
+};
 
-  return diagnostics;
+export function scanGithubAlerts(source: string): ReadonlyArray<Diagnostic> {
+  return runLineScanners(source, [githubAlertScanner]);
 }
 
 export function sourceContainsGithubAlerts(source: string): boolean {
