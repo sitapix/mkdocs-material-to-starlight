@@ -17,7 +17,7 @@
  */
 
 import { readdir } from 'node:fs/promises';
-import { join, posix } from 'node:path';
+import { join } from 'node:path';
 import { parseRepoUrl } from '../../domain/config/repo-context.js';
 import { createDiagnostic } from '../../domain/diagnostics/diagnostic.js';
 import type { FileSystem } from '../../domain/ports/file-system.js';
@@ -31,10 +31,7 @@ import { createNodeFileSystem } from '../../infrastructure/fs/node-file-system.j
 import { createMdxOutputValidator } from '../../infrastructure/mdx/at-mdx-js-validator.js';
 import { createJsYamlDecoder } from '../../infrastructure/yaml/js-yaml-decoder.js';
 import { convertSite, type TaggedDiagnostic } from '../../use-cases/convert-site/convert.js';
-import {
-  collectUnknownFrontmatterFieldNames,
-  enrichMissingDocsDirMessage,
-} from '../../use-cases/convert-site/diagnostic-enrichment.js';
+import { enrichMissingDocsDirMessage } from '../../use-cases/convert-site/diagnostic-enrichment.js';
 import { buildDeferredWizardDiagnostics } from '../../use-cases/convert-site/wizard-decision-diagnostics.js';
 import { type AssetCopy, planAssetCopies } from '../../use-cases/copy-assets/plan.js';
 import { extractAutoAppend } from '../../use-cases/detect-features/auto-append.js';
@@ -63,6 +60,7 @@ import { diagnoseThemeFonts } from '../../use-cases/detect-features/diagnose-the
 import { resolveThemeAssets } from '../../use-cases/detect-features/resolve-theme-assets.js';
 import { extractPluginOptions } from '../../use-cases/detect-features/extract-plugin-options.js';
 import { buildSidebar } from '../../use-cases/compile-navigation/build-sidebar.js';
+import { assembleConfigOutputs } from '../../use-cases/serialize-config/assemble-config-outputs.js';
 import {
   extractI18nConfig,
   extractI18nLocales,
@@ -78,13 +76,9 @@ import { extractThemeFonts } from '../../use-cases/detect-features/theme-fonts.j
 import { extractThemeLanguage } from '../../use-cases/detect-features/theme-language.js';
 import { extractTocConfig } from '../../use-cases/detect-features/toc-config.js';
 import { loadMkdocsConfig } from '../../use-cases/load-config/load-mkdocs-config.js';
-import { serializeAstroConfig } from '../../use-cases/serialize-config/astro-config.js';
 import { serializeBiomeConfig } from '../../use-cases/serialize-config/biome-config.js';
 import { serializeContentConfig } from '../../use-cases/serialize-config/content-config.js';
-import { serializeMigrationNotes } from '../../use-cases/serialize-config/migration-notes.js';
-import { serializePackageJson } from '../../use-cases/serialize-config/package-json.js';
 import { serializeSidebar } from '../../use-cases/serialize-config/sidebar.js';
-import { inferFrontmatterTypes } from '../../use-cases/validate-output/infer-frontmatter-types.js';
 
 export interface ConvertSiteFromDiskInput {
   readonly projectDir: string;
@@ -603,61 +597,18 @@ export async function convertSiteFromDisk(
   //     public-folder paths (Rollup tries to bundle them and fails). We
   //     instead emit a `<link rel="stylesheet" href="/<path>">` entry in
   //     `head[]` so the file loads as a static asset at runtime.
-  const extraCssExternal: string[] = [];
-  const extraCssPublicHrefs: string[] = [];
-  for (const p of extraAssets.css) {
-    if (/^[a-z][a-z0-9+\-.]*:\/\//i.test(p)) {
-      extraCssExternal.push(p);
-    } else {
-      extraCssPublicHrefs.push(`/${p.replace(/^\/+/, '')}`);
-    }
-  }
-  const extraCssEntries = extraCssExternal;
-  // Fontsource packages are imported as bare specifiers — Vite resolves
-  // them as the package's CSS export, so they slot into customCss verbatim.
-  const fontCssImports: string[] = [];
-  if (themeFonts?.text !== undefined) fontCssImports.push(themeFonts.text.package);
-  if (themeFonts?.code !== undefined) fontCssImports.push(themeFonts.code.package);
-  const fontDependencies: ReadonlyArray<readonly [string, string]> = fontCssImports.map(
-    (p) => [p, 'latest'] as const,
-  );
-  const extraJsEntries = extraAssets.js.map((js) => ({
-    ...js,
-    src: /^[a-z][a-z0-9+\-.]*:\/\//i.test(js.src) ? js.src : `/${js.src.replace(/^\/+/, '')}`,
-  }));
   const { logoSrc, faviconRaw, faviconRawCandidate, faviconExtensionRejected } =
     await resolveThemeAssets({
       themeOptions: config.value.theme?.options ?? {},
       fs,
       docsDir,
     });
-  // starlight-links-validator: opt-in (default OFF) since 2026-05-05.
-  //
-  // Real-world Material sites routinely link to non-content paths (`/LICENSE`,
-  // `/CHANGELOG`, `/contributing`, etc. that point at GitLab/GitHub web
-  // surfaces, gh-pages aliases, or static files) AND to dynamic pages that
-  // MkDocs generated (mkdocs-click CLI references, mkdocstrings autodoc).
-  // The plugin's defaults reject all of these at `astro build`, breaking
-  // every migrated build out-of-the-box.
-  //
-  // The converter's own `broken-link` diagnostic catches the genuinely
-  // missing cross-content links during conversion (and surfaces them in
-  // MIGRATION_NOTES.md). That covers the validator's primary value
-  // proposition for migration users without the noise.
-  //
-  // Users who want strict pre-deploy validation can opt in via the
-  // `linksValidator: true` API flag (or the `--strict-links` CLI flag).
-  const enableLinksValidator = input.linksValidator === true;
-  const logoEntry =
-    logoSrc === null
-      ? {}
-      : {
-          logo: {
-            src: `./src/assets/${posix.basename(logoSrc)}`,
-            ...(input.logoReplacesTitle === true ? { replacesTitle: true as const } : {}),
-          },
-        };
-  const astroConfigSource = serializeAstroConfig({
+  const {
+    astroConfigSource,
+    packageJsonSource,
+    migrationNotesSource,
+    extendedFrontmatterFields,
+  } = assembleConfigOutputs({
     siteName: config.value.siteName,
     siteDescription: config.value.siteDescription,
     siteUrl: config.value.siteUrl,
@@ -665,58 +616,26 @@ export async function convertSiteFromDisk(
     sidebar: sidebarWithPages,
     detectedFeatures: allFeatures,
     redirects,
-    enableLinksValidator,
-    extraCssEntries: [...extraCssEntries, ...fontCssImports],
-    extraJsEntries,
-    ...(i18n === null ? {} : { i18n }),
-    ...(social.length > 0 ? { social } : {}),
-    ...(editLinkBaseUrl === null ? {} : { editLinkBaseUrl }),
-    ...(tableOfContents === undefined ? {} : { tableOfContents }),
-    ...logoEntry,
-    ...(faviconRaw === null ? {} : { favicon: `/${posix.basename(faviconRaw)}` }),
-    ...(expressiveCodeConfig === undefined
-      ? {}
-      : { expressiveCode: { themes: expressiveCodeConfig.themes } }),
-    ...(analytics !== null || extraCssPublicHrefs.length > 0
-      ? {
-          extraHeadEntries: [
-            ...(analytics?.headEntries ?? []),
-            ...extraCssPublicHrefs.map((href) => ({
-              tag: 'link' as const,
-              attrs: { rel: 'stylesheet', href },
-            })),
-          ],
-        }
-      : {}),
-    ...(input.mikeVersions !== undefined ? { mikeVersions: input.mikeVersions } : {}),
-    ...(blogOptions !== undefined ? { blogOptions } : {}),
-    ...(tagsOptions !== undefined ? { tagsOptions } : {}),
-  });
-  const packageJsonSource = serializePackageJson({
-    siteName: config.value.siteName,
-    siteDescription: config.value.siteDescription,
-    detectedFeatures: allFeatures,
-    extraDependencies: fontDependencies,
-    ...(input.packageName !== undefined ? { packageName: input.packageName } : {}),
-  });
-  const sourceDocs = Object.values(siteResult.value.files).map((source) => ({
-    source,
-  }));
-  const migrationNotesSource = serializeMigrationNotes({
-    diagnostics: allDiagnostics,
+    enableLinksValidator: input.linksValidator === true,
+    extraAssets,
+    themeFonts,
+    i18n,
+    social,
+    editLinkBaseUrl,
+    tableOfContents,
+    logoSrc,
+    faviconRaw,
+    logoReplacesTitle: input.logoReplacesTitle === true,
+    expressiveCodeConfig,
+    analytics,
+    mikeVersions: input.mikeVersions,
+    blogOptions,
+    tagsOptions,
+    packageName: input.packageName,
+    files: siteResult.value.files,
+    allDiagnostics,
     extras: config.value.extras,
-    sourceDocs,
   });
-
-  // Auto-extend the generated `src/content.config.ts` schema with every
-  // frontmatter field that triggered an `unknown-frontmatter-field`
-  // diagnostic. Without this, every project that uses fields like `tags` or
-  // `date` would fail `astro build` until the user manually edits the file.
-  // Field types are inferred from observed values; users can tighten later.
-  const extendedFrontmatterFields = inferFrontmatterTypes(
-    collectUnknownFrontmatterFieldNames(allDiagnostics),
-    sourceDocs,
-  );
 
   const { stylesheetSource, rssEndpointSource, ogEndpointSource, tagsYmlSource, preserveSlugs } =
     buildOutputSources({
