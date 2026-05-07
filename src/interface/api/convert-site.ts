@@ -57,7 +57,11 @@ import { extractExtraAssets } from '../../use-cases/detect-features/extra-assets
 import { detectExtraWarnings } from '../../use-cases/detect-features/extra-warnings.js';
 import { detectFeaturesFromPlugins } from '../../use-cases/detect-features/from-plugins.js';
 import { detectFeaturesFromThemeFeatures } from '../../use-cases/detect-features/from-theme-features.js';
-import { classifyHook } from '../../use-cases/detect-features/hook-archetypes.js';
+import {
+  diagnoseHooks,
+  extractHookPaths,
+} from '../../use-cases/detect-features/diagnose-hooks.js';
+import { diagnosePalette } from '../../use-cases/detect-features/diagnose-palette.js';
 import {
   extractI18nConfig,
   extractI18nLocales,
@@ -504,79 +508,13 @@ export async function convertSiteFromDisk(
   const palette = mapMaterialPaletteToStarlight(config.value.theme?.options.palette ?? null);
   const paletteRaw = config.value.theme?.options.palette;
   const paletteSpecified = paletteRaw !== undefined && paletteRaw !== null;
-  const paletteDiagnostics: Array<{
-    sourcePath: string;
-    diagnostic: ReturnType<typeof createDiagnostic>;
-  }> = [];
-  if (palette !== null && !palette.isCustom) {
-    paletteDiagnostics.push({
-      sourcePath: 'mkdocs.yml',
-      diagnostic: createDiagnostic({
-        severity: 'info',
-        ruleId: 'palette-translated',
-        source: 'mkdocs-material-to-starlight',
-        message: `Material palette primary "${palette.sourceName}" translated to Starlight accent CSS variables (hue=${String(palette.accentHue)}).`,
-      }),
-    });
-  } else if (palette !== null && palette.isCustom) {
-    paletteDiagnostics.push({
-      sourcePath: 'mkdocs.yml',
-      diagnostic: createDiagnostic({
-        severity: 'warning',
-        ruleId: 'palette-custom-needs-manual',
-        source: 'mkdocs-material-to-starlight',
-        message:
-          'theme.palette.primary: custom — translate your --md-primary-fg-color overrides to --sl-color-accent-* manually.',
-      }),
-    });
-  } else if (paletteSpecified) {
-    paletteDiagnostics.push({
-      sourcePath: 'mkdocs.yml',
-      diagnostic: createDiagnostic({
-        severity: 'warning',
-        ruleId: 'palette-unknown-color',
-        source: 'mkdocs-material-to-starlight',
-        message:
-          'theme.palette.primary names a color the converter does not recognize; using Starlight default accent.',
-      }),
-    });
-  }
+  const paletteDiagnostics = diagnosePalette(palette, paletteSpecified);
 
-  const hookPaths: ReadonlyArray<string> = (() => {
-    const raw = config.value.extras.hooks;
-    if (!Array.isArray(raw)) return [];
-    return raw.filter((p): p is string => typeof p === 'string');
-  })();
-  const hookDiagnostics: Array<{
-    sourcePath: string;
-    diagnostic: ReturnType<typeof createDiagnostic>;
-  }> = [];
-  for (const hookRel of hookPaths) {
-    const hookFull = join(projectDir, hookRel);
-    const read = await fs.readText(hookFull);
-    if (!read.ok) {
-      hookDiagnostics.push({
-        sourcePath: hookRel,
-        diagnostic: createDiagnostic({
-          severity: 'warning',
-          ruleId: 'hook-file-not-found',
-          source: 'mkdocs-material-to-starlight',
-          message: `mkdocs.yml hooks: references "${hookRel}" but the file could not be read at ${hookFull}.`,
-        }),
-      });
-      continue;
-    }
-    const archetypes = classifyHook(read.value);
-    hookDiagnostics.push({
-      sourcePath: hookRel,
-      diagnostic: createDiagnostic({
-        severity: 'warning',
-        ruleId: 'hook-archetype-detected',
-        source: 'mkdocs-material-to-starlight',
-        message: `Python hook archetypes: ${archetypes.join(', ')}. The converter cannot evaluate Python; reproduce the behaviour as remark/rehype plugin, Starlight component override, or Astro endpoint.`,
-      }),
-    });
-  }
+  const hookDiagnostics = await diagnoseHooks({
+    projectDir,
+    fs,
+    hookPaths: extractHookPaths(config.value.extras),
+  });
 
   const themeFeatureDiagnostics: Array<{
     sourcePath: string;
