@@ -155,7 +155,7 @@ export async function runWizardFlow(
         // if the converter throws (defense in depth — converter follows the
         // diagnostics-over-throws contract today, but a future bug shouldn't
         // leak a setInterval onto the event loop).
-        let converted;
+        let converted: Awaited<ReturnType<typeof converter>>;
         try {
           converted = await converter(finalCommand);
         } finally {
@@ -329,7 +329,7 @@ export async function runWizardFlow(
   const phaseTimer = startPhaseRotation(spin, reparsed.check);
   // try/finally guarantees the phase-rotation interval is cleared even if the
   // converter throws — see the note on the saved-prefs path above.
-  let converted;
+  let converted: Awaited<ReturnType<typeof converter>>;
   try {
     converted = await converter(reparsed);
   } finally {
