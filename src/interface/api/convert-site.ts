@@ -62,6 +62,10 @@ import {
 } from '../../use-cases/detect-features/diagnose-hooks.js';
 import { diagnosePalette } from '../../use-cases/detect-features/diagnose-palette.js';
 import { diagnoseThemeFeatures } from '../../use-cases/detect-features/diagnose-theme-features.js';
+import { diagnoseExpressiveCode } from '../../use-cases/detect-features/diagnose-expressive-code.js';
+import { diagnoseThemeLanguage } from '../../use-cases/detect-features/diagnose-theme-language.js';
+import { diagnoseAnalytics } from '../../use-cases/detect-features/diagnose-analytics.js';
+import { diagnoseThemeFonts } from '../../use-cases/detect-features/diagnose-theme-fonts.js';
 import {
   extractI18nConfig,
   extractI18nLocales,
@@ -579,45 +583,7 @@ export async function convertSiteFromDisk(
   }));
 
   const expressiveCodeConfig = extractExpressiveCodeConfig(config.value.markdownExtensions);
-  const expressiveCodeDiagnostics: Array<{
-    sourcePath: string;
-    diagnostic: ReturnType<typeof createDiagnostic>;
-  }> = [];
-  if (expressiveCodeConfig !== undefined) {
-    const [light, dark] = expressiveCodeConfig.themes;
-    if (expressiveCodeConfig.fellBack) {
-      expressiveCodeDiagnostics.push({
-        sourcePath: 'mkdocs.yml',
-        diagnostic: createDiagnostic({
-          severity: 'warning',
-          ruleId: 'expressive-code-theme-fallback',
-          source: 'mkdocs-material-to-starlight',
-          message: `pygments_style "${expressiveCodeConfig.sourceStyle}" has no curated Shiki equivalent — defaulted to ['${light}', '${dark}']. Replace expressiveCode.themes in astro.config.mjs with a closer match from https://shiki.style/themes.`,
-        }),
-      });
-    } else {
-      expressiveCodeDiagnostics.push({
-        sourcePath: 'mkdocs.yml',
-        diagnostic: createDiagnostic({
-          severity: 'info',
-          ruleId: 'expressive-code-theme-applied',
-          source: 'mkdocs-material-to-starlight',
-          message: `pygments_style "${expressiveCodeConfig.sourceStyle}" mapped to expressiveCode.themes ['${light}', '${dark}'].`,
-        }),
-      });
-    }
-    if (expressiveCodeConfig.unsupportedOptions.length > 0) {
-      expressiveCodeDiagnostics.push({
-        sourcePath: 'mkdocs.yml',
-        diagnostic: createDiagnostic({
-          severity: 'warning',
-          ruleId: 'expressive-code-options-dropped',
-          source: 'mkdocs-material-to-starlight',
-          message: `pymdownx.highlight option(s) dropped (no ExpressiveCode equivalent): ${expressiveCodeConfig.unsupportedOptions.join(', ')}.`,
-        }),
-      });
-    }
-  }
+  const expressiveCodeDiagnostics = diagnoseExpressiveCode(expressiveCodeConfig);
 
   const redirects = extractRedirects(config.value.plugins);
   const i18nFromPlugin = extractI18nConfig(config.value.plugins);
@@ -627,70 +593,13 @@ export async function convertSiteFromDisk(
     i18nFromPlugin === null && i18nFromAlternate === null
       ? extractThemeLanguage(config.value.theme?.options ?? {})
       : undefined;
-  const themeLanguageDiagnostics: Array<{
-    sourcePath: string;
-    diagnostic: ReturnType<typeof createDiagnostic>;
-  }> = [];
-  if (themeLanguage !== undefined) {
-    themeLanguageDiagnostics.push({
-      sourcePath: 'mkdocs.yml',
-      diagnostic: createDiagnostic({
-        severity: 'info',
-        ruleId: 'theme-language-applied',
-        source: 'mkdocs-material-to-starlight',
-        message: `theme.language "${themeLanguage.code}" mapped to starlight locales.root.lang ("${themeLanguage.label}").`,
-      }),
-    });
-  }
+  const themeLanguageDiagnostics = diagnoseThemeLanguage(themeLanguage);
 
   const analytics = mapAnalyticsToHeadEntries(config.value.extras);
-  const analyticsDiagnostics: Array<{
-    sourcePath: string;
-    diagnostic: ReturnType<typeof createDiagnostic>;
-  }> = [];
-  if (analytics !== null) {
-    analyticsDiagnostics.push({
-      sourcePath: 'mkdocs.yml',
-      diagnostic: createDiagnostic({
-        severity: 'info',
-        ruleId: 'extra-analytics-applied',
-        source: 'mkdocs-material-to-starlight',
-        message: `extra.analytics provider "${analytics.provider}" property "${analytics.property}" injected into starlight head[].`,
-      }),
-    });
-    if (analytics.unsupported.includes('feedback')) {
-      analyticsDiagnostics.push({
-        sourcePath: 'mkdocs.yml',
-        diagnostic: createDiagnostic({
-          severity: 'warning',
-          ruleId: 'extra-analytics-feedback-dropped',
-          source: 'mkdocs-material-to-starlight',
-          message:
-            'extra.analytics.feedback widget has no Starlight equivalent — reimplement via a custom component or install a community plugin.',
-        }),
-      });
-    }
-  }
+  const analyticsDiagnostics = diagnoseAnalytics(analytics);
 
   const themeFonts = extractThemeFonts(config.value.theme?.options ?? {});
-  const themeFontsDiagnostics: Array<{
-    sourcePath: string;
-    diagnostic: ReturnType<typeof createDiagnostic>;
-  }> = [];
-  if (themeFonts !== undefined) {
-    const parts: string[] = [];
-    if (themeFonts.text) parts.push(`text=${themeFonts.text.package}`);
-    if (themeFonts.code) parts.push(`code=${themeFonts.code.package}`);
-    themeFontsDiagnostics.push({
-      sourcePath: 'mkdocs.yml',
-      diagnostic: createDiagnostic({
-        severity: 'info',
-        ruleId: 'theme-fonts-applied',
-        source: 'mkdocs-material-to-starlight',
-        message: `theme.font mapped to Fontsource: ${parts.join(', ')}. Run \`npm install\` to fetch.`,
-      }),
-    });
-  }
+  const themeFontsDiagnostics = diagnoseThemeFonts(themeFonts);
 
   const deferredDiagnostics = buildDeferredWizardDiagnostics(input);
 
