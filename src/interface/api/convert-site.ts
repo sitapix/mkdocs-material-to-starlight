@@ -66,6 +66,7 @@ import { detectInsidersFeatures } from '../../use-cases/detect-features/insiders
 import { extractRedirects } from '../../use-cases/detect-features/redirects.js';
 import { runBulkScans } from '../../use-cases/scan-occurrences/run-bulk-scans.js';
 import { applyThemeAssetCopies } from '../../use-cases/copy-assets/apply-theme-asset-copies.js';
+import { buildOutputSources } from '../../use-cases/serialize-config/build-output-sources.js';
 import { extractSocial } from '../../use-cases/detect-features/social.js';
 import { detectLongtailFeatures } from '../../use-cases/detect-features/theme-features-longtail.js';
 import { extractThemeFonts } from '../../use-cases/detect-features/theme-fonts.js';
@@ -76,11 +77,8 @@ import { serializeAstroConfig } from '../../use-cases/serialize-config/astro-con
 import { serializeBiomeConfig } from '../../use-cases/serialize-config/biome-config.js';
 import { serializeContentConfig } from '../../use-cases/serialize-config/content-config.js';
 import { serializeMigrationNotes } from '../../use-cases/serialize-config/migration-notes.js';
-import { serializeOgEndpoint } from '../../use-cases/serialize-config/og-endpoint.js';
 import { serializePackageJson } from '../../use-cases/serialize-config/package-json.js';
-import { serializeRssEndpoint } from '../../use-cases/serialize-config/rss-endpoint.js';
 import { serializeSidebar } from '../../use-cases/serialize-config/sidebar.js';
-import { serializeStyleSheet } from '../../use-cases/serialize-config/styles.js';
 import { inferFrontmatterTypes } from '../../use-cases/validate-output/infer-frontmatter-types.js';
 
 export interface ConvertSiteFromDiskInput {
@@ -1106,64 +1104,19 @@ export async function convertSiteFromDisk(
     sourceDocs,
   );
 
-  const paletteStrategy = input.palette;
-  const stylesheetSource = serializeStyleSheet(palette, themeFonts ?? null, paletteStrategy);
-  // RSS endpoint requires a parseable absolute `site:` URL — the
-  // `@astrojs/rss` runtime crashes the build with "Invalid input: expected
-  // string, received undefined (site)" when site is missing or invalid.
-  // We already skip emitting `site:` when `siteUrl` is non-URL-shaped
-  // (Python YAML-tag substitutions, env-var placeholders), so the same
-  // gate must also disable RSS or the user opts in to a guaranteed build
-  // failure. Real-world break (jobindjohn/obsidian-publish-mkdocs).
-  const isValidSiteUrl =
-    config.value.siteUrl !== null &&
-    /^https?:\/\//i.test(config.value.siteUrl) &&
-    (() => {
-      try {
-        return Boolean(new URL(config.value.siteUrl ?? ''));
-      } catch {
-        return false;
-      }
-    })();
-  const rssEnabled =
-    input.rss === false
-      ? false
-      : input.rss === true
-        ? isValidSiteUrl
-        : allFeatures.includes('rss') && isValidSiteUrl;
-  const rssEndpointSource = rssEnabled
-    ? serializeRssEndpoint({
-        siteName: config.value.siteName,
-        siteDescription: config.value.siteDescription,
-        siteUrl: config.value.siteUrl,
-      })
-    : null;
-  const ogEndpointSource = allFeatures.includes('og-cards')
-    ? serializeOgEndpoint({
-        siteName: config.value.siteName,
-        ...(socialCardsLayoutOptions !== undefined
-          ? { cardsLayoutOptions: socialCardsLayoutOptions }
-          : {}),
-      })
-    : null;
-  // starlight-tags 1.0+ requires a `tags.yml` at the project root listing
-  // every tag the site uses. Material's tags plugin doesn't carry this
-  // structure, so emit a minimal stub the user can extend. Without the file,
-  // the build fails at static-paths generation time.
-  const tagsYmlSource = allFeatures.includes('tags')
-    ? '# starlight-tags configuration. Each tag must declare a `label` (display\n# name); other fields (description, color, icon, permalink, etc.) are\n# optional. Tag IDs must be lowercase letters/digits/hyphens/underscores.\n# See https://frostybee.github.io/starlight-tags/ for the full schema.\ntags:\n  example:\n    label: Example\n    description: An example tag — replace with your own definitions.\n'
-    : null;
-  // Auto-apply Starlight 0.35+'s `docsLoader({ generateId })` when any source
-  // path has segments github-slugger would reshape. Replaces the historic
-  // `slug-incompatible-path` *warning* with an actual fix: the emitted
-  // content.config.ts overrides the default sluggifier so paths like
-  // `1.0/configuration.md` and `c++-primer.md` resolve verbatim and the
-  // converter's emitted sidebar entries match. The warning still fires (so
-  // users see what happened in MIGRATION_NOTES.md) but the build no longer
-  // breaks.
-  const preserveSlugs = siteResult.value.diagnostics.some(
-    (d) => d.diagnostic.ruleId === 'slug-incompatible-path',
-  );
+  const { stylesheetSource, rssEndpointSource, ogEndpointSource, tagsYmlSource, preserveSlugs } =
+    buildOutputSources({
+      siteName: config.value.siteName,
+      siteDescription: config.value.siteDescription,
+      siteUrl: config.value.siteUrl,
+      palette,
+      paletteStrategy: input.palette,
+      themeFonts,
+      detectedFeatures: allFeatures,
+      socialCardsLayoutOptions,
+      rssOption: input.rss,
+      siteDiagnostics: siteResult.value.diagnostics,
+    });
   const writeResult = await writeOutputs({
     outputDir: input.outputDir,
     files: siteResult.value.files,
