@@ -17,47 +17,33 @@
  * Pure: source string → Diagnostic[]. No side effects.
  */
 
-import {
-  createDiagnostic,
-  type Diagnostic,
-} from '../../domain/diagnostics/diagnostic.js';
-import { isFenceLine } from '../../domain/syntax/fence.js';
+import { createDiagnostic, type Diagnostic } from '../../domain/diagnostics/diagnostic.js';
+import { type LineScanner, runLineScanners } from '../../domain/scanners/line-scanner.js';
 
 const SOURCE = 'detect-macros/scan-expressions';
 const VARIABLE_RE = /\{\{[^}]+\}\}/g;
 
-export function scanMacroExpressions(
-  source: string,
-): ReadonlyArray<Diagnostic> {
-  const diagnostics: Diagnostic[] = [];
-  const lines = source.split('\n');
-  let inFence = false;
-  let lineNumber = 0;
-
-  for (const line of lines) {
-    lineNumber += 1;
-    if (isFenceLine(line)) {
-      inFence = !inFence;
-      continue;
-    }
-    if (inFence) continue;
-
-    for (const match of line.matchAll(VARIABLE_RE)) {
+const macroExpressionScanner: LineScanner = {
+  ruleId: 'macros-expression-detected',
+  scan: (line, lineNumber) => {
+    const matches = [...line.matchAll(VARIABLE_RE)];
+    if (matches.length === 0) return null;
+    return matches.map((match) => {
       const expression = match[0];
       const column = (match.index ?? 0) + 1;
-      diagnostics.push(
-        createDiagnostic({
-          severity: 'info',
-          ruleId: 'macros-expression-detected',
-          source: SOURCE,
-          message: `Jinja2 expression \`${truncate(expression)}\` at line ${String(lineNumber)} will not be evaluated; replace with literal Markdown or an Astro component.`,
-          place: { line: lineNumber, column },
-        }),
-      );
-    }
-  }
+      return createDiagnostic({
+        severity: 'info',
+        ruleId: 'macros-expression-detected',
+        source: SOURCE,
+        message: `Jinja2 expression \`${truncate(expression)}\` at line ${String(lineNumber)} will not be evaluated; replace with literal Markdown or an Astro component.`,
+        place: { line: lineNumber, column },
+      });
+    });
+  },
+};
 
-  return diagnostics;
+export function scanMacroExpressions(source: string): ReadonlyArray<Diagnostic> {
+  return runLineScanners(source, [macroExpressionScanner]);
 }
 
 function truncate(text: string): string {

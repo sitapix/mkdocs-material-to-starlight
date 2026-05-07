@@ -67,6 +67,7 @@ import { diagnoseThemeLanguage } from '../../use-cases/detect-features/diagnose-
 import { diagnoseAnalytics } from '../../use-cases/detect-features/diagnose-analytics.js';
 import { diagnoseThemeFonts } from '../../use-cases/detect-features/diagnose-theme-fonts.js';
 import { resolveThemeAssets } from '../../use-cases/detect-features/resolve-theme-assets.js';
+import { extractPluginOptions } from '../../use-cases/detect-features/extract-plugin-options.js';
 import {
   extractI18nConfig,
   extractI18nLocales,
@@ -423,58 +424,12 @@ export async function convertSiteFromDisk(
   // their starlight-* / astro-og-canvas equivalents. Unrecognized keys
   // are dropped during translation; the plugin-blog/-tags/-social
   // diagnostics remain the canonical pointers to manual remediation.
-  const blogPlugin = config.value.plugins.find((p) => p.name === 'blog');
-  const tagsPlugin = config.value.plugins.find((p) => p.name === 'tags');
-  const socialPlugin = config.value.plugins.find((p) => p.name === 'social');
-  // Material blog plugin: blog_dir defaults to `blog`. Authors live in
-  // `<docs_dir>/<blog_dir>/.authors.yml`. starlight-blog needs them as
-  // the `authors` field of the plugin invocation; without this, every
-  // blog post fails with "Author 'X' not found in the blog configuration."
-  const blogDir =
-    typeof blogPlugin?.options['blog_dir'] === 'string'
-      ? (blogPlugin.options['blog_dir'] as string)
-      : 'blog';
-  const authorsYmlPath = join(docsDir, blogDir, '.authors.yml');
-  const authorsYmlRead = await fs.readText(authorsYmlPath);
-  const authorsFromFile = authorsYmlRead.ok
-    ? (() => {
-        const decoded = yamlDecoder.decode(authorsYmlRead.value);
-        if (!decoded.ok) return undefined;
-        const root = decoded.value as Record<string, unknown> | null;
-        if (root === null || typeof root !== 'object') return undefined;
-        const authors = root['authors'];
-        if (authors === null || typeof authors !== 'object') return undefined;
-        return authors as Record<string, unknown>;
-      })()
-    : undefined;
-  const blogOptionsBase = blogPlugin !== undefined ? blogPlugin.options : {};
-  // Author resolution priority:
-  //   1. `plugins.blog.authors:` is an object map → use it verbatim.
-  //   2. Otherwise (missing OR a flag like `authors: true`), prefer the
-  //      sidecar `.authors.yml` if present. Real-world (ksaaskil): mkdocs.yml
-  //      has `authors: true` + `authors_file: "{blog}/.authors.yml"`, so the
-  //      flag wins under "any defined" semantics and the file's contents
-  //      never reach starlight-blog — every post then fails with
-  //      "Author 'ksaaskil' not found in the blog configuration."
-  const baseAuthors = blogOptionsBase['authors'];
-  const baseAuthorsIsObjectMap =
-    baseAuthors !== null && typeof baseAuthors === 'object' && !Array.isArray(baseAuthors);
-  const blogOptions =
-    blogPlugin !== undefined &&
-    (Object.keys(blogOptionsBase).length > 0 || authorsFromFile !== undefined)
-      ? authorsFromFile !== undefined && !baseAuthorsIsObjectMap
-        ? { ...blogOptionsBase, authors: authorsFromFile }
-        : blogOptionsBase
-      : undefined;
-  const tagsOptions =
-    tagsPlugin !== undefined && Object.keys(tagsPlugin.options).length > 0
-      ? tagsPlugin.options
-      : undefined;
-  const rawSocialLayout = socialPlugin?.options['cards_layout_options'];
-  const socialCardsLayoutOptions =
-    rawSocialLayout !== null && typeof rawSocialLayout === 'object'
-      ? (rawSocialLayout as Readonly<Record<string, unknown>>)
-      : undefined;
+  const { blogOptions, tagsOptions, socialCardsLayoutOptions } = await extractPluginOptions({
+    plugins: config.value.plugins,
+    docsDir,
+    fs,
+    yaml: yamlDecoder,
+  });
 
   // Plugin-level diagnostics (for plugins that have no Starlight equivalent
   // or are deprecated by Material itself). These are emitted once per run,

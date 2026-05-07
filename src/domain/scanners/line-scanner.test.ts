@@ -86,4 +86,39 @@ describe('runLineScanners', () => {
     expect(out).toHaveLength(1);
     expect(out[0]?.place?.line).toBe(2);
   });
+
+  it('accepts a scanner that returns an array of diagnostics for one line', () => {
+    // Some scanners (e.g. macro-expression) emit multiple findings per line.
+    // The Module accepts `Diagnostic | ReadonlyArray<Diagnostic> | null` so
+    // those scanners fit without callers having to filter post-hoc.
+    const TWO_DOLLARS_RE = /\$/g;
+    const dollarScanner: LineScanner = {
+      ruleId: 'dollar-found',
+      scan: (line, lineNumber) => {
+        const matches = [...line.matchAll(TWO_DOLLARS_RE)];
+        if (matches.length === 0) return null;
+        return matches.map((m) =>
+          createDiagnostic({
+            severity: 'info',
+            ruleId: 'dollar-found',
+            source: 'test/dollar',
+            message: `$ at column ${String((m.index ?? 0) + 1)}`,
+            place: { line: lineNumber, column: (m.index ?? 0) + 1 },
+          }),
+        );
+      },
+    };
+    const out = runLineScanners('a $ b $ c\n', [dollarScanner]);
+    expect(out).toHaveLength(2);
+    expect(out[0]?.place?.column).toBe(3);
+    expect(out[1]?.place?.column).toBe(7);
+  });
+
+  it('accepts a scanner that returns an empty array (treats it as a non-match)', () => {
+    const noopScanner: LineScanner = {
+      ruleId: 'never',
+      scan: () => [],
+    };
+    expect(runLineScanners('any line\n', [noopScanner])).toEqual([]);
+  });
 });

@@ -25,11 +25,18 @@ export interface LineScanner {
   /** Stable identifier; matches the rule the scanner emits. */
   readonly ruleId: string;
   /**
-   * Inspect a single non-fenced line. Return a Diagnostic to record a
-   * finding, or `null` to skip. `lineNumber` is 1-based to match how
-   * Diagnostic places are reported elsewhere in the codebase.
+   * Inspect a single non-fenced line. Return:
+   *   - a Diagnostic to record one finding,
+   *   - an array of Diagnostics for scanners that emit multiple findings per
+   *     line (e.g. multiple `{{ }}` macro expressions on the same line),
+   *   - `null` to skip.
+   * `lineNumber` is 1-based to match how Diagnostic places are reported
+   * elsewhere in the codebase. An empty array is equivalent to null.
    */
-  readonly scan: (line: string, lineNumber: number) => Diagnostic | null;
+  readonly scan: (
+    line: string,
+    lineNumber: number,
+  ) => Diagnostic | ReadonlyArray<Diagnostic> | null;
 }
 
 export function runLineScanners(
@@ -48,9 +55,12 @@ export function runLineScanners(
     if (inFence) continue;
     const lineNumber = i + 1;
     for (const scanner of scanners) {
-      const diagnostic = scanner.scan(line, lineNumber);
-      if (diagnostic !== null) {
-        diagnostics.push(diagnostic);
+      const result = scanner.scan(line, lineNumber);
+      if (result === null) continue;
+      if (Array.isArray(result)) {
+        for (const d of result) diagnostics.push(d);
+      } else {
+        diagnostics.push(result as Diagnostic);
       }
     }
   }
