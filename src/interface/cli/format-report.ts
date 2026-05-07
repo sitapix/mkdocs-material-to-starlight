@@ -1,22 +1,27 @@
 /**
  * Format a diagnostic report as terminal-friendly text.
  *
- * Pure: takes the tagged-diagnostic list, returns a multi-line string. No
- * colors or ANSI escapes are added here — that responsibility belongs to a
- * separate decorator if the user wants color output.
- *
  * Each line follows the unified-style locator format:
  *   <source-path>:<line>:<column>  <severity>  <ruleId>  <message>
  *
  * Followed by a summary of severity counts.
  *
- * Security: every interpolated string (sourcePath, ruleId, message) is
- * passed through `sanitizeForSingleLine` to defend against terminal-escape
- * injection (CWE-150). A hostile mkdocs.yml or third-party error message
- * could otherwise embed cursor-movement / window-title sequences that
- * compromise the user's terminal session.
+ * Color: applied via picocolors, which auto-disables under `NO_COLOR`,
+ * non-TTY stdout, and the `FORCE_COLOR=0` env var. Tests run with no
+ * TTY → picocolors no-ops → assertions on plain substrings still pass.
+ * The colors are ours (added after sanitization), so they're trustworthy:
+ * the hostile-input strip below removes any ANSI from user-controlled
+ * fields BEFORE we add our own decoration.
+ *
+ * Security: every interpolated user-controlled string (sourcePath,
+ * ruleId, message) is passed through `sanitizeForSingleLine` BEFORE any
+ * picocolors call, so a hostile mkdocs.yml or third-party error message
+ * cannot embed cursor-movement / window-title sequences (CWE-150). The
+ * ANSI codes that survive in the final string are exclusively the ones
+ * picocolors emits for our own coloring.
  */
 
+import pc from 'picocolors';
 import { sanitizeForSingleLine } from '../../infrastructure/terminal/sanitize-terminal-output.js';
 import type { TaggedDiagnostic } from '../../use-cases/convert-site/convert.js';
 
@@ -43,9 +48,9 @@ export function formatReport(
         ? sanitizeForSingleLine(outputDir).replace(/\/$/, '')
         : '<output-dir>';
     return (
-      `OK — 0 issues found. Site converted cleanly.\n` +
-      `Next: cd ${where} && npm install && npm run dev\n` +
-      `Docs: https://starlight.astro.build/\n`
+      `${pc.green(pc.bold('OK'))} — 0 issues found. Site converted cleanly.\n` +
+      `Next: ${pc.cyan(`cd ${where} && npm install && npm run dev`)}\n` +
+      `Docs: ${pc.cyan(pc.underline('https://starlight.astro.build/'))}\n`
     );
   }
 
@@ -59,14 +64,28 @@ export function formatReport(
     }
     if (collapse) {
       const hidden = items.length - SHOW_FIRST;
-      lines.push(`  … and ${String(hidden)} more "${ruleId}" — see ${notesPath} for the full list`);
+      lines.push(
+        pc.dim(`  … and ${String(hidden)} more "${ruleId}" — see ${notesPath} for the full list`),
+      );
     }
   }
   lines.push('', summarize(diagnostics));
   if (diagnostics.length > 0) {
-    lines.push(`Full report with descriptions and fixes: ${notesPath}`);
+    lines.push(`Full report with descriptions and fixes: ${pc.cyan(pc.underline(notesPath))}`);
   }
   return `${lines.join('\n')}\n`;
+}
+
+/**
+ * Map severity → color. Errors are red+bold (the loud stop sign), warnings
+ * are yellow (caution), info is blue (neutral mention). Matches `eslint`,
+ * `tsc`, and most linters' conventions so the eye already knows what to
+ * scan for.
+ */
+function colorSeverity(severity: 'info' | 'warning' | 'error', text: string): string {
+  if (severity === 'error') return pc.red(pc.bold(text));
+  if (severity === 'warning') return pc.yellow(text);
+  return pc.blue(text);
 }
 
 interface RuleGroup {
@@ -101,7 +120,10 @@ function formatOne(tagged: TaggedDiagnostic): string {
   const place = tagged.diagnostic.place;
   const locator =
     place === undefined ? safePath : `${safePath}:${String(place.line)}:${String(place.column)}`;
-  return `${locator}  ${tagged.diagnostic.severity}  ${safeRuleId}  ${safeMessage}`;
+  // Path dim, severity colored by level, ruleId bold-cyan, message normal.
+  // Two spaces between fields stay so existing grep / awk pipelines keep working.
+  const severity = tagged.diagnostic.severity;
+  return `${pc.dim(locator)}  ${colorSeverity(severity, severity)}  ${pc.bold(pc.cyan(safeRuleId))}  ${safeMessage}`;
 }
 
 function summarize(diagnostics: ReadonlyArray<TaggedDiagnostic>): string {
@@ -110,10 +132,18 @@ function summarize(diagnostics: ReadonlyArray<TaggedDiagnostic>): string {
     counts[tagged.diagnostic.severity] += 1;
   }
   const parts: string[] = [];
-  if (counts.error > 0) parts.push(`${counts.error} ${pluralize(counts.error, 'error')}`);
-  if (counts.warning > 0) parts.push(`${counts.warning} ${pluralize(counts.warning, 'warning')}`);
-  if (counts.info > 0) parts.push(`${counts.info} info`);
-  return parts.join(', ');
+  if (counts.error > 0) {
+    parts.push(colorSeverity('error', `${counts.error} ${pluralize(counts.error, 'error')}`));
+  }
+  if (counts.warning > 0) {
+    parts.push(
+      colorSeverity('warning', `${counts.warning} ${pluralize(counts.warning, 'warning')}`),
+    );
+  }
+  if (counts.info > 0) {
+    parts.push(colorSeverity('info', `${counts.info} info`));
+  }
+  return parts.join('  ');
 }
 
 function pluralize(n: number, singular: string): string {
