@@ -65,6 +65,7 @@ import {
 import { detectInsidersFeatures } from '../../use-cases/detect-features/insiders-features.js';
 import { extractRedirects } from '../../use-cases/detect-features/redirects.js';
 import { runBulkScans } from '../../use-cases/scan-occurrences/run-bulk-scans.js';
+import { applyThemeAssetCopies } from '../../use-cases/copy-assets/apply-theme-asset-copies.js';
 import { extractSocial } from '../../use-cases/detect-features/social.js';
 import { detectLongtailFeatures } from '../../use-cases/detect-features/theme-features-longtail.js';
 import { extractThemeFonts } from '../../use-cases/detect-features/theme-fonts.js';
@@ -1185,82 +1186,15 @@ export async function convertSiteFromDisk(
     return err({ code: 'file-write-failed', message: assetCopyResult.error });
   }
 
-  const assetPostDiagnostics: Array<{
-    sourcePath: string;
-    diagnostic: ReturnType<typeof createDiagnostic>;
-  }> = [];
-  if (faviconExtensionRejected && faviconRawCandidate !== null) {
-    assetPostDiagnostics.push({
-      sourcePath: 'mkdocs.yml',
-      diagnostic: createDiagnostic({
-        severity: 'warning',
-        ruleId: 'favicon-extension-unsupported',
-        source: 'mkdocs-material-to-starlight',
-        message:
-          `theme.favicon: \`${faviconRawCandidate}\` uses an extension Starlight ` +
-          `does not accept (allowed: .ico, .gif, .jpg/.jpeg, .png, .svg). The ` +
-          `favicon was dropped from the generated astro.config.mjs so the build ` +
-          `succeeds; Starlight falls back to its default chrome.`,
-      }),
-    });
-  }
-  // When the logo file doesn't exist on disk, skip emitting the `logo:`
-  // config entry — Starlight's `logo.src` is resolved as a Vite import and
-  // a missing file fails the build with "Rollup failed to resolve import".
-  // Real-world break (Enveloppe/mkdocs-publisher-template): the source
-  // references `assets/meta/favicons.png` but the file isn't in the
-  // repo. Diagnostic surfaces the missing file; emission is suppressed.
-  if (logoSrc !== null) {
-    const logoCopy = await copyOne(
-      join(docsDir, logoSrc),
-      join(input.outputDir, 'src', 'assets', posix.basename(logoSrc)),
-    );
-    if (!logoCopy.ok) {
-      assetPostDiagnostics.push({
-        sourcePath: 'mkdocs.yml',
-        diagnostic: createDiagnostic({
-          severity: 'warning',
-          ruleId: 'logo-source-missing',
-          source: 'mkdocs-material-to-starlight',
-          message: `theme.logo: ${logoSrc} could not be located. ${logoCopy.error}`,
-        }),
-      });
-    }
-  }
-  if (faviconRaw !== null) {
-    const faviconCopy = await copyOne(
-      join(docsDir, faviconRaw),
-      join(input.outputDir, 'public', posix.basename(faviconRaw)),
-    );
-    if (!faviconCopy.ok) {
-      assetPostDiagnostics.push({
-        sourcePath: 'mkdocs.yml',
-        diagnostic: createDiagnostic({
-          severity: 'warning',
-          ruleId: 'favicon-source-missing',
-          source: 'mkdocs-material-to-starlight',
-          message: `theme.favicon: ${faviconRaw} could not be located. ${faviconCopy.error}`,
-        }),
-      });
-    }
-  }
-  // If we collected post-build asset diagnostics, append them to the
-  // existing MIGRATION_NOTES.md so users see them in the same place.
-  if (assetPostDiagnostics.length > 0) {
-    const extraSection =
-      '\n## logo / favicon assets\n\n' +
-      assetPostDiagnostics
-        .map((d) => `- **${d.sourcePath}** — ${d.diagnostic.ruleId}: ${d.diagnostic.message}`)
-        .join('\n') +
-      '\n';
-    // Best-effort atomic re-write of MIGRATION_NOTES.md with the appended
-    // post-write section. Failures here are non-fatal — the original notes
-    // file is already on disk.
-    await atomicWriteText(
-      join(input.outputDir, 'MIGRATION_NOTES.md'),
-      migrationNotesSource + extraSection,
-    );
-  }
+  await applyThemeAssetCopies({
+    docsDir,
+    outputDir: input.outputDir,
+    logoSrc,
+    faviconRaw,
+    faviconRawCandidate,
+    faviconExtensionRejected,
+    migrationNotesSource,
+  });
 
   return ok({
     // Include site-conversion + auto-discovery + plugin-level diagnostics
@@ -1315,12 +1249,6 @@ function snippetExtensionOptions(
 ): Readonly<Record<string, unknown>> {
   const entry = exts.find((e) => e.name === 'pymdownx.snippets');
   return entry?.options ?? {};
-}
-
-async function copyOne(source: string, target: string): Promise<Result<true, string>> {
-  // Atomic: write to a sibling tmp, then rename. Prevents partial-output
-  // corruption if the process is interrupted mid-copy.
-  return atomicCopyFile(source, target);
 }
 
 function collectCandidateDirectories(sourcePaths: ReadonlyArray<string>): ReadonlyArray<string> {
