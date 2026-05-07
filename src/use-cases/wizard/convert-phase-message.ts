@@ -2,15 +2,21 @@
  * Pick a "what's happening right now" message for the convert spinner based
  * on how long it's been running.
  *
- * The converter is opaque to the wizard — it returns a single Promise without
+ * The converter is opaque to the wizard. It returns a single Promise without
  * emitting phase events. Rather than a static message that goes stale during
- * a 60-second `astro check`, we rotate through a fixed schedule of phase
- * names. The thresholds approximate observed phase durations for medium-size
- * sites; they're not load-bearing — if a phase finishes faster, the next
- * threshold catches up. The point is to keep the line *moving* so a long run
- * doesn't read as a hang.
+ * a multi-minute run, we rotate through a fixed schedule of phase names.
  *
- * Pure: no I/O, no clock — caller passes `elapsedMs`.
+ * Thresholds match real observed timing: conversion itself usually finishes
+ * in under a second, but `--check` runs `astro check` on the output, which
+ * can take several minutes on first run (observed: ~5 min). The phase rotation
+ * keeps the spinner line moving so a long check doesn't read as a hang. The
+ * post-30s message extends a "still running" reassurance once we cross the
+ * 90s mark so the user knows multi-minute waits are expected here.
+ *
+ * Thresholds aren't load-bearing. If a phase finishes faster, the next
+ * threshold catches up.
+ *
+ * Pure: no I/O, no clock. Caller passes `elapsedMs`.
  */
 
 export interface ConvertPhaseContext {
@@ -22,6 +28,9 @@ export function convertPhaseMessage(elapsedMs: number, ctx: ConvertPhaseContext)
   if (elapsedMs < 5_000) return 'Walking files…';
   if (elapsedMs < 15_000) return 'Transforming AST…';
   if (elapsedMs < 30_000) return 'Writing output…';
-  if (ctx.withAstroCheck) return 'Running `astro check` (slowest phase)…';
-  return 'Finalizing…';
+  if (!ctx.withAstroCheck) return 'Finalizing…';
+  if (elapsedMs < 90_000) return 'Running `astro check`…';
+  // Past 90s the spinner reads as a hang without reassurance. Reword to
+  // tell the user a multi-minute wait is expected for first --check runs.
+  return 'Running `astro check` (first runs can take a few minutes)…';
 }

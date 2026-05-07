@@ -34,7 +34,7 @@ Your docs are live on Starlight. Requires Node 20+.
 
 ## Why use this
 
-- **Exercised on real docs.** FastAPI, Pydantic, Polars, httpx, Typer, SQLModel, AWS Nuke, and Privacy Guides are part of the test suite. The full pipeline finishes in seconds.
+- **Tested at real scale.** A first `--check` run typically takes 1–5 minutes; `astro check` is the slow step, not the converter. Repeat `--check` runs finish in 10–30s. Without `--check`, conversion alone finishes in seconds.
 - **Maps every Material feature.** Admonitions, tabs, grids, snippets, icons, math, mermaid, i18n, mike versions. Features without a clean Starlight equivalent (Jinja macros, custom theme overrides) become diagnostics with file and line numbers.
 - **Scripts cleanly.** The wizard prints its equivalent unattended command on exit. Drop that command into a CI workflow. Exit codes follow Unix convention.
 - **Idempotent.** Running it twice produces byte-identical output, so reruns do not churn diffs.

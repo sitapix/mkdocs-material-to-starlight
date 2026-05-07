@@ -360,18 +360,36 @@ export async function runWizardFlow(
 /**
  * Render a multi-line note immediately above the convert spinner. The spinner
  * itself is a single tiny glyph; without something prominent above it, a
- * 30–90s convert reads as "did the wizard hang?". The note explains the
- * phases and rough duration so the user knows what to expect, and the
- * spinner below it serves only as a "still alive" pulse.
+ * multi-minute `--check` run reads as "did the wizard hang?". The note
+ * explains the phases and honest worst-case duration, so the spinner below
+ * serves only as a "still alive" pulse.
+ *
+ * Why the duration looks high for `--check`: conversion itself is fast
+ * (often under a second). The slow step is `astro check` running against
+ * the converted output. First runs can take several minutes; the converter
+ * has no control over that.
  */
 function renderConvertAnnouncement(prompter: Prompter, withAstroCheck: boolean): void {
-  const lines = ['Typical run: 5–30 seconds.', 'Phases: walk files → transform AST → write output'];
   if (withAstroCheck) {
-    lines.push(
-      'Then: astro check (this is the slowest phase — can take 30–60s on a fresh install).',
+    prompter.note(
+      [
+        'First `--check` run: typically 1–5 minutes.',
+        '`astro check` is the slow step. The converter itself is sub-second on most sites.',
+        'Repeat `--check` runs are typically 10–30s.',
+        '',
+        'Phases: walk files → transform AST → write output → astro check',
+      ].join('\n'),
+      'Converting your site',
     );
+    return;
   }
-  prompter.note(lines.join('\n'), 'Converting your site');
+  prompter.note(
+    [
+      'Typical run: a few seconds, even on thousand-page sites.',
+      'Phases: walk files → transform AST → write output',
+    ].join('\n'),
+    'Converting your site',
+  );
 }
 
 /**
