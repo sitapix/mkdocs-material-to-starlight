@@ -16,25 +16,11 @@
  * user input; only on programmer error or OS conditions.
  */
 
-import { readdir } from 'node:fs/promises';
 import { join } from 'node:path';
-import { parseRepoUrl } from '../../domain/config/repo-context.js';
-import type { FileSystem } from '../../domain/ports/file-system.js';
 import { err, ok, type Result } from '../../domain/result.js';
 import { atomicCopyFile, atomicWriteText } from '../../infrastructure/fs/atomic-write.js';
-import { createNodeConfigDiscoverer } from '../../infrastructure/fs/node-config-discoverer.js';
-import { createNodeDirectoryReader } from '../../infrastructure/fs/node-directory-reader.js';
-import { createNodeFileSystem } from '../../infrastructure/fs/node-file-system.js';
-import { createMdxOutputValidator } from '../../infrastructure/mdx/at-mdx-js-validator.js';
-import { createJsYamlDecoder } from '../../infrastructure/yaml/js-yaml-decoder.js';
 import { convertSite, type TaggedDiagnostic } from '../../use-cases/convert-site/convert.js';
-import { enrichMissingDocsDirMessage } from '../../use-cases/convert-site/diagnostic-enrichment.js';
-import { type AssetCopy, planAssetCopies } from '../../use-cases/copy-assets/plan.js';
-import { extractAutoAppend } from '../../use-cases/detect-features/auto-append.js';
-import {
-  applyExcludePatterns,
-  extractExcludePatterns,
-} from '../../use-cases/detect-features/exclude-config.js';
+import { type AssetCopy } from '../../use-cases/copy-assets/plan.js';
 import { detectFeaturesFromPlugins } from '../../use-cases/detect-features/from-plugins.js';
 import { detectFeaturesFromThemeFeatures } from '../../use-cases/detect-features/from-theme-features.js';
 import { resolveThemeAssets } from '../../use-cases/detect-features/resolve-theme-assets.js';
@@ -42,10 +28,9 @@ import { extractPluginOptions } from '../../use-cases/detect-features/extract-pl
 import { buildSidebar } from '../../use-cases/compile-navigation/build-sidebar.js';
 import { assembleConfigOutputs } from '../../use-cases/serialize-config/assemble-config-outputs.js';
 import { runConfigAnalysis } from '../../use-cases/detect-features/run-config-analysis.js';
-import { extractI18nLocales } from '../../use-cases/detect-features/i18n-config.js';
 import { applyThemeAssetCopies } from '../../use-cases/copy-assets/apply-theme-asset-copies.js';
 import { buildOutputSources } from '../../use-cases/serialize-config/build-output-sources.js';
-import { loadMkdocsConfig } from '../../use-cases/load-config/load-mkdocs-config.js';
+import { prepareConvertContext } from '../../use-cases/load-config/prepare-convert-context.js';
 import { serializeBiomeConfig } from '../../use-cases/serialize-config/biome-config.js';
 import { serializeContentConfig } from '../../use-cases/serialize-config/content-config.js';
 import { serializeSidebar } from '../../use-cases/serialize-config/sidebar.js';
@@ -155,126 +140,46 @@ export interface ConvertSiteFromDiskError {
 }
 
 const STARLIGHT_CONTENT_PREFIX = ['src', 'content', 'docs'] as const;
-const ASSET_EXTENSIONS: ReadonlyArray<string> = [
-  '.md',
-  '.mdx',
-  '.png',
-  '.jpg',
-  '.jpeg',
-  '.gif',
-  '.svg',
-  '.webp',
-  '.avif',
-  '.pdf',
-  '.mp4',
-  '.webm',
-];
 
 export async function convertSiteFromDisk(
   input: ConvertSiteFromDiskInput,
 ): Promise<Result<ConvertSiteFromDiskOutput, ConvertSiteFromDiskError>> {
-  const fs = createNodeFileSystem();
-  const dirReader = createNodeDirectoryReader();
-  const yamlDecoder = createJsYamlDecoder();
-  const configDiscoverer = createNodeConfigDiscoverer();
-
-  const loaded = await loadMkdocsConfig(
-    { inputDir: input.projectDir },
-    { fs, dirReader, yamlDecoder, configDiscoverer },
-  );
-  if (!loaded.ok) {
-    return err(translateLoadError(loaded.error, input.projectDir));
-  }
-  const projectDir = loaded.value.projectDir;
-  const autoDiscovery = loaded.value.autoDiscovery;
-  const strippedPythonTags = loaded.value.strippedPythonTags;
-  const config = { ok: true as const, value: loaded.value.config };
-
-  // Idempotency guard: if output dir exists and is non-empty, demand --force.
-  if (input.force !== true) {
-    let existing: string[] = [];
-    try {
-      existing = await readdir(input.outputDir);
-    } catch {
-      // dir doesn't exist — fine
-    }
-    if (existing.length > 0) {
-      return err({
-        code: 'output-not-empty',
-        message: `Output directory ${input.outputDir} is not empty. Re-run with --force to overwrite, or pick a different output directory.`,
-      });
-    }
-  }
-
-  const docsDir = join(projectDir, config.value.docsDir);
-  const sourceListingRaw = await dirReader.list(docsDir, ['.md', '.mdx']);
-  if (!sourceListingRaw.ok) {
-    return err({
-      code: 'directory-read-failed',
-      message: enrichMissingDocsDirMessage(sourceListingRaw.error.message, config.value.plugins),
-    });
-  }
-  // Apply mkdocs-exclude patterns BEFORE every downstream step that walks
-  // the file list (sidebar, asset planning, slug map). Filtering here means
-  // excluded pages never appear in the output, the sidebar, or the slug
-  // map — matching mkdocs-exclude's semantics.
-  const excludePatterns = extractExcludePatterns(config.value.plugins);
-  const sourceListing = {
-    ok: true as const,
-    value: applyExcludePatterns(sourceListingRaw.value, excludePatterns),
-  };
-  const allFiles = await dirReader.list(docsDir, ASSET_EXTENSIONS);
-  if (!allFiles.ok) {
-    return err({
-      code: 'directory-read-failed',
-      message: enrichMissingDocsDirMessage(allFiles.error.message, config.value.plugins),
-    });
-  }
-  const themeOptionsForExcludes = config.value.theme?.options ?? {};
-  const logoExcludePath =
-    typeof themeOptionsForExcludes.logo === 'string' ? themeOptionsForExcludes.logo : null;
-  const faviconExcludePath =
-    typeof themeOptionsForExcludes.favicon === 'string' ? themeOptionsForExcludes.favicon : null;
-  const assetPlanExcludes = [logoExcludePath, faviconExcludePath].filter(
-    (p): p is string => p !== null,
-  );
-  const assetPlan = planAssetCopies({
-    allFiles: allFiles.value,
-    markdownExtensions: ['.md', '.mdx'],
-    excludePaths: assetPlanExcludes,
+  const ctx = await prepareConvertContext({
+    projectDir: input.projectDir,
+    outputDir: input.outputDir,
+    force: input.force === true,
+    snippetBasePaths: input.snippetBasePaths,
+    tabs: input.tabs,
+    outputValidator: input.outputValidator,
   });
-
-  const resolvedSnippetBasePaths =
-    input.snippetBasePaths === undefined
-      ? undefined
-      : input.snippetBasePaths.map((p) => join(projectDir, p));
-  const repoContext = parseRepoUrl(config.value.repoUrl);
-
-  const autoAppendContent = await readAutoAppendContent(
-    extractAutoAppend(config.value.markdownExtensions),
-    docsDir,
+  if (!ctx.ok) return err(ctx.error);
+  const {
     fs,
-  );
-
-  const i18nLocales = extractI18nLocales(config.value.plugins);
-  const includeMarkdownEnabled = config.value.plugins.some((p) => p.name === 'include-markdown');
-  const macrosScanEnabled = config.value.plugins.some((p) => p.name === 'macros');
-  const themeFeatures = (() => {
-    const f = config.value.theme?.options.features;
-    return Array.isArray(f) ? f.filter((x): x is string => typeof x === 'string') : [];
-  })();
-  const hasTabsLink = themeFeatures.includes('content.tabs.link');
-  const hasNavigationTabs = themeFeatures.includes('navigation.tabs');
-  // Default to MDX so tabs render via Starlight's native <Tabs>+<TabItem>
-  // components (theme-aware styling, accessibility, syncKey support). The
-  // legacy `html` mode emits `<div class="sl-tabs">` + a CSS shim and is
-  // retained only for callers who explicitly opt in via `tabs: 'html'`.
-  const emitMdxTabs = input.tabs !== 'html';
-
-  // Default-wire the production validator. Callers can pass an explicit
-  // validator (test seam) or `null` to skip validation entirely.
-  const outputValidator =
-    input.outputValidator === undefined ? createMdxOutputValidator() : input.outputValidator;
+    dirReader,
+    yamlDecoder,
+    projectDir,
+    docsDir,
+    autoDiscovery,
+    strippedPythonTags,
+    config: configValue,
+    sourcePaths,
+    assetPlan,
+    resolvedSnippetBasePaths,
+    repoContext,
+    autoAppendContent,
+    i18nLocales,
+    includeMarkdownEnabled,
+    macrosScanEnabled,
+    themeFeatures,
+    hasTabsLink,
+    hasNavigationTabs,
+    emitMdxTabs,
+    outputValidator,
+  } = ctx.value;
+  // Preserve the existing `config.value.…` shape used downstream so this
+  // refactor is purely structural — no per-callsite renames.
+  const config = { ok: true as const, value: configValue };
+  const sourceListing = { ok: true as const, value: sourcePaths };
 
   const siteResult = await convertSite({
     docsDir,
@@ -491,38 +396,6 @@ export async function convertSiteFromDisk(
   });
 }
 
-function dirOfRel(relPath: string): string {
-  const idx = relPath.lastIndexOf('/');
-  return idx === -1 ? '' : relPath.slice(0, idx);
-}
-
-function translateLoadError(
-  error: import('../../use-cases/load-config/load-mkdocs-config.js').LoadMkdocsConfigError,
-  inputDir: string,
-): ConvertSiteFromDiskError {
-  switch (error.kind) {
-    case 'config-ambiguous': {
-      const list = error.candidates.map((c, i) => `  ${String(i + 1)}. ${c}`).join('\n');
-      return {
-        code: 'config-ambiguous',
-        message:
-          `Multiple mkdocs.yml/.yaml found under ${error.searchedDir}. ` +
-          `Re-run pointing at the intended subdirectory directly:\n${list}\n` +
-          `Example: \`mkdocs-material-to-starlight ${error.searchedDir}/${dirOfRel(error.candidates[0] ?? '')} <output-dir>\``,
-        candidates: error.candidates,
-      };
-    }
-    case 'config-not-found':
-      return {
-        code: 'config-not-found',
-        message: `mkdocs.yml not found under ${inputDir} (searched the project tree to depth 4, pruning node_modules/dist/build/.git/site/...).`,
-      };
-    case 'yaml-decode-failed':
-      return { code: 'yaml-decode-failed', message: error.message };
-    case 'config-invalid':
-      return { code: 'config-invalid', message: error.message };
-  }
-}
 
 function snippetExtensionOptions(
   exts: ReadonlyArray<{
@@ -619,25 +492,3 @@ async function writeOne(target: string, content: string): Promise<Result<true, s
   return atomicWriteText(target, content);
 }
 
-async function readAutoAppendContent(
-  paths: ReadonlyArray<string>,
-  docsDir: string,
-  fs: FileSystem,
-): Promise<string> {
-  if (paths.length === 0) {
-    return '';
-  }
-  const bodies: string[] = [];
-  for (const relativePath of paths) {
-    // Material's `pymdownx.snippets.auto_append` paths are resolved against
-    // the configured `base_path` first, falling back to the docs dir. Phase-1
-    // tries the docs dir; if not present, the file is silently skipped (the
-    // user's diagnostic surface is the conversion run, not this read).
-    const candidate = join(docsDir, relativePath);
-    const read = await fs.readText(candidate);
-    if (read.ok) {
-      bodies.push(read.value);
-    }
-  }
-  return bodies.join('\n\n');
-}
