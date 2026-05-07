@@ -19,11 +19,8 @@
 import { readdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import { parseRepoUrl } from '../../domain/config/repo-context.js';
-import { createDiagnostic } from '../../domain/diagnostics/diagnostic.js';
 import type { FileSystem } from '../../domain/ports/file-system.js';
 import { err, ok, type Result } from '../../domain/result.js';
-import { mapAnalyticsToHeadEntries } from '../../domain/starlight/analytics-mapping.js';
-import { mapMaterialPaletteToStarlight } from '../../domain/starlight/palette-mapping.js';
 import { atomicCopyFile, atomicWriteText } from '../../infrastructure/fs/atomic-write.js';
 import { createNodeConfigDiscoverer } from '../../infrastructure/fs/node-config-discoverer.js';
 import { createNodeDirectoryReader } from '../../infrastructure/fs/node-directory-reader.js';
@@ -32,49 +29,22 @@ import { createMdxOutputValidator } from '../../infrastructure/mdx/at-mdx-js-val
 import { createJsYamlDecoder } from '../../infrastructure/yaml/js-yaml-decoder.js';
 import { convertSite, type TaggedDiagnostic } from '../../use-cases/convert-site/convert.js';
 import { enrichMissingDocsDirMessage } from '../../use-cases/convert-site/diagnostic-enrichment.js';
-import { buildDeferredWizardDiagnostics } from '../../use-cases/convert-site/wizard-decision-diagnostics.js';
 import { type AssetCopy, planAssetCopies } from '../../use-cases/copy-assets/plan.js';
 import { extractAutoAppend } from '../../use-cases/detect-features/auto-append.js';
-import { diagnosePlugins } from '../../use-cases/detect-features/diagnose-plugins.js';
-import { deriveEditLinkBaseUrl } from '../../use-cases/detect-features/edit-link.js';
 import {
   applyExcludePatterns,
   extractExcludePatterns,
 } from '../../use-cases/detect-features/exclude-config.js';
-import { extractExpressiveCodeConfig } from '../../use-cases/detect-features/expressive-code-config.js';
-import { extractAlternateLocales } from '../../use-cases/detect-features/extra-alternate.js';
-import { extractExtraAssets } from '../../use-cases/detect-features/extra-assets.js';
-import { detectExtraWarnings } from '../../use-cases/detect-features/extra-warnings.js';
 import { detectFeaturesFromPlugins } from '../../use-cases/detect-features/from-plugins.js';
 import { detectFeaturesFromThemeFeatures } from '../../use-cases/detect-features/from-theme-features.js';
-import {
-  diagnoseHooks,
-  extractHookPaths,
-} from '../../use-cases/detect-features/diagnose-hooks.js';
-import { diagnosePalette } from '../../use-cases/detect-features/diagnose-palette.js';
-import { diagnoseThemeFeatures } from '../../use-cases/detect-features/diagnose-theme-features.js';
-import { diagnoseExpressiveCode } from '../../use-cases/detect-features/diagnose-expressive-code.js';
-import { diagnoseThemeLanguage } from '../../use-cases/detect-features/diagnose-theme-language.js';
-import { diagnoseAnalytics } from '../../use-cases/detect-features/diagnose-analytics.js';
-import { diagnoseThemeFonts } from '../../use-cases/detect-features/diagnose-theme-fonts.js';
 import { resolveThemeAssets } from '../../use-cases/detect-features/resolve-theme-assets.js';
 import { extractPluginOptions } from '../../use-cases/detect-features/extract-plugin-options.js';
 import { buildSidebar } from '../../use-cases/compile-navigation/build-sidebar.js';
 import { assembleConfigOutputs } from '../../use-cases/serialize-config/assemble-config-outputs.js';
-import {
-  extractI18nConfig,
-  extractI18nLocales,
-} from '../../use-cases/detect-features/i18n-config.js';
-import { detectInsidersFeatures } from '../../use-cases/detect-features/insiders-features.js';
-import { extractRedirects } from '../../use-cases/detect-features/redirects.js';
-import { runBulkScans } from '../../use-cases/scan-occurrences/run-bulk-scans.js';
+import { runConfigAnalysis } from '../../use-cases/detect-features/run-config-analysis.js';
+import { extractI18nLocales } from '../../use-cases/detect-features/i18n-config.js';
 import { applyThemeAssetCopies } from '../../use-cases/copy-assets/apply-theme-asset-copies.js';
 import { buildOutputSources } from '../../use-cases/serialize-config/build-output-sources.js';
-import { extractSocial } from '../../use-cases/detect-features/social.js';
-import { detectLongtailFeatures } from '../../use-cases/detect-features/theme-features-longtail.js';
-import { extractThemeFonts } from '../../use-cases/detect-features/theme-fonts.js';
-import { extractThemeLanguage } from '../../use-cases/detect-features/theme-language.js';
-import { extractTocConfig } from '../../use-cases/detect-features/toc-config.js';
 import { loadMkdocsConfig } from '../../use-cases/load-config/load-mkdocs-config.js';
 import { serializeBiomeConfig } from '../../use-cases/serialize-config/biome-config.js';
 import { serializeContentConfig } from '../../use-cases/serialize-config/content-config.js';
@@ -382,213 +352,39 @@ export async function convertSiteFromDisk(
     yaml: yamlDecoder,
   });
 
-  // Plugin-level diagnostics (for plugins that have no Starlight equivalent
-  // or are deprecated by Material itself). These are emitted once per run,
-  // not per file, and are tagged with `mkdocs.yml` as their source path so
-  // the user can find them in MIGRATION_NOTES.md.
-  const pluginDiagnostics = diagnosePlugins(
-    config.value.plugins,
-    config.value.markdownExtensions,
-  ).map((d) => ({
-    sourcePath: 'mkdocs.yml',
-    diagnostic: d,
-  }));
-  const sectionIndexDiagnostics = sidebarBuilt.value.sectionIndexDiagnostics;
-  const literateNavDiagnostics = sidebarBuilt.value.literateNavDiagnostics;
-  const includeMarkdownAppliedDiagnostic = includeMarkdownEnabled
-    ? [
-        {
-          sourcePath: 'mkdocs.yml',
-          diagnostic: createDiagnostic({
-            severity: 'info' as const,
-            ruleId: 'plugin-include-markdown-applied',
-            source: 'mkdocs-material-to-starlight',
-            message:
-              'mkdocs-include-markdown-plugin: `{% include %}` and `{% include-markdown %}` directives have been resolved inline before per-file conversion.',
-          }),
-        },
-      ]
-    : [];
-
-  const palette = mapMaterialPaletteToStarlight(config.value.theme?.options.palette ?? null);
-  const paletteRaw = config.value.theme?.options.palette;
-  const paletteSpecified = paletteRaw !== undefined && paletteRaw !== null;
-  const paletteDiagnostics = diagnosePalette(palette, paletteSpecified);
-
-  const hookDiagnostics = await diagnoseHooks({
-    projectDir,
-    fs,
-    hookPaths: extractHookPaths(config.value.extras),
-  });
-
-  const themeFeatureDiagnostics = diagnoseThemeFeatures({
-    hasTabsLink,
-    hasNavigationTabs,
-    themeFeatures,
-    copyright: config.value.copyright,
-    repoUrl: config.value.repoUrl,
-    repoName: config.value.repoName,
-    themeOptions: config.value.theme?.options ?? {},
-  });
-
-  // Per-flag info diagnostics for long-tail theme.features entries not covered
-  // by the primary classifier. Each entry gets its own diagnostic with a rich
-  // Starlight-approximation recommendation so users can find each affected flag
-  // in MIGRATION_NOTES.md.
-  const longtailEntries = detectLongtailFeatures(themeFeatures);
-  const longtailDiagnostics: Array<{
-    sourcePath: string;
-    diagnostic: ReturnType<typeof createDiagnostic>;
-  }> = longtailEntries.map((entry) => ({
-    sourcePath: 'mkdocs.yml',
-    diagnostic: createDiagnostic({
-      severity: 'info',
-      ruleId: 'theme-feature-longtail-detected',
-      source: 'mkdocs-material-to-starlight',
-      message: `theme.features \`${entry.flag}\`: ${entry.recommendation}`,
-    }),
-  }));
-
-  // Per-flag/plugin info diagnostics for Material Insiders features. These
-  // run alongside (not instead of) the longtail/diagnose-plugins detectors —
-  // the Insiders rule provides the explicit "this requires a paid Material
-  // subscription" labeling so users can grep MIGRATION_NOTES.md for `insiders`.
-  const insidersEntries = detectInsidersFeatures({
-    themeFeatures,
-    pluginNames: config.value.plugins.map((p) => p.name),
-  });
-  const insidersDiagnostics: Array<{
-    sourcePath: string;
-    diagnostic: ReturnType<typeof createDiagnostic>;
-  }> = insidersEntries.map((entry) => ({
-    sourcePath: 'mkdocs.yml',
-    diagnostic: createDiagnostic({
-      severity: 'info',
-      ruleId: 'material-insiders-feature-detected',
-      source: 'mkdocs-material-to-starlight',
-      message:
-        entry.kind === 'theme-feature'
-          ? `theme.features \`${entry.feature}\`: ${entry.rationale}`
-          : `plugins \`${entry.feature}\`: ${entry.rationale}`,
-    }),
-  }));
-
-  const pythonTagDiagnostics = strippedPythonTags.map((tag) => ({
-    sourcePath: 'mkdocs.yml',
-    diagnostic: createDiagnostic({
-      severity: 'info' as const,
-      ruleId: 'yaml-python-tag-stripped',
-      source: 'mkdocs-material-to-starlight',
-      message: `Python tag stripped from mkdocs.yml: ${tag}`,
-    }),
-  }));
-
-  const expressiveCodeConfig = extractExpressiveCodeConfig(config.value.markdownExtensions);
-  const expressiveCodeDiagnostics = diagnoseExpressiveCode(expressiveCodeConfig);
-
-  const redirects = extractRedirects(config.value.plugins);
-  const i18nFromPlugin = extractI18nConfig(config.value.plugins);
-  const i18nFromAlternate =
-    i18nFromPlugin === null ? extractAlternateLocales(config.value.extras) : null;
-  const themeLanguage =
-    i18nFromPlugin === null && i18nFromAlternate === null
-      ? extractThemeLanguage(config.value.theme?.options ?? {})
-      : undefined;
-  const themeLanguageDiagnostics = diagnoseThemeLanguage(themeLanguage);
-
-  const analytics = mapAnalyticsToHeadEntries(config.value.extras);
-  const analyticsDiagnostics = diagnoseAnalytics(analytics);
-
-  const themeFonts = extractThemeFonts(config.value.theme?.options ?? {});
-  const themeFontsDiagnostics = diagnoseThemeFonts(themeFonts);
-
-  const deferredDiagnostics = buildDeferredWizardDiagnostics(input);
-
-  // Hoisted: needed both by the CSS scanner below and by config serialization.
-  const extraAssets = extractExtraAssets(config.value.extras);
-
-  const bulkOccurrenceDiagnostics = await runBulkScans({
-    docsDir,
-    projectDir,
+  const analysis = await runConfigAnalysis({
+    config: config.value,
     fs,
     dirReader,
+    projectDir,
+    docsDir,
     sourcePaths: sourceListing.value,
-    plugins: config.value.plugins,
-    markdownExtensions: config.value.markdownExtensions,
+    themeFeatures,
     hasTabsLink,
-    extraCssPaths: extraAssets.css,
-    extraJsPaths: extraAssets.js.map((j) => j.src),
+    hasNavigationTabs,
+    includeMarkdownEnabled,
+    strippedPythonTags,
+    autoDiscovery,
+    precomputedDiagnostics: [
+      ...siteResult.value.diagnostics,
+      ...sidebarBuilt.value.sectionIndexDiagnostics,
+      ...sidebarBuilt.value.literateNavDiagnostics,
+    ],
+    deferredInput: input,
   });
-
-  // Surface diagnostics for `extra:` keys with no Starlight equivalent
-  // (consent dialog, lifecycle status dictionary, non-Google analytics
-  // providers). Pure detection — does not affect other branches.
-  const extraWarningDiagnostics = detectExtraWarnings(config.value.extras).map((d) => ({
-    sourcePath: 'mkdocs.yml',
-    diagnostic: d,
-  }));
-
-  // Surface the auto-discovery redirect (when it fired) in the diagnostic
-  // stream so it lands in CI logs and `MIGRATION_NOTES.md` next to every
-  // other config-level finding. Call-site honest: the user who ran the
-  // converter against `<repo>` sees exactly which subdir we picked.
-  const autoDiscoveryDiagnostics =
-    autoDiscovery === null
-      ? []
-      : [
-          {
-            sourcePath: 'mkdocs.yml',
-            diagnostic: createDiagnostic({
-              severity: 'info',
-              ruleId: 'mkdocs-config-auto-discovered',
-              source: 'mkdocs-material-to-starlight',
-              message:
-                `No mkdocs.yml at ${autoDiscovery.fromDir} — auto-discovered ` +
-                `${autoDiscovery.discoveredRelPath} and converted from ${projectDir}. ` +
-                `Pass that path directly on subsequent runs to skip discovery.`,
-            }),
-          },
-        ];
-
-  const allDiagnostics = [
-    ...autoDiscoveryDiagnostics,
-    ...siteResult.value.diagnostics,
-    ...pluginDiagnostics,
-    ...sectionIndexDiagnostics,
-    ...literateNavDiagnostics,
-    ...includeMarkdownAppliedDiagnostic,
-    ...paletteDiagnostics,
-    ...pythonTagDiagnostics,
-    ...themeFeatureDiagnostics,
-    ...extraWarningDiagnostics,
-    ...longtailDiagnostics,
-    ...insidersDiagnostics,
-    ...hookDiagnostics,
-    ...expressiveCodeDiagnostics,
-    ...themeLanguageDiagnostics,
-    ...themeFontsDiagnostics,
-    ...analyticsDiagnostics,
-    ...deferredDiagnostics,
-    ...bulkOccurrenceDiagnostics,
-  ];
-
-  const i18nFromThemeLanguage =
-    themeLanguage === undefined
-      ? null
-      : {
-          defaultLocale: themeLanguage.code,
-          locales: [
-            {
-              code: themeLanguage.code,
-              label: themeLanguage.label,
-              isDefault: true,
-            },
-          ],
-        };
-  const i18n = i18nFromPlugin ?? i18nFromAlternate ?? i18nFromThemeLanguage;
-  const social = extractSocial(config.value.extras);
-  const editLinkBaseUrl = deriveEditLinkBaseUrl(config.value.repoUrl, config.value.editUri);
-  const tableOfContents = extractTocConfig(config.value.markdownExtensions);
+  const allDiagnostics = analysis.allDiagnostics;
+  const {
+    palette,
+    themeFonts,
+    redirects,
+    expressiveCodeConfig,
+    analytics,
+    i18n,
+    social,
+    editLinkBaseUrl,
+    tableOfContents,
+    extraAssets,
+  } = analysis.detected;
   // Split extra CSS into two buckets:
   //   - external URLs (e.g. https://fonts.…/foo.css) pass through to
   //     Starlight `customCss` — Vite leaves the URL alone.
@@ -683,10 +479,11 @@ export async function convertSiteFromDisk(
   });
 
   return ok({
-    // Include site-conversion + auto-discovery + plugin-level diagnostics
-    // so callers see every signal — auto-discovery in particular surfaces
-    // a redirect message when we found mkdocs.yml in a nested folder.
-    diagnostics: [...autoDiscoveryDiagnostics, ...siteResult.value.diagnostics],
+    // The full diagnostic stream now flows through `analysis.allDiagnostics`,
+    // which already includes site-conversion + auto-discovery + plugin-level
+    // diagnostics in the canonical order. Callers see every signal — the
+    // auto-discovery redirect message is the first entry when it fired.
+    diagnostics: allDiagnostics,
     sidebarSource: serializeSidebar(sidebarWithPages),
     astroConfigSource,
     packageJsonSource,
