@@ -34,7 +34,7 @@ Your docs are live on Starlight. Requires Node 20+.
 
 ## Why use this
 
-- **Handles real sites.** Around 860 tests run against fixtures from FastAPI, Pydantic, Polars, httpx, Typer, SQLModel, AWS Nuke, and Privacy Guides. The full pipeline finishes in seconds.
+- **Exercised on real docs.** FastAPI, Pydantic, Polars, httpx, Typer, SQLModel, AWS Nuke, and Privacy Guides are part of the test suite. The full pipeline finishes in seconds.
 - **Maps every Material feature.** Admonitions, tabs, grids, snippets, icons, math, mermaid, i18n, mike versions. Features without a clean Starlight equivalent (Jinja macros, custom theme overrides) become diagnostics with file and line numbers.
 - **Scripts cleanly.** The wizard prints its equivalent unattended command on exit. Drop that command into a CI workflow. Exit codes follow Unix convention.
 - **Idempotent.** Running it twice produces byte-identical output, so reruns do not churn diffs.
@@ -267,7 +267,7 @@ Requires Node 20+.
 
 ```bash
 npm install
-npm test                                      # full suite (~860 tests, <2s)
+npm test                                      # full suite, runs in ~10s
 npm run typecheck                             # tsc --noEmit
 npm run build                                 # emit dist/
 

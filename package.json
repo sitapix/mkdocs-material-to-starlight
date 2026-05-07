@@ -1,7 +1,7 @@
 {
   "name": "mkdocs-material-to-starlight",
   "version": "0.2.0",
-  "description": "Convert MkDocs Material documentation sites to Astro Starlight with isolated, idempotent transforms and built-in MDX/Markdown parse validation.",
+  "description": "Migrate MkDocs Material sites to Astro Starlight in one command. Maps pages, plugins, sidebar, redirects, and i18n; reports anything left over with file:line diagnostics.",
   "type": "module",
   "license": "MIT",
   "author": "sitapix",
