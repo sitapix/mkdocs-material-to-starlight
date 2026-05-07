@@ -39,8 +39,9 @@ describe('runWizard — Tier 0 only (vanilla site)', () => {
     const plan = makePlan();
     const defaults = deriveDefaults(plan.config, { userAgent: undefined, env: {} });
     const prompter = createFakePrompter({
-      // outputDir is now a `path` prompt (clack 1.3+ tab-completing directory picker).
-      path: ['/o'],
+      // outputDir is a `text` prompt — the user can type any path, existing or
+      // not. The downstream pipeline mkdir-recursives it on first write.
+      text: ['/o'],
       confirm: [true],
       // Tier 0 packageManager. The convert/advanced gate is selectKey, not select.
       select: ['npm'],
@@ -49,6 +50,7 @@ describe('runWizard — Tier 0 only (vanilla site)', () => {
 
     const result = await runWizard({
       projectDir: '/p',
+      cwd: '/cwd',
       plan,
       defaults,
       prompter,
@@ -62,12 +64,47 @@ describe('runWizard — Tier 0 only (vanilla site)', () => {
     }
   });
 
+  it('defaults the output-dir prompt to ${cwd}/starlight (idiomatic clack: empty field, dimmed placeholder, defaultValue on bare Enter)', async () => {
+    const plan = makePlan();
+    const defaults = deriveDefaults(plan.config, { userAgent: undefined, env: {} });
+    const prompter = createFakePrompter({
+      // No `text` script entry: the fake returns defaultValue (empty Enter),
+      // exercising the canonical clack init-prompt pattern used by
+      // create-astro / create-svelte.
+      confirm: [true],
+      select: ['npm'],
+      selectKey: ['c'],
+    });
+    const result = await runWizard({
+      projectDir: '/p',
+      cwd: '/Users/me/projects/docs',
+      plan,
+      defaults,
+      prompter,
+    });
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.value.outputDir).toBe('/Users/me/projects/docs/starlight');
+
+    // Contract: the prompt must be `text` so users can type non-existent paths
+    // (the conversion auto-creates them). A `path` prompt would force selecting
+    // an existing directory — wrong shape for the "create new site" workflow.
+    // The default is wired via placeholder + defaultValue (NOT initialValue) so
+    // the field starts empty: the user sees a dimmed suggestion and can either
+    // press Enter to accept or type without backspacing through a pre-fill.
+    const outputDirCall = prompter.calls.find((c) => c.message === 'Output directory');
+    expect(outputDirCall?.kind).toBe('text');
+    expect(outputDirCall?.initialValue).toBeUndefined();
+    expect(outputDirCall?.placeholder).toBe('/Users/me/projects/docs/starlight');
+    expect(outputDirCall?.defaultValue).toBe('/Users/me/projects/docs/starlight');
+  });
+
   it('returns WIZARD_CANCELLED when user cancels at outputDir prompt', async () => {
     const plan = makePlan();
     const defaults = deriveDefaults(plan.config, { userAgent: undefined, env: {} });
-    const prompter = createFakePrompter({ path: [null] });
+    const prompter = createFakePrompter({ text: [null] });
     const result = await runWizard({
       projectDir: '/p',
+      cwd: '/cwd',
       plan,
       defaults,
       prompter,
@@ -80,13 +117,14 @@ describe('runWizard — Tier 0 only (vanilla site)', () => {
     const plan = makePlan();
     const defaults = deriveDefaults(plan.config, { userAgent: undefined, env: {} });
     const prompter = createFakePrompter({
-      path: ['/o'],
+      text: ['/o'],
       confirm: [true],
       select: ['npm'],
       selectKey: [null], // cancel at the gate
     });
     const result = await runWizard({
       projectDir: '/p',
+      cwd: '/cwd',
       plan,
       defaults,
       prompter,
@@ -103,13 +141,14 @@ describe('runWizard — Tier 1 conditional (content.tabs.link → tabs prompt)',
     });
     const defaults = deriveDefaults(plan.config, { userAgent: undefined, env: {} });
     const prompter = createFakePrompter({
-      path: ['/o'],
+      text: ['/o'],
       confirm: [true],
       select: ['npm', 'mdx'],
       selectKey: ['c'],
     });
     const result = await runWizard({
       projectDir: '/p',
+      cwd: '/cwd',
       plan,
       defaults,
       prompter,
@@ -123,13 +162,14 @@ describe('runWizard — Tier 1 conditional (content.tabs.link → tabs prompt)',
     const plan = makePlan();
     const defaults = deriveDefaults(plan.config, { userAgent: undefined, env: {} });
     const prompter = createFakePrompter({
-      path: ['/o'],
+      text: ['/o'],
       confirm: [true],
       select: ['npm'],
       selectKey: ['c'],
     });
     await runWizard({
       projectDir: '/p',
+      cwd: '/cwd',
       plan,
       defaults,
       prompter,
@@ -145,13 +185,14 @@ describe('runWizard — additional Tier 1 prompts', () => {
     });
     const defaults = deriveDefaults(plan.config, { userAgent: undefined, env: {} });
     const prompter = createFakePrompter({
-      path: ['/o'],
+      text: ['/o'],
       confirm: [true, true], // check, sidebar-topics
       select: ['npm'],
       selectKey: ['c'],
     });
     const result = await runWizard({
       projectDir: '/p',
+      cwd: '/cwd',
       plan,
       defaults,
       prompter,
@@ -167,13 +208,14 @@ describe('runWizard — additional Tier 1 prompts', () => {
     const plan = makePlan({ plugins: [{ name: 'rss', options: {} }] });
     const defaults = deriveDefaults(plan.config, { userAgent: undefined, env: {} });
     const prompter = createFakePrompter({
-      path: ['/o'],
+      text: ['/o'],
       confirm: [true, true], // check, rss
       select: ['npm'],
       selectKey: ['c'],
     });
     const result = await runWizard({
       projectDir: '/p',
+      cwd: '/cwd',
       plan,
       defaults,
       prompter,
@@ -190,13 +232,13 @@ describe('runWizard — additional Tier 1 prompts', () => {
     };
     const defaults = deriveDefaults(plan.config, { userAgent: undefined, env: {} });
     const prompter = createFakePrompter({
-      path: ['/o'],
+      text: ['/o'],
       confirm: [true],
       select: ['npm'],
       selectKey: ['c'],
       multiselect: [['en', 'fr']],
     });
-    const result = await runWizard({ plan: planWithLocales, projectDir: '/p', defaults, prompter });
+    const result = await runWizard({ plan: planWithLocales, projectDir: '/p', cwd: '/cwd', defaults, prompter });
     expect(result.ok).toBe(true);
     if (result.ok) expect(result.value.locales).toEqual(['en', 'fr']);
   });
@@ -207,13 +249,13 @@ describe('runWizard — additional Tier 1 prompts', () => {
     const planWithLocales: ConversionPlan = { ...plan, detectedLocales: longList };
     const defaults = deriveDefaults(plan.config, { userAgent: undefined, env: {} });
     const prompter = createFakePrompter({
-      path: ['/o'],
+      text: ['/o'],
       confirm: [true],
       select: ['npm'],
       selectKey: ['c'],
       autocompleteMultiselect: [['en', 'de']],
     });
-    const result = await runWizard({ plan: planWithLocales, projectDir: '/p', defaults, prompter });
+    const result = await runWizard({ plan: planWithLocales, projectDir: '/p', cwd: '/cwd', defaults, prompter });
     expect(result.ok).toBe(true);
     if (result.ok) expect(result.value.locales).toEqual(['en', 'de']);
     expect(prompter.calls.some((c) => c.kind === 'autocompleteMultiselect')).toBe(true);
@@ -225,7 +267,7 @@ describe('runWizard — Tier 2 advanced opt-in', () => {
     const plan = makePlan();
     const defaults = deriveDefaults(plan.config, { userAgent: undefined, env: {} });
     const prompter = createFakePrompter({
-      path: ['/o'],
+      text: ['/o'],
       // Tier 0 check, Tier 2 linksValidator
       confirm: [true, false],
       // Tier 0 packageManager, Tier 2 cards/mdxMode/configFormat
@@ -235,6 +277,7 @@ describe('runWizard — Tier 2 advanced opt-in', () => {
     });
     const result = await runWizard({
       projectDir: '/p',
+      cwd: '/cwd',
       plan,
       defaults,
       prompter,
@@ -262,12 +305,12 @@ describe('runWizard — accessibility / colorblind-friendly UX', () => {
     });
     const defaults = deriveDefaults(plan.config, { userAgent: undefined, env: {} });
     const prompter = createFakePrompter({
-      path: ['/o'],
+      text: ['/o'],
       confirm: [true],
       select: ['npm', 'mdx'],
       selectKey: ['c'],
     });
-    await runWizard({ projectDir: '/p', plan, defaults, prompter });
+    await runWizard({ projectDir: '/p', cwd: '/cwd', plan, defaults, prompter });
     expect(
       prompter.logs.some(
         (l) => l.level === 'step' && l.message.toLowerCase().includes('content.tabs.link'),
@@ -282,7 +325,7 @@ describe('runWizard — accessibility / colorblind-friendly UX', () => {
     const defaults = deriveDefaults(plan.config, { userAgent: undefined, env: {} });
     let observedTabsOptions: ReadonlyArray<{ label: string; hint?: string }> = [];
     const wrapped = createFakePrompter({
-      path: ['/o'],
+      text: ['/o'],
       confirm: [true],
       select: ['npm', 'mdx'],
       selectKey: ['c'],
@@ -300,7 +343,7 @@ describe('runWizard — accessibility / colorblind-friendly UX', () => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       return realSelect(o as any);
     };
-    await runWizard({ projectDir: '/p', plan, defaults, prompter: wrapped });
+    await runWizard({ projectDir: '/p', cwd: '/cwd', plan, defaults, prompter: wrapped });
     const recommended = observedTabsOptions.find((opt) => opt.hint?.includes('recommended'));
     expect(recommended).toBeDefined();
     // And the label itself must NOT contain "(recommended)" inlined.
@@ -315,12 +358,12 @@ describe('runWizard — pre-convert recap', () => {
     const plan = makePlan();
     const defaults = deriveDefaults(plan.config, { userAgent: undefined, env: {} });
     const prompter = createFakePrompter({
-      path: ['/o'],
+      text: ['/o'],
       confirm: [true],
       select: ['npm'],
       selectKey: ['c'],
     });
-    await runWizard({ projectDir: '/p', plan, defaults, prompter });
+    await runWizard({ projectDir: '/p', cwd: '/cwd', plan, defaults, prompter });
 
     // Exactly one note fires, and it precedes the gate's selectKey call.
     expect(prompter.notes.length).toBeGreaterThanOrEqual(1);
@@ -329,8 +372,10 @@ describe('runWizard — pre-convert recap', () => {
     if (recap === undefined) return;
     expect(recap.body).toContain('/p');
     expect(recap.body).toContain('/o');
-    // Title should signal "you're about to convert".
-    expect(recap.title?.toLowerCase()).toMatch(/convert|review|summary/);
+    // Title should signal "this is the recap before the gate fires" — the
+    // exact wording varies by tone pass, but it must reference the user's
+    // decisions or the upcoming convert step.
+    expect(recap.title?.toLowerCase()).toMatch(/convert|review|summary|choices/);
   });
 
   it('recap reflects Tier 1 decisions (tabs strategy when content.tabs.link triggers)', async () => {
@@ -339,12 +384,12 @@ describe('runWizard — pre-convert recap', () => {
     });
     const defaults = deriveDefaults(plan.config, { userAgent: undefined, env: {} });
     const prompter = createFakePrompter({
-      path: ['/o'],
+      text: ['/o'],
       confirm: [true],
       select: ['npm', 'mdx'],
       selectKey: ['c'],
     });
-    await runWizard({ projectDir: '/p', plan, defaults, prompter });
+    await runWizard({ projectDir: '/p', cwd: '/cwd', plan, defaults, prompter });
     const recap = prompter.notes[prompter.notes.length - 1];
     expect(recap).toBeDefined();
     if (recap === undefined) return;
@@ -372,12 +417,12 @@ describe('runWizard — every Tier 1 detection step includes a docs URL', () => 
     });
     const defaults = deriveDefaults(plan.config, { userAgent: undefined, env: {} });
     const prompter = createFakePrompter({
-      path: ['/o'],
+      text: ['/o'],
       confirm: [true],
       select: ['npm', 'mdx'],
       selectKey: ['c'],
     });
-    await runWizard({ projectDir: '/p', plan, defaults, prompter });
+    await runWizard({ projectDir: '/p', cwd: '/cwd', plan, defaults, prompter });
     expectStepHasUrl(prompter.logs, /content\.tabs\.link/i);
   });
 
@@ -387,12 +432,12 @@ describe('runWizard — every Tier 1 detection step includes a docs URL', () => 
     });
     const defaults = deriveDefaults(plan.config, { userAgent: undefined, env: {} });
     const prompter = createFakePrompter({
-      path: ['/o'],
+      text: ['/o'],
       confirm: [true, true],
       select: ['npm'],
       selectKey: ['c'],
     });
-    await runWizard({ projectDir: '/p', plan, defaults, prompter });
+    await runWizard({ projectDir: '/p', cwd: '/cwd', plan, defaults, prompter });
     expectStepHasUrl(prompter.logs, /navigation\.tabs/i);
   });
 
@@ -400,12 +445,12 @@ describe('runWizard — every Tier 1 detection step includes a docs URL', () => 
     const plan = makePlan({ plugins: [{ name: 'rss', options: {} }] });
     const defaults = deriveDefaults(plan.config, { userAgent: undefined, env: {} });
     const prompter = createFakePrompter({
-      path: ['/o'],
+      text: ['/o'],
       confirm: [true, true],
       select: ['npm'],
       selectKey: ['c'],
     });
-    await runWizard({ projectDir: '/p', plan, defaults, prompter });
+    await runWizard({ projectDir: '/p', cwd: '/cwd', plan, defaults, prompter });
     expectStepHasUrl(prompter.logs, /rss plugin/i);
   });
 
@@ -416,13 +461,13 @@ describe('runWizard — every Tier 1 detection step includes a docs URL', () => 
     };
     const defaults = deriveDefaults(plan.config, { userAgent: undefined, env: {} });
     const prompter = createFakePrompter({
-      path: ['/o'],
+      text: ['/o'],
       confirm: [true],
       select: ['npm'],
       selectKey: ['c'],
       multiselect: [['docs/_snippets']],
     });
-    await runWizard({ projectDir: '/p', plan, defaults, prompter });
+    await runWizard({ projectDir: '/p', cwd: '/cwd', plan, defaults, prompter });
     expectStepHasUrl(prompter.logs, /pymdownx\.snippets/i);
   });
 
@@ -433,13 +478,13 @@ describe('runWizard — every Tier 1 detection step includes a docs URL', () => 
     };
     const defaults = deriveDefaults(plan.config, { userAgent: undefined, env: {} });
     const prompter = createFakePrompter({
-      path: ['/o'],
+      text: ['/o'],
       confirm: [true],
       select: ['npm'],
       selectKey: ['c'],
       multiselect: [['en', 'fr']],
     });
-    await runWizard({ projectDir: '/p', plan, defaults, prompter });
+    await runWizard({ projectDir: '/p', cwd: '/cwd', plan, defaults, prompter });
     expectStepHasUrl(prompter.logs, /i18n plugin/i);
   });
 
@@ -447,13 +492,12 @@ describe('runWizard — every Tier 1 detection step includes a docs URL', () => 
     const plan = makePlan({ plugins: [{ name: 'mike', options: {} }] });
     const defaults = deriveDefaults(plan.config, { userAgent: undefined, env: {} });
     const prompter = createFakePrompter({
-      path: ['/o'],
+      text: ['/o', 'v1,v2,latest'],
       confirm: [true],
       select: ['npm'],
       selectKey: ['c'],
-      text: ['v1,v2,latest'],
     });
-    await runWizard({ projectDir: '/p', plan, defaults, prompter });
+    await runWizard({ projectDir: '/p', cwd: '/cwd', plan, defaults, prompter });
     expectStepHasUrl(prompter.logs, /mike/i);
   });
 
@@ -466,12 +510,12 @@ describe('runWizard — every Tier 1 detection step includes a docs URL', () => 
     });
     const defaults = deriveDefaults(plan.config, { userAgent: undefined, env: {} });
     const prompter = createFakePrompter({
-      path: ['/o'],
+      text: ['/o'],
       confirm: [true],
       select: ['npm', 'translate'],
       selectKey: ['c'],
     });
-    await runWizard({ projectDir: '/p', plan, defaults, prompter });
+    await runWizard({ projectDir: '/p', cwd: '/cwd', plan, defaults, prompter });
     expectStepHasUrl(prompter.logs, /theme\.palette/i);
   });
 
@@ -482,13 +526,13 @@ describe('runWizard — every Tier 1 detection step includes a docs URL', () => 
     };
     const defaults = deriveDefaults(plan.config, { userAgent: undefined, env: {} });
     const prompter = createFakePrompter({
-      path: ['/o'],
+      text: ['/o'],
       confirm: [true],
       select: ['npm'],
       selectKey: ['c'],
       multiselect: [['custom.css']],
     });
-    await runWizard({ projectDir: '/p', plan, defaults, prompter });
+    await runWizard({ projectDir: '/p', cwd: '/cwd', plan, defaults, prompter });
     expectStepHasUrl(prompter.logs, /extra css\/js asset/i);
   });
 });
@@ -498,10 +542,10 @@ describe('runWizard — Tier 0 cancellation paths', () => {
     const plan = makePlan();
     const defaults = deriveDefaults(plan.config, { userAgent: undefined, env: {} });
     const prompter = createFakePrompter({
-      path: ['/o'],
+      text: ['/o'],
       select: [null],
     });
-    const result = await runWizard({ projectDir: '/p', plan, defaults, prompter });
+    const result = await runWizard({ projectDir: '/p', cwd: '/cwd', plan, defaults, prompter });
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.error).toBe(WIZARD_CANCELLED);
   });
@@ -510,11 +554,11 @@ describe('runWizard — Tier 0 cancellation paths', () => {
     const plan = makePlan();
     const defaults = deriveDefaults(plan.config, { userAgent: undefined, env: {} });
     const prompter = createFakePrompter({
-      path: ['/o'],
+      text: ['/o'],
       select: ['npm'],
       confirm: [null],
     });
-    const result = await runWizard({ projectDir: '/p', plan, defaults, prompter });
+    const result = await runWizard({ projectDir: '/p', cwd: '/cwd', plan, defaults, prompter });
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.error).toBe(WIZARD_CANCELLED);
   });
@@ -527,11 +571,11 @@ describe('runWizard — Tier 1 cancellation paths', () => {
     });
     const defaults = deriveDefaults(plan.config, { userAgent: undefined, env: {} });
     const prompter = createFakePrompter({
-      path: ['/o'],
+      text: ['/o'],
       confirm: [true],
       select: ['npm', null],
     });
-    const result = await runWizard({ projectDir: '/p', plan, defaults, prompter });
+    const result = await runWizard({ projectDir: '/p', cwd: '/cwd', plan, defaults, prompter });
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.error).toBe(WIZARD_CANCELLED);
   });
@@ -542,11 +586,11 @@ describe('runWizard — Tier 1 cancellation paths', () => {
     });
     const defaults = deriveDefaults(plan.config, { userAgent: undefined, env: {} });
     const prompter = createFakePrompter({
-      path: ['/o'],
+      text: ['/o'],
       confirm: [true, null],
       select: ['npm'],
     });
-    const result = await runWizard({ projectDir: '/p', plan, defaults, prompter });
+    const result = await runWizard({ projectDir: '/p', cwd: '/cwd', plan, defaults, prompter });
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.error).toBe(WIZARD_CANCELLED);
   });
@@ -558,12 +602,12 @@ describe('runWizard — Tier 1 cancellation paths', () => {
     };
     const defaults = deriveDefaults(plan.config, { userAgent: undefined, env: {} });
     const prompter = createFakePrompter({
-      path: ['/o'],
+      text: ['/o'],
       confirm: [true],
       select: ['npm'],
       multiselect: [null],
     });
-    const result = await runWizard({ projectDir: '/p', plan, defaults, prompter });
+    const result = await runWizard({ projectDir: '/p', cwd: '/cwd', plan, defaults, prompter });
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.error).toBe(WIZARD_CANCELLED);
   });
@@ -572,11 +616,11 @@ describe('runWizard — Tier 1 cancellation paths', () => {
     const plan = makePlan({ plugins: [{ name: 'rss', options: {} }] });
     const defaults = deriveDefaults(plan.config, { userAgent: undefined, env: {} });
     const prompter = createFakePrompter({
-      path: ['/o'],
+      text: ['/o'],
       confirm: [true, null],
       select: ['npm'],
     });
-    const result = await runWizard({ projectDir: '/p', plan, defaults, prompter });
+    const result = await runWizard({ projectDir: '/p', cwd: '/cwd', plan, defaults, prompter });
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.error).toBe(WIZARD_CANCELLED);
   });
@@ -588,12 +632,12 @@ describe('runWizard — Tier 1 cancellation paths', () => {
     };
     const defaults = deriveDefaults(plan.config, { userAgent: undefined, env: {} });
     const prompter = createFakePrompter({
-      path: ['/o'],
+      text: ['/o'],
       confirm: [true],
       select: ['npm'],
       multiselect: [null],
     });
-    const result = await runWizard({ projectDir: '/p', plan, defaults, prompter });
+    const result = await runWizard({ projectDir: '/p', cwd: '/cwd', plan, defaults, prompter });
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.error).toBe(WIZARD_CANCELLED);
   });
@@ -605,12 +649,12 @@ describe('runWizard — Tier 1 cancellation paths', () => {
     };
     const defaults = deriveDefaults(plan.config, { userAgent: undefined, env: {} });
     const prompter = createFakePrompter({
-      path: ['/o'],
+      text: ['/o'],
       confirm: [true],
       select: ['npm'],
       autocompleteMultiselect: [null],
     });
-    const result = await runWizard({ projectDir: '/p', plan, defaults, prompter });
+    const result = await runWizard({ projectDir: '/p', cwd: '/cwd', plan, defaults, prompter });
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.error).toBe(WIZARD_CANCELLED);
   });
@@ -619,12 +663,11 @@ describe('runWizard — Tier 1 cancellation paths', () => {
     const plan = makePlan({ plugins: [{ name: 'mike', options: {} }] });
     const defaults = deriveDefaults(plan.config, { userAgent: undefined, env: {} });
     const prompter = createFakePrompter({
-      path: ['/o'],
+      text: ['/o', null],
       confirm: [true],
       select: ['npm'],
-      text: [null],
     });
-    const result = await runWizard({ projectDir: '/p', plan, defaults, prompter });
+    const result = await runWizard({ projectDir: '/p', cwd: '/cwd', plan, defaults, prompter });
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.error).toBe(WIZARD_CANCELLED);
   });
@@ -638,11 +681,11 @@ describe('runWizard — Tier 1 cancellation paths', () => {
     });
     const defaults = deriveDefaults(plan.config, { userAgent: undefined, env: {} });
     const prompter = createFakePrompter({
-      path: ['/o'],
+      text: ['/o'],
       confirm: [true],
       select: ['npm', null],
     });
-    const result = await runWizard({ projectDir: '/p', plan, defaults, prompter });
+    const result = await runWizard({ projectDir: '/p', cwd: '/cwd', plan, defaults, prompter });
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.error).toBe(WIZARD_CANCELLED);
   });
@@ -654,12 +697,12 @@ describe('runWizard — Tier 1 cancellation paths', () => {
     };
     const defaults = deriveDefaults(plan.config, { userAgent: undefined, env: {} });
     const prompter = createFakePrompter({
-      path: ['/o'],
+      text: ['/o'],
       confirm: [true],
       select: ['npm'],
       multiselect: [null],
     });
-    const result = await runWizard({ projectDir: '/p', plan, defaults, prompter });
+    const result = await runWizard({ projectDir: '/p', cwd: '/cwd', plan, defaults, prompter });
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.error).toBe(WIZARD_CANCELLED);
   });
@@ -672,12 +715,12 @@ describe('runWizard — Tier 1 cancellation paths', () => {
     };
     const defaults = deriveDefaults(plan.config, { userAgent: undefined, env: {} });
     const prompter = createFakePrompter({
-      path: ['/o'],
+      text: ['/o'],
       confirm: [true],
       select: ['npm'],
       autocompleteMultiselect: [null],
     });
-    const result = await runWizard({ projectDir: '/p', plan, defaults, prompter });
+    const result = await runWizard({ projectDir: '/p', cwd: '/cwd', plan, defaults, prompter });
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.error).toBe(WIZARD_CANCELLED);
   });
@@ -691,13 +734,13 @@ describe('runWizard — Tier 1 snippets path', () => {
     };
     const defaults = deriveDefaults(plan.config, { userAgent: undefined, env: {} });
     const prompter = createFakePrompter({
-      path: ['/o'],
+      text: ['/o'],
       confirm: [true],
       select: ['npm'],
       selectKey: ['c'],
       multiselect: [['docs/_snippets']],
     });
-    const result = await runWizard({ projectDir: '/p', plan, defaults, prompter });
+    const result = await runWizard({ projectDir: '/p', cwd: '/cwd', plan, defaults, prompter });
     expect(result.ok).toBe(true);
     if (result.ok) expect(result.value.snippetBasePaths).toEqual(['docs/_snippets']);
   });
@@ -709,12 +752,12 @@ describe('runWizard — Tier 1 snippets path', () => {
     };
     const defaults = deriveDefaults(plan.config, { userAgent: undefined, env: {} });
     const prompter = createFakePrompter({
-      path: ['/o'],
+      text: ['/o'],
       confirm: [true],
       select: ['npm'],
       selectKey: ['c'],
     });
-    const result = await runWizard({ projectDir: '/p', plan, defaults, prompter });
+    const result = await runWizard({ projectDir: '/p', cwd: '/cwd', plan, defaults, prompter });
     expect(result.ok).toBe(true);
     expect(prompter.calls.some((c) => c.kind === 'multiselect')).toBe(false);
   });
@@ -723,12 +766,12 @@ describe('runWizard — Tier 1 snippets path', () => {
     const plan = makePlan();
     const defaults = deriveDefaults(plan.config, { userAgent: undefined, env: {} });
     const prompter = createFakePrompter({
-      path: ['/o'],
+      text: ['/o'],
       confirm: [true],
       select: ['npm'],
       selectKey: ['c'],
     });
-    await runWizard({ projectDir: '/p', plan, defaults, prompter });
+    await runWizard({ projectDir: '/p', cwd: '/cwd', plan, defaults, prompter });
     expect(prompter.calls.some((c) => c.message.toLowerCase().includes('snippet'))).toBe(false);
   });
 });
@@ -738,13 +781,12 @@ describe('runWizard — Tier 1 mike path', () => {
     const plan = makePlan({ plugins: [{ name: 'mike', options: {} }] });
     const defaults = deriveDefaults(plan.config, { userAgent: undefined, env: {} });
     const prompter = createFakePrompter({
-      path: ['/o'],
+      text: ['/o', ' v1, v2 ,  ,latest '],
       confirm: [true],
       select: ['npm'],
       selectKey: ['c'],
-      text: [' v1, v2 ,  ,latest '],
     });
-    const result = await runWizard({ projectDir: '/p', plan, defaults, prompter });
+    const result = await runWizard({ projectDir: '/p', cwd: '/cwd', plan, defaults, prompter });
     expect(result.ok).toBe(true);
     if (result.ok) expect(result.value.mikeVersions).toEqual(['v1', 'v2', 'latest']);
   });
@@ -753,13 +795,12 @@ describe('runWizard — Tier 1 mike path', () => {
     const plan = makePlan({ plugins: [{ name: 'mike', options: {} }] });
     const defaults = deriveDefaults(plan.config, { userAgent: undefined, env: {} });
     const prompter = createFakePrompter({
-      path: ['/o'],
+      text: ['/o', ''],
       confirm: [true],
       select: ['npm'],
       selectKey: ['c'],
-      text: [''],
     });
-    const result = await runWizard({ projectDir: '/p', plan, defaults, prompter });
+    const result = await runWizard({ projectDir: '/p', cwd: '/cwd', plan, defaults, prompter });
     expect(result.ok).toBe(true);
     if (result.ok) expect(result.value.mikeVersions).toEqual([]);
   });
@@ -780,12 +821,12 @@ describe('runWizard — Tier 1 palette path', () => {
       const plan = paletteOnlyPlan();
       const defaults = deriveDefaults(plan.config, { userAgent: undefined, env: {} });
       const prompter = createFakePrompter({
-        path: ['/o'],
+        text: ['/o'],
         confirm: [true],
         select: ['npm', choice],
         selectKey: ['c'],
       });
-      const result = await runWizard({ projectDir: '/p', plan, defaults, prompter });
+      const result = await runWizard({ projectDir: '/p', cwd: '/cwd', plan, defaults, prompter });
       expect(result.ok).toBe(true);
       if (result.ok) expect(result.value.palette).toBe(choice);
     });
@@ -801,13 +842,13 @@ describe('runWizard — Tier 1 extra-assets path', () => {
     };
     const defaults = deriveDefaults(plan.config, { userAgent: undefined, env: {} });
     const prompter = createFakePrompter({
-      path: ['/o'],
+      text: ['/o'],
       confirm: [true],
       select: ['npm'],
       selectKey: ['c'],
       multiselect: [['a.css', 'c.css']],
     });
-    const result = await runWizard({ projectDir: '/p', plan, defaults, prompter });
+    const result = await runWizard({ projectDir: '/p', cwd: '/cwd', plan, defaults, prompter });
     expect(result.ok).toBe(true);
     if (result.ok) expect(result.value.extraAssets).toEqual(['a.css', 'c.css']);
     expect(prompter.calls.some((c) => c.kind === 'autocompleteMultiselect')).toBe(false);
@@ -821,13 +862,13 @@ describe('runWizard — Tier 1 extra-assets path', () => {
     };
     const defaults = deriveDefaults(plan.config, { userAgent: undefined, env: {} });
     const prompter = createFakePrompter({
-      path: ['/o'],
+      text: ['/o'],
       confirm: [true],
       select: ['npm'],
       selectKey: ['c'],
       autocompleteMultiselect: [['asset0.css', 'asset1.css']],
     });
-    const result = await runWizard({ projectDir: '/p', plan, defaults, prompter });
+    const result = await runWizard({ projectDir: '/p', cwd: '/cwd', plan, defaults, prompter });
     expect(result.ok).toBe(true);
     if (result.ok) expect(result.value.extraAssets).toEqual(['asset0.css', 'asset1.css']);
   });
@@ -836,12 +877,12 @@ describe('runWizard — Tier 1 extra-assets path', () => {
     const plan = makePlan({ extras: { extra_css: [] } });
     const defaults = deriveDefaults(plan.config, { userAgent: undefined, env: {} });
     const prompter = createFakePrompter({
-      path: ['/o'],
+      text: ['/o'],
       confirm: [true],
       select: ['npm'],
       selectKey: ['c'],
     });
-    await runWizard({ projectDir: '/p', plan, defaults, prompter });
+    await runWizard({ projectDir: '/p', cwd: '/cwd', plan, defaults, prompter });
     expect(prompter.calls.some((c) => c.message.toLowerCase().includes('extra'))).toBe(false);
   });
 });
@@ -851,12 +892,12 @@ describe('runWizard — Tier 1 i18n no-locale edge case', () => {
     const plan = makePlan({ plugins: [{ name: 'i18n', options: {} }] });
     const defaults = deriveDefaults(plan.config, { userAgent: undefined, env: {} });
     const prompter = createFakePrompter({
-      path: ['/o'],
+      text: ['/o'],
       confirm: [true],
       select: ['npm'],
       selectKey: ['c'],
     });
-    await runWizard({ projectDir: '/p', plan, defaults, prompter });
+    await runWizard({ projectDir: '/p', cwd: '/cwd', plan, defaults, prompter });
     expect(prompter.calls.some((c) => c.message.toLowerCase().includes('locale'))).toBe(false);
   });
 });
@@ -866,12 +907,12 @@ describe('runWizard — Tier 2 cancellation paths', () => {
     const plan = makePlan();
     const defaults = deriveDefaults(plan.config, { userAgent: undefined, env: {} });
     const prompter = createFakePrompter({
-      path: ['/o'],
+      text: ['/o'],
       confirm: [true, null],
       select: ['npm'],
       selectKey: ['a'],
     });
-    const result = await runWizard({ projectDir: '/p', plan, defaults, prompter });
+    const result = await runWizard({ projectDir: '/p', cwd: '/cwd', plan, defaults, prompter });
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.error).toBe(WIZARD_CANCELLED);
   });
@@ -880,12 +921,12 @@ describe('runWizard — Tier 2 cancellation paths', () => {
     const plan = makePlan();
     const defaults = deriveDefaults(plan.config, { userAgent: undefined, env: {} });
     const prompter = createFakePrompter({
-      path: ['/o'],
+      text: ['/o'],
       confirm: [true, false],
       select: ['npm', null],
       selectKey: ['a'],
     });
-    const result = await runWizard({ projectDir: '/p', plan, defaults, prompter });
+    const result = await runWizard({ projectDir: '/p', cwd: '/cwd', plan, defaults, prompter });
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.error).toBe(WIZARD_CANCELLED);
   });
@@ -894,12 +935,12 @@ describe('runWizard — Tier 2 cancellation paths', () => {
     const plan = makePlan();
     const defaults = deriveDefaults(plan.config, { userAgent: undefined, env: {} });
     const prompter = createFakePrompter({
-      path: ['/o'],
+      text: ['/o'],
       confirm: [true, false],
       select: ['npm', 'html', null],
       selectKey: ['a'],
     });
-    const result = await runWizard({ projectDir: '/p', plan, defaults, prompter });
+    const result = await runWizard({ projectDir: '/p', cwd: '/cwd', plan, defaults, prompter });
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.error).toBe(WIZARD_CANCELLED);
   });
@@ -908,12 +949,12 @@ describe('runWizard — Tier 2 cancellation paths', () => {
     const plan = makePlan();
     const defaults = deriveDefaults(plan.config, { userAgent: undefined, env: {} });
     const prompter = createFakePrompter({
-      path: ['/o'],
+      text: ['/o'],
       confirm: [true, false],
       select: ['npm', 'html', 'auto', null],
       selectKey: ['a'],
     });
-    const result = await runWizard({ projectDir: '/p', plan, defaults, prompter });
+    const result = await runWizard({ projectDir: '/p', cwd: '/cwd', plan, defaults, prompter });
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.error).toBe(WIZARD_CANCELLED);
   });

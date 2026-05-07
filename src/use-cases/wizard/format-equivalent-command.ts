@@ -14,13 +14,23 @@
 
 const SINGLE_LINE_LIMIT = 80;
 
+export interface EquivalentCommandHighlighter {
+  /** Decorator for the binary name (first token). */
+  readonly binary?: (text: string) => string;
+}
+
 export function formatEquivalentCommand(
   argv: ReadonlyArray<string>,
   binaryName = 'mkdocs-material-to-starlight',
+  highlighter: EquivalentCommandHighlighter = {},
 ): string {
-  const tokens = [binaryName, ...argv];
-  const single = tokens.join(' ');
-  if (single.length <= SINGLE_LINE_LIMIT) return single;
+  const decoratedBinary = (highlighter.binary ?? identity)(binaryName);
+  // Wrap-decision uses the *plain* binary length so ANSI escapes don't push
+  // a one-liner over the threshold and force a multi-line render.
+  const plainTokens = [binaryName, ...argv];
+  const plainSingle = plainTokens.join(' ');
+  const tokens = [decoratedBinary, ...argv];
+  if (plainSingle.length <= SINGLE_LINE_LIMIT) return tokens.join(' ');
   return tokens
     .map((tok, i) => {
       if (i === 0) return `${tok} \\`;
@@ -28,4 +38,8 @@ export function formatEquivalentCommand(
       return `  ${tok} \\`;
     })
     .join('\n');
+}
+
+function identity(text: string): string {
+  return text;
 }

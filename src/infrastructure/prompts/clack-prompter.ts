@@ -85,6 +85,9 @@ export function createClackPrompter(): Prompter {
       if (o.placeholder !== undefined) {
         clackOptions.placeholder = o.placeholder;
       }
+      if (o.defaultValue !== undefined) {
+        clackOptions.defaultValue = o.defaultValue;
+      }
       if (o.validate !== undefined) {
         const validate = o.validate;
         clackOptions.validate = (value: string | undefined) => validate(value ?? '');
@@ -198,6 +201,14 @@ export function createClackPrompter(): Prompter {
         stop: (text?: string) => s.stop(text),
         error: (text?: string) => s.error(text),
       };
+    },
+    // Picocolors auto-honors NO_COLOR and disables on non-TTY, so these
+    // decorators degrade to identity in CI / pipes / color-blind setups.
+    highlight: {
+      name: (text: string) => pc.bold(pc.cyan(text)),
+      url: (text: string) => pc.cyan(pc.underline(text)),
+      value: (text: string) => pc.bold(text),
+      count: (text: string) => pc.bold(text),
     },
   };
 }

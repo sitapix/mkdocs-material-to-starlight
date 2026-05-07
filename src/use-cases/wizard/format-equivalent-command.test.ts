@@ -59,4 +59,18 @@ describe('formatEquivalentCommand', () => {
     const out = formatEquivalentCommand(['./p', './o'], 'my-cli');
     expect(out).toMatch(/^my-cli/);
   });
+
+  it('applies an optional binary highlighter so the command itself can pop in a TTY', () => {
+    const out = formatEquivalentCommand(['./p', './o'], 'my-cli', {
+      binary: (s) => `<<${s}>>`,
+    });
+    expect(out).toContain('<<my-cli>>');
+    expect(out).toContain('./p');
+    expect(out).not.toContain('<<./p>>');
+  });
+
+  it('falls back to identity when no highlighter is provided', () => {
+    const out = formatEquivalentCommand(['./p', './o'], 'my-cli');
+    expect(out).not.toContain('<<');
+  });
 });

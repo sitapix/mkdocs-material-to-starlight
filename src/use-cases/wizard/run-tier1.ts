@@ -36,7 +36,10 @@ const MULTISELECT_AUTOCOMPLETE_THRESHOLD = 8;
 const MIKE_VERSION_PATTERN = /^[A-Za-z0-9._-]+$/;
 
 function step(prompter: Prompter, label: string, trigger: Tier1Trigger): void {
-  prompter.log.step(`Detected: ${label}. Learn more: ${tier1DocsUrl(trigger)}`);
+  const url = tier1DocsUrl(trigger);
+  prompter.log.step(
+    `Detected: ${prompter.highlight.name(label)}. Learn more: ${prompter.highlight.url(url)}`,
+  );
 }
 
 export async function runTier1(

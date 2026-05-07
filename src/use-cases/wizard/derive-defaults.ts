@@ -10,6 +10,7 @@
  * `--yes` on a fresh install equals "what we shipped before this wizard."
  */
 
+import { join } from 'node:path';
 import type { MkdocsConfig } from '../../domain/config/mkdocs-config.js';
 import type { DefaultAnswers, PackageManager } from '../../domain/wizard/answers.js';
 
@@ -57,10 +58,17 @@ export function guessPackageManager(userAgent: string | undefined): PackageManag
   return 'npm';
 }
 
-export function deriveOutputDirName(siteName: string): string {
-  const slug = siteName
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '');
-  return `./${slug || 'starlight-docs'}-starlight`;
+/**
+ * Default output directory for the wizard's first prompt: a `starlight`
+ * folder right next to wherever the user ran the CLI.
+ *
+ * Pure: takes the cwd as a parameter so the function is trivially testable.
+ * The interface layer (`wizard-runner.ts`) owns reading `process.cwd()`.
+ *
+ * The result is intentionally absolute (when the cwd is absolute) so the
+ * prompt shows the user the full destination — no surprise about where
+ * `./starlight` resolves relative to.
+ */
+export function deriveOutputDirName(cwd: string): string {
+  return join(cwd, 'starlight');
 }

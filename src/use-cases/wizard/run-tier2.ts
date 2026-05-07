@@ -20,7 +20,7 @@ export async function runTier2(
   defaults: DefaultAnswers,
 ): Promise<Result<Partial<WizardAnswers>, WizardCancelled>> {
   prompter.log.info(
-    'Advanced options below. Anything not asked here is reachable via CLI flags — see --help.',
+    'Advanced options below. Anything not asked here is reachable via CLI flags. See --help.',
   );
 
   const linksValidator = await prompter.confirm({

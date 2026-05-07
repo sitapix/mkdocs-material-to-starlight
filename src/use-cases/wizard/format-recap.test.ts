@@ -92,3 +92,28 @@ describe('formatRecap — output is human-scannable', () => {
     expect(lines.length).toBeGreaterThanOrEqual(4);
   });
 });
+
+describe('formatRecap — highlighter', () => {
+  it('applies the value highlighter to user-chosen values, not labels', () => {
+    const text = formatRecap(
+      recapWith({
+        tier0: { ...baseTier0, packageManager: 'pnpm', check: false },
+        tier1: { tabs: 'mdx' },
+      }),
+      { value: (s) => `<<${s}>>` },
+    );
+    // Labels (`from:`, `to:`, `package manager:`, `tabs:`) stay plain so the
+    // prompt rail is scannable; only the chosen values are wrapped.
+    expect(text).toContain('from: <</abs/project>>');
+    expect(text).toContain('to:   <<./my-docs-starlight>>');
+    expect(text).toContain('package manager: <<pnpm>>');
+    expect(text).toContain('tabs: <<mdx>>');
+    expect(text).not.toContain('<<from:');
+  });
+
+  it('defaults to identity when no highlighter is provided (plain output)', () => {
+    const text = formatRecap(recapWith({ tier1: { tabs: 'mdx' } }));
+    expect(text).toContain('tabs: mdx');
+    expect(text).not.toContain('<<');
+  });
+});

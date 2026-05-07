@@ -45,6 +45,20 @@ export interface MappingRow {
   readonly materialInput: string;
   /** Required PyMdown / Python-Markdown extensions for the input to occur. */
   readonly requiredExtensions: ReadonlyArray<string>;
+  /**
+   * Required mkdocs.yml `plugins:` entries (matched by name) for this row to
+   * fire. Empty/omitted means "not gated on plugins". Used so plugin-* rows
+   * (e.g. `plugin-privacy`, `plugin-charts`) only surface when the user
+   * actually has that plugin configured.
+   */
+  readonly requiredPlugins?: ReadonlyArray<string>;
+  /**
+   * Required keys inside `theme.options` (typically `custom_dir`) for this row
+   * to fire. Used for partial-override-driven features that have no plugin or
+   * extension trigger (e.g. `comment-system`, which lives in
+   * `overrides/partials/comments.html`).
+   */
+  readonly requiredThemeOptions?: ReadonlyArray<string>;
   /** Human-readable description of the Starlight output. */
   readonly starlightOutput: string;
   /** Output file extension required for this transform's emit. */
@@ -302,6 +316,7 @@ const TABLE: ReadonlyArray<MappingRow> = [
     featureId: 'plugin-glightbox',
     materialInput: 'mkdocs.yml plugins: [glightbox] (image lightbox plugin)',
     requiredExtensions: [],
+    requiredPlugins: ['glightbox'],
     starlightOutput: 'starlight-image-zoom Starlight plugin auto-wired in astro.config.mjs',
     fileExt: 'md',
     conversionType: 'recommended-dep',
@@ -311,6 +326,7 @@ const TABLE: ReadonlyArray<MappingRow> = [
     featureId: 'plugin-mike',
     materialInput: 'mkdocs.yml plugins: [mike] (versioning plugin)',
     requiredExtensions: [],
+    requiredPlugins: ['mike'],
     starlightOutput:
       'starlight-versions Starlight plugin auto-wired (versions list left as a stub); starlight-changelogs companion package added to package.json deps so users can publish release notes alongside the version switcher',
     fileExt: 'md',
@@ -417,6 +433,7 @@ const TABLE: ReadonlyArray<MappingRow> = [
     featureId: 'plugin-blog',
     materialInput: 'Material `blog` plugin in mkdocs.yml',
     requiredExtensions: [],
+    requiredPlugins: ['blog'],
     starlightOutput: 'starlight-blog community plugin added to package.json + astro.config.mjs',
     fileExt: 'md',
     conversionType: 'recommended-dep',
@@ -426,6 +443,7 @@ const TABLE: ReadonlyArray<MappingRow> = [
     featureId: 'plugin-tags',
     materialInput: 'Material `tags` plugin in mkdocs.yml',
     requiredExtensions: [],
+    requiredPlugins: ['tags'],
     starlightOutput: 'starlight-tags community plugin added to package.json + astro.config.mjs',
     fileExt: 'md',
     conversionType: 'recommended-dep',
@@ -445,6 +463,7 @@ const TABLE: ReadonlyArray<MappingRow> = [
     featureId: 'plugin-redirects',
     materialInput: 'mkdocs-redirects plugin with redirect_maps in mkdocs.yml',
     requiredExtensions: [],
+    requiredPlugins: ['redirects'],
     starlightOutput:
       'top-level `redirects: { ... }` block in astro.config.mjs; .md suffix stripped, /index collapsed, external URLs preserved',
     fileExt: 'md',
@@ -455,6 +474,7 @@ const TABLE: ReadonlyArray<MappingRow> = [
     featureId: 'plugin-last-updated',
     materialInput: 'mkdocs-git-revision-date-localized plugin in mkdocs.yml',
     requiredExtensions: [],
+    requiredPlugins: ['git-revision-date-localized'],
     starlightOutput: 'Starlight `lastUpdated: true` config flag (built-in, reads git history)',
     fileExt: 'md',
     conversionType: 'recommended-dep',
@@ -464,6 +484,7 @@ const TABLE: ReadonlyArray<MappingRow> = [
     featureId: 'plugin-i18n-rename',
     materialInput: 'mkdocs-static-i18n filename suffix layout (page.fr.md, guides/intro.de.md)',
     requiredExtensions: [],
+    requiredPlugins: ['i18n'],
     starlightOutput:
       'Starlight directory-prefix i18n layout (fr/page.md, de/guides/intro.md); locale codes preserved including regional variants (zh-CN, pt-BR)',
     fileExt: 'md',
@@ -485,6 +506,7 @@ const TABLE: ReadonlyArray<MappingRow> = [
     featureId: 'plugin-rss',
     materialInput: 'mkdocs-rss-plugin in mkdocs.yml (per-page RSS/Atom feed)',
     requiredExtensions: [],
+    requiredPlugins: ['rss'],
     starlightOutput:
       '@astrojs/rss dependency + src/pages/rss.xml.ts endpoint scaffold using getCollection("docs"); site, title, description sourced from mkdocs.yml',
     fileExt: 'md',
@@ -539,6 +561,7 @@ const TABLE: ReadonlyArray<MappingRow> = [
     materialInput:
       'mkdocs.yml `plugins: privacy` (Material privacy plugin — fetches and inlines external assets at build time, including Google Fonts and external images)',
     requiredExtensions: [],
+    requiredPlugins: ['privacy'],
     starlightOutput:
       'no automatic conversion — Astro has no equivalent build-time external-asset rewriter; diagnostic surfaces the manual remediation path (use @fontsource for fonts, copy external images into src/assets/, or write an integration that mirrors privacy-plugin behavior)',
     fileExt: 'md',
@@ -562,6 +585,7 @@ const TABLE: ReadonlyArray<MappingRow> = [
     featureId: 'plugin-search',
     materialInput: 'mkdocs.yml `plugins: search` (default Material/MkDocs Lunr-based search)',
     requiredExtensions: [],
+    requiredPlugins: ['search'],
     starlightOutput:
       'no-op — Starlight ships Pagefind-based search built-in. lunr-specific `search.lang`, `search.separator`, `search.pipeline` options are dropped with a diagnostic; users wanting custom tokenization configure Pagefind via the starlight `pagefind` config key',
     fileExt: 'md',
@@ -585,6 +609,7 @@ const TABLE: ReadonlyArray<MappingRow> = [
     materialInput:
       'mkdocs.yml `plugins: social` (Material social-cards plugin — generates Open Graph card PNGs at build using Pillow + Cairo)',
     requiredExtensions: [],
+    requiredPlugins: ['social'],
     starlightOutput:
       'no automatic conversion — recommended dep `astro-og-canvas` (or `@astrojs/og`) added to package.json with a stub `src/pages/og/[...slug].png.ts` endpoint; per-card layout, fonts, and color overrides are not auto-mapped from the Material `social.cards_layout_options` block',
     fileExt: 'md',
@@ -620,6 +645,7 @@ const TABLE: ReadonlyArray<MappingRow> = [
     materialInput:
       'Material partial override (overrides/main.html or overrides/partials/comments.html) embedding Giscus, Disqus, or Utterances script tags — not a single config knob',
     requiredExtensions: [],
+    requiredThemeOptions: ['custom_dir'],
     starlightOutput:
       'no automatic conversion — recommendation surfaced as a diagnostic to install `starlight-giscus` (or write a `Comments.astro` component override); the partial-override HTML itself is left in the project for manual porting',
     fileExt: 'md',
@@ -632,6 +658,7 @@ const TABLE: ReadonlyArray<MappingRow> = [
     materialInput:
       'mkdocs.yml `plugins: optimize` (Material optimize plugin — minifies HTML/CSS/JS and recompresses images at build)',
     requiredExtensions: [],
+    requiredPlugins: ['optimize'],
     starlightOutput:
       "no-op — Astro's build pipeline already minifies HTML/CSS/JS, fingerprints assets, and supports image optimization via `astro:assets`. Diagnostic confirms the plugin was detected and replaced by built-ins; per-asset `optimize.cache_dir` and concurrency knobs are dropped",
     fileExt: 'md',
@@ -643,6 +670,7 @@ const TABLE: ReadonlyArray<MappingRow> = [
     materialInput:
       'mkdocs.yml `plugins: offline` (Material offline-bundle plugin — single-file site for filesystem viewing)',
     requiredExtensions: [],
+    requiredPlugins: ['offline'],
     starlightOutput:
       'no automatic conversion — Astro has no equivalent file:// bundler. Diagnostic recommends a manual remediation: build with `astro build`, then either ship the `dist/` directory verbatim or wrap it in a service worker via `@vite-pwa/astro` for offline PWA delivery',
     fileExt: 'md',
@@ -677,6 +705,7 @@ const TABLE: ReadonlyArray<MappingRow> = [
     materialInput:
       'mkdocs.yml `plugins: mkdocs-swagger-ui-tag` (renders Swagger/OpenAPI specs via the `<swagger-ui>` custom element in Markdown)',
     requiredExtensions: [],
+    requiredPlugins: ['swagger-ui-tag'],
     starlightOutput:
       '`starlight-openapi` Starlight plugin auto-wired in astro.config.mjs; each `<swagger-ui>` tag must be manually replaced with the appropriate Starlight Openapi route or component',
     fileExt: 'md',
@@ -817,6 +846,7 @@ const TABLE: ReadonlyArray<MappingRow> = [
     featureId: 'plugin-minify',
     materialInput: '`mkdocs-minify-plugin` (HTML/CSS/JS minification at build)',
     requiredExtensions: [],
+    requiredPlugins: ['minify'],
     starlightOutput:
       "no-op — Astro/Vite minify HTML/CSS/JS by default in production builds. Plugin's `minify_html_options` etc. are dropped",
     fileExt: 'md',
@@ -827,6 +857,7 @@ const TABLE: ReadonlyArray<MappingRow> = [
     featureId: 'plugin-glossary',
     materialInput: '`mkdocs-glossary-plugin` (hover-tooltip glossary terms)',
     requiredExtensions: [],
+    requiredPlugins: ['glossary'],
     starlightOutput:
       "recommend the converter's `abbr` handling (`*[TERM]: definition`) for plain-text definitions, or a custom MDX `<Glossary>` component for richer tooltips",
     fileExt: 'md',
@@ -837,6 +868,7 @@ const TABLE: ReadonlyArray<MappingRow> = [
     featureId: 'plugin-video',
     materialInput: '`mkdocs-video` (`![type:video](url)` syntax)',
     requiredExtensions: [],
+    requiredPlugins: ['mkdocs-video'],
     starlightOutput:
       'recommend native MDX `<video>` elements or `starlight-videos` plugin (course-style video components)',
     fileExt: 'mdx',
@@ -848,6 +880,7 @@ const TABLE: ReadonlyArray<MappingRow> = [
     materialInput:
       '`mkdocs-puml` / `plantuml-markdown` (PlantUML diagrams via `@startuml...@enduml`)',
     requiredExtensions: [],
+    requiredPlugins: ['build_plantuml'],
     starlightOutput:
       'recommend `astro-plantuml` integration; the same `@startuml...@enduml` fenced syntax is supported',
     fileExt: 'md',
@@ -858,6 +891,7 @@ const TABLE: ReadonlyArray<MappingRow> = [
     featureId: 'plugin-encryptcontent',
     materialInput: '`mkdocs-encryptcontent-plugin` (per-page password encryption)',
     requiredExtensions: [],
+    requiredPlugins: ['encryptcontent'],
     starlightOutput:
       'no automatic conversion — Astro outputs static HTML with no client-side decryption layer. Recommend a deployment-level auth gate (Cloudflare Access, Netlify password) or removing protected content from the public site',
     fileExt: 'md',
@@ -869,6 +903,7 @@ const TABLE: ReadonlyArray<MappingRow> = [
     featureId: 'plugin-charts',
     materialInput: '`mkdocs-charts-plugin` (Vega-Lite block syntax)',
     requiredExtensions: [],
+    requiredPlugins: ['charts'],
     starlightOutput:
       'no first-class equivalent — recommend a custom MDX `<VegaChart>` component using vega-embed, or pre-render charts to SVG/PNG ahead of conversion',
     fileExt: 'mdx',
@@ -881,6 +916,7 @@ const TABLE: ReadonlyArray<MappingRow> = [
     materialInput:
       '`mkdocs-monorepo-plugin` (multiple sub-docs trees stitched into one site at MkDocs build time)',
     requiredExtensions: [],
+    requiredPlugins: ['monorepo'],
     starlightOutput:
       "no automatic conversion — the plugin's build-time fetch is not replicated. Source-side placeholder pages render with their stub text only. Recommended migration: clone external content locally before conversion, OR replace placeholder pages with links to the external docs sites, OR use Astro content collections + a custom loader",
     fileExt: 'md',
@@ -893,6 +929,7 @@ const TABLE: ReadonlyArray<MappingRow> = [
     materialInput:
       '`mkdocs-multirepo-plugin` (similar to monorepo but with arbitrary repo→subdir mappings)',
     requiredExtensions: [],
+    requiredPlugins: ['multirepo'],
     starlightOutput:
       'same as `plugin-monorepo` — no automatic conversion; placeholder pages must be fetched, removed, or replaced manually',
     fileExt: 'md',
@@ -905,6 +942,7 @@ const TABLE: ReadonlyArray<MappingRow> = [
     materialInput:
       '`mkdocs-markdownextradata-plugin` (`{{ var }}` Jinja-style variable interpolation from `extra.*`)',
     requiredExtensions: [],
+    requiredPlugins: ['markdownextradata'],
     starlightOutput:
       'no automatic conversion — bare `{{ }}` conflicts with MDX expressions. Recommend Astro `import.meta.env.PUBLIC_*` env vars in MDX',
     fileExt: 'mdx',

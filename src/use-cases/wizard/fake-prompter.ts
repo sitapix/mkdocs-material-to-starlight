@@ -32,6 +32,8 @@ interface RecordedCall {
   readonly message: string;
   readonly options?: ReadonlyArray<unknown>;
   readonly initialValue?: unknown;
+  readonly placeholder?: string;
+  readonly defaultValue?: string;
 }
 
 interface RecordedLog {
@@ -122,8 +124,17 @@ export function createFakePrompter(script: ScriptedAnswers = {}): FakePrompter {
     },
     log,
     text: async (o: TextOptions) => {
-      calls.push({ kind: 'text', message: o.message, initialValue: o.initialValue });
-      return next<string | null>('text', o.initialValue ?? '');
+      // Build incrementally so optional fields stay absent (not `undefined`)
+      // when not provided — required by `exactOptionalPropertyTypes: true`.
+      const call: RecordedCall = { kind: 'text', message: o.message };
+      if (o.initialValue !== undefined) (call as { initialValue?: unknown }).initialValue = o.initialValue;
+      if (o.placeholder !== undefined) (call as { placeholder?: string }).placeholder = o.placeholder;
+      if (o.defaultValue !== undefined) (call as { defaultValue?: string }).defaultValue = o.defaultValue;
+      calls.push(call);
+      // Mirror clack's submit-on-empty contract: defaultValue wins when the
+      // user just presses Enter. Tests opt into that path by omitting a `text`
+      // script entry — same as a real user accepting the suggestion.
+      return next<string | null>('text', o.initialValue ?? o.defaultValue ?? '');
     },
     path: async (o: PathOptions) => {
       calls.push({ kind: 'path', message: o.message, initialValue: o.initialValue });
@@ -174,6 +185,12 @@ export function createFakePrompter(script: ScriptedAnswers = {}): FakePrompter {
         'autocompleteMultiselect',
         (o.initialValues ?? []) as ReadonlyArray<V>,
       );
+    },
+    highlight: {
+      name: (text: string) => text,
+      url: (text: string) => text,
+      value: (text: string) => text,
+      count: (text: string) => text,
     },
     spinner: (o: SpinnerOptions): SpinnerHandle => {
       const record = {

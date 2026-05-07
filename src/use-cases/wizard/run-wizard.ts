@@ -35,6 +35,12 @@ import { runTier2 } from './run-tier2.js';
 
 export interface RunWizardInput {
   readonly projectDir: string;
+  /**
+   * Working directory the CLI was invoked from. Used to derive the default
+   * output dir (`${cwd}/starlight`). Passed in by the interface layer so this
+   * use-case stays pure (no `process.cwd()` access here).
+   */
+  readonly cwd: string;
   readonly plan: ConversionPlan;
   readonly defaults: DefaultAnswers;
   readonly prompter: Prompter;
@@ -43,9 +49,9 @@ export interface RunWizardInput {
 export async function runWizard(
   input: RunWizardInput,
 ): Promise<Result<WizardAnswers, WizardCancelled>> {
-  const { projectDir, plan, defaults, prompter } = input;
+  const { projectDir, cwd, plan, defaults, prompter } = input;
 
-  const tier0 = await runTier0(prompter, plan, defaults);
+  const tier0 = await runTier0(prompter, cwd, defaults);
   if (!tier0.ok) return tier0;
 
   const tier1 = await runTier1(prompter, plan, defaults);
@@ -56,8 +62,11 @@ export async function runWizard(
   // emitted only for decisions the user actually answered, so the recap
   // reflects what was asked rather than dumping the full answer set.
   prompter.note(
-    formatRecap({ projectDir, tier0: tier0.value, tier1: tier1.value }),
-    'About to convert — review your choices',
+    formatRecap(
+      { projectDir, tier0: tier0.value, tier1: tier1.value },
+      { value: prompter.highlight.value },
+    ),
+    'Your choices so far',
   );
 
   // Single gate: convert with current answers, or open advanced options.

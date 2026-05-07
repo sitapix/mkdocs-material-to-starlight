@@ -72,6 +72,42 @@ describe('explainConversion', () => {
     expect(both.some((row) => row.featureId === 'content-tabs')).toBe(true);
   });
 
+  it('does not fire plugin rows when the plugin is absent from the config', () => {
+    // Regression: every plugin-* row used to declare `requiredExtensions: []`
+    // and no plugin gating, so `every([])` was true and the row fired for
+    // every project. The wizard surfaced manual remediations for plugins
+    // that weren't even installed.
+    const rows = explainConversion(makeConfig());
+    const ids = rows.map((row) => row.featureId);
+    expect(ids).not.toContain('plugin-privacy');
+    expect(ids).not.toContain('plugin-offline');
+    expect(ids).not.toContain('plugin-encryptcontent');
+    expect(ids).not.toContain('plugin-charts');
+    expect(ids).not.toContain('plugin-monorepo');
+    expect(ids).not.toContain('plugin-multirepo');
+    expect(ids).not.toContain('plugin-markdownextradata');
+    expect(ids).not.toContain('comment-system');
+  });
+
+  it('fires a plugin row when the matching plugin is configured', () => {
+    const rows = explainConversion(
+      makeConfig({ plugins: [{ name: 'privacy', options: {} }] }),
+    );
+    expect(rows.some((row) => row.featureId === 'plugin-privacy')).toBe(true);
+  });
+
+  it('fires comment-system only when theme.custom_dir is set', () => {
+    const without = explainConversion(
+      makeConfig({ theme: { name: 'material', options: {} } }),
+    );
+    expect(without.some((row) => row.featureId === 'comment-system')).toBe(false);
+
+    const withOverrides = explainConversion(
+      makeConfig({ theme: { name: 'material', options: { custom_dir: 'overrides' } } }),
+    );
+    expect(withOverrides.some((row) => row.featureId === 'comment-system')).toBe(true);
+  });
+
   it('returns rows in stable table order', () => {
     const config = makeConfig({
       markdownExtensions: [

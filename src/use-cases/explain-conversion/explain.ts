@@ -3,14 +3,14 @@
  * source file is touched.
  *
  * Given a parsed `mkdocs.yml`, this returns the subset of conversion-mapping
- * rows whose `requiredExtensions` are all enabled in the user's
- * configuration. The result is a deterministic preview suitable for a
- * `--explain` CLI mode.
+ * rows whose required extensions, plugins, and theme options are all
+ * present in the user's configuration. The result is a deterministic
+ * preview suitable for a `--explain` CLI mode.
  *
  * Pure: takes a `MkdocsConfig` value, returns a list of mapping rows. No I/O.
  *
- * Rows whose `requiredExtensions` is empty (always-applicable transforms
- * like internal-link rewriting) are included unconditionally.
+ * A row with no requirements at all (always-applicable transforms like
+ * internal-link rewriting) is included unconditionally.
  */
 
 import type { MkdocsConfig } from '../../domain/config/mkdocs-config.js';
@@ -22,8 +22,15 @@ export function explainConversion(config: MkdocsConfig): ReadonlyArray<MappingRo
   // component extension (e.g. `attr_list`) fires when the user shortcut
   // via the bundle.
   const expanded = expandMetaBundles(config.markdownExtensions);
-  const enabled = new Set(expanded.map((ext) => ext.name));
-  return getAllMappingRows().filter((row) =>
-    row.requiredExtensions.every((required) => enabled.has(required)),
+  const enabledExtensions = new Set(expanded.map((ext) => ext.name));
+  const enabledPlugins = new Set(config.plugins.map((plugin) => plugin.name));
+  const themeOptions = config.theme?.options ?? {};
+  return getAllMappingRows().filter(
+    (row) =>
+      row.requiredExtensions.every((required) => enabledExtensions.has(required)) &&
+      (row.requiredPlugins ?? []).every((required) => enabledPlugins.has(required)) &&
+      (row.requiredThemeOptions ?? []).every((key) =>
+        Object.prototype.hasOwnProperty.call(themeOptions, key),
+      ),
   );
 }

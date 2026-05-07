@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { MkdocsConfig } from '../../domain/config/mkdocs-config.js';
-import { deriveDefaults, guessPackageManager } from './derive-defaults.js';
+import { deriveDefaults, deriveOutputDirName, guessPackageManager } from './derive-defaults.js';
 
 const baseConfig: MkdocsConfig = {
   siteName: 'My Docs',
@@ -48,6 +48,28 @@ describe('deriveDefaults', () => {
     expect(d.suppressRules).toEqual([]);
     expect(d.configFormat).toBe('mjs');
     expect(d.packageName).toBeNull();
+  });
+});
+
+describe('deriveOutputDirName', () => {
+  // Default = `${cwd}/starlight`. The wizard runs in the user's shell — the
+  // most discoverable answer is "a `starlight` folder right here, next to
+  // wherever I invoked the CLI." Absolute path so the user sees, in the prompt
+  // itself, exactly where the converted site will land.
+  it('returns ${cwd}/starlight for a typical absolute cwd', () => {
+    expect(deriveOutputDirName('/Users/me/projects/docs')).toBe(
+      '/Users/me/projects/docs/starlight',
+    );
+  });
+
+  it('joins safely when cwd has a trailing slash', () => {
+    expect(deriveOutputDirName('/Users/me/projects/docs/')).toBe(
+      '/Users/me/projects/docs/starlight',
+    );
+  });
+
+  it('handles a relative cwd (test/CI scenarios)', () => {
+    expect(deriveOutputDirName('.')).toBe('starlight');
   });
 });
 

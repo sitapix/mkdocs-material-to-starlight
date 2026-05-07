@@ -56,6 +56,18 @@ describe('confirmOverwriteIfNeeded', () => {
     expect(result).toBe('cancelled');
   });
 
+  it('escalates the warning when the target is an existing Astro/Starlight project', async () => {
+    const prompter = createFakePrompter({ confirm: [false] });
+    await confirmOverwriteIfNeeded(prompter, fakeInspector('astro-project'), '/existing/site');
+    // The user is about to clobber a real Astro project; the warning must
+    // call that out specifically (more than just "non-empty"), and reference
+    // the path so they know what they're trampling.
+    const warn = prompter.logs.find((l) => l.level === 'warn');
+    expect(warn).toBeDefined();
+    expect(warn?.message).toContain('/existing/site');
+    expect(warn?.message.toLowerCase()).toMatch(/astro|starlight/);
+  });
+
   it('confirm prompt defaults to NO so an inattentive Enter does not destroy data', async () => {
     let observed: { initialValue?: boolean } | undefined;
     const wrapped = createFakePrompter({ confirm: [false] });

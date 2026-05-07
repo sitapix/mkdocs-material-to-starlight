@@ -11,14 +11,19 @@ import { getTranslationDepth } from '../../domain/conversion-mapping/table.js';
 import type { ConversionPlan } from '../../domain/wizard/plan.js';
 import { resolveInteractivity } from '../../infrastructure/env/tty-detection.js';
 import { createNodeDirInspector } from '../../infrastructure/fs/dir-inspector.js';
+import { createNodeDirectoryReader } from '../../infrastructure/fs/node-directory-reader.js';
+import { createNodeWizardPrefsStore } from '../../infrastructure/fs/wizard-prefs-store.js';
 import { extractSnippetBasePaths } from '../../use-cases/config/snippet-base-paths.js';
 import { explainConversion } from '../../use-cases/explain-conversion/explain.js';
 import { answersToFlags } from '../../use-cases/wizard/answers-to-flags.js';
 import { confirmOverwriteIfNeeded } from '../../use-cases/wizard/confirm-overwrite.js';
 import { deriveDefaults } from '../../use-cases/wizard/derive-defaults.js';
+import { formatAttentionLines } from '../../use-cases/wizard/format-attention-lines.js';
 import { formatEquivalentCommand } from '../../use-cases/wizard/format-equivalent-command.js';
 import { needsAttentionPreview } from '../../use-cases/wizard/needs-attention-preview.js';
+import { restorePrefs } from '../../use-cases/wizard/restore-prefs.js';
 import { runWizard } from '../../use-cases/wizard/run-wizard.js';
+import { validateProjectPreflight } from '../../use-cases/wizard/validate-project-preflight.js';
 import type { CliIo } from './main.js';
 import { type Command, parseArgs } from './parse-args.js';
 import { readProjectDirInteractively } from './wizard-project-dir.js';
@@ -53,16 +58,54 @@ export async function runWizardFlow(
   const prompter = createClackPrompter();
 
   prompter.intro('mkdocs-material-to-starlight');
-  prompter.log.info('Convert a MkDocs Material site to Astro Starlight.');
+  prompter.log.info('Convert your MkDocs Material site to Astro Starlight.');
 
   // Step 1: project dir — re-prompt on missing/invalid mkdocs.yml so a typo
   // doesn't drop the user back to the shell.
   const loaded = await readProjectDirInteractively(prompter, projectDirHint);
   if (loaded === 'cancelled') {
-    prompter.cancel('Cancelled. No files were written.');
+    prompter.cancel('Cancelled. Nothing changed.');
     return { kind: 'cancelled' };
   }
   const { projectDir, configValue } = loaded;
+
+  // Re-run memory: if the user converted this project before, offer to skip
+  // the wizard and run with their saved flags. Best-effort — any read error
+  // collapses to "no prefs" so a corrupt file never blocks the wizard.
+  const prefsStore = createNodeWizardPrefsStore();
+  const restored = await restorePrefs(prompter, prefsStore, projectDir);
+  if (restored !== null) {
+    const reparsedRestored = parseArgs(restored);
+    if (reparsedRestored.kind === 'convert') {
+      prompter.note(
+        formatEquivalentCommand(restored, undefined, { binary: prompter.highlight.name }),
+        'Re-running with your saved answers',
+      );
+      prompter.outro('Converting…');
+      return { kind: 'success', command: reparsedRestored, equivalentFlags: restored };
+    }
+    // Saved flags failed to re-parse (CLI surface drift since they were
+    // written). Fall through to the normal wizard rather than blocking.
+    prompter.log.warn(
+      "Saved answers don't match the current CLI. Starting fresh.",
+    );
+  }
+
+  // Preflight: validate `docs_dir` resolves before asking any prompt. Mirrors
+  // the convert-time check in `prepareConvertContext` but runs in
+  // milliseconds — fails fast on a misconfigured `docs_dir:` so the user
+  // doesn't answer a dozen prompts only to hit a "no markdown found" error
+  // afterwards. Cancellation here keeps the framed UX (no raw stderr dump).
+  const preflight = await validateProjectPreflight(
+    projectDir,
+    configValue,
+    createNodeDirectoryReader(),
+  );
+  if (!preflight.ok) {
+    prompter.note(preflight.error.message, "Found a problem with your project");
+    prompter.cancel('Fix the issue above and try again.');
+    return { kind: 'cancelled' };
+  }
 
   // Step 2: build the plan and defaults.
   const plan: ConversionPlan = {
@@ -81,10 +124,13 @@ export async function runWizardFlow(
   // Surface what we detected before asking anything else, so users see why
   // the upcoming prompts exist. Levels use distinct shapes (◇/◆/▲), not just
   // color, so this remains legible without color or for color-blind readers.
-  prompter.log.step(`Detected site: ${configValue.siteName}`);
+  // Decoration goes through prompter.highlight (defined on the port) so the
+  // ANSI vocabulary lives next to the adapter and tests stay plain-text.
+  const { name: hlName, url: hlUrl, count: hlCount } = prompter.highlight;
+  prompter.log.step(`Found your site: ${hlName(configValue.siteName)}`);
   if (plan.mappingRows.length > 0) {
     prompter.log.step(
-      `${String(plan.mappingRows.length)} feature mapping${plan.mappingRows.length === 1 ? '' : 's'} will fire (run with --explain to list them).`,
+      `${hlCount(String(plan.mappingRows.length))} feature mapping${plan.mappingRows.length === 1 ? '' : 's'} will fire (run with ${hlUrl('--explain')} to list them).`,
     );
   }
 
@@ -96,14 +142,20 @@ export async function runWizardFlow(
   const manualRows = plan.mappingRows.filter((row) => getTranslationDepth(row) === 'manual');
   if (lossyRows.length > 0) {
     prompter.note(
-      lossyRows.map((r) => `• ${r.featureId} — ${r.starlightOutput}`).join('\n'),
-      `${String(lossyRows.length)} lossy translation${lossyRows.length === 1 ? '' : 's'} (named loss; diagnostic surfaces it)`,
+      formatAttentionLines(
+        lossyRows.map((r) => ({ name: r.featureId, description: r.starlightOutput })),
+        { name: hlName },
+      ),
+      `${hlCount(String(lossyRows.length))} lossy translation${lossyRows.length === 1 ? '' : 's'}`,
     );
   }
   if (manualRows.length > 0) {
     prompter.note(
-      manualRows.map((r) => `• ${r.featureId} — ${r.starlightOutput}`).join('\n'),
-      `${String(manualRows.length)} manual remediation${manualRows.length === 1 ? '' : 's'} required (no automatic translation)`,
+      formatAttentionLines(
+        manualRows.map((r) => ({ name: r.featureId, description: r.starlightOutput })),
+        { name: hlName },
+      ),
+      `${hlCount(String(manualRows.length))} manual remediation${manualRows.length === 1 ? '' : 's'}`,
     );
   }
 
@@ -113,17 +165,22 @@ export async function runWizardFlow(
   // just show it earlier so the user can decide whether to proceed.
   const attention = needsAttentionPreview(configValue);
   if (attention.length > 0) {
-    const lines = attention.map((a) => `• ${a.name} — ${a.docsUrl}`);
     prompter.note(
-      lines.join('\n'),
-      `${String(attention.length)} item${attention.length === 1 ? '' : 's'} will need manual attention`,
+      formatAttentionLines(
+        attention.map((a) => ({ name: a.name, description: a.docsUrl })),
+        { name: hlName, description: hlUrl },
+      ),
+      `${hlCount(String(attention.length))} item${attention.length === 1 ? '' : 's'} will need manual attention`,
     );
   }
 
   // Step 3: run the rest of the wizard (outputDir, packageManager, Tier 1, Tier 2).
-  const result = await runWizard({ projectDir, plan, defaults, prompter });
+  // cwd is read here (impure shell) and threaded into the pure wizard so the
+  // default output dir is `${cwd}/starlight` — the most discoverable answer
+  // for "where will this land?"
+  const result = await runWizard({ projectDir, cwd: process.cwd(), plan, defaults, prompter });
   if (!result.ok) {
-    prompter.cancel('Cancelled. No files were written.');
+    prompter.cancel('Cancelled. Nothing changed.');
     return { kind: 'cancelled' };
   }
 
@@ -137,7 +194,7 @@ export async function runWizardFlow(
     result.value.outputDir,
   );
   if (overwrite === 'cancelled') {
-    prompter.cancel('Cancelled. No files were written.');
+    prompter.cancel('Cancelled. Nothing changed.');
     return { kind: 'cancelled' };
   }
 
@@ -146,12 +203,36 @@ export async function runWizardFlow(
   const reparsed = parseArgs(flags);
   if (reparsed.kind !== 'convert') {
     io.stderr(`error: wizard produced an invalid command: ${JSON.stringify(reparsed)}`);
-    prompter.cancel('Cancelled. No files were written.');
+    prompter.cancel('Cancelled. Nothing changed.');
     return { kind: 'cancelled' };
   }
   // Show the equivalent CLI invocation as a framed note so the user can save
   // it for unattended re-runs. Rendered while the prompter session is still
   // active — once we return, the shell prints the diagnostic report unframed.
-  prompter.note(formatEquivalentCommand(flags), 'Equivalent command (save to re-run unattended)');
+  prompter.note(
+    formatEquivalentCommand(flags, undefined, { binary: prompter.highlight.name }),
+    'Save this command to skip the wizard next time',
+  );
+  // Persist the answer set so the next run can offer to skip the wizard.
+  // Best-effort: a write failure is logged inline but never aborts a
+  // successful wizard run — the equivalent-command note above is the
+  // user's primary handoff, the prefs file is a convenience.
+  const written = await prefsStore.write(projectDir, { version: 1, flags });
+  if (!written.ok) {
+    prompter.log.warn(`Could not save answers for next run: ${written.error.message}`);
+  }
+  // Set expectations before the frame closes: when astro check was opted into,
+  // the user is about to wait 30-60s for conversion + check to finish, and the
+  // results appear OUTSIDE the rail (formatReport prints to plain stdout). A
+  // one-line heads-up beats a silent pause.
+  if (reparsed.check) {
+    prompter.log.info(
+      `${prompter.highlight.value('astro check')} runs after conversion. Results appear below.`,
+    );
+  }
+  // Close the frame with a proper outro so the rail visually terminates before
+  // the diagnostic report dumps to stdout. Without this, the rail's vertical
+  // bar trails into ungated text and the visual handoff is messy.
+  prompter.outro('Converting…');
   return { kind: 'success', command: reparsed, equivalentFlags: flags };
 }

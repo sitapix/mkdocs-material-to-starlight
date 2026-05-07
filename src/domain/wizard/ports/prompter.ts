@@ -22,8 +22,19 @@ interface SelectChoice<V extends string> {
 
 export interface TextOptions {
   readonly message: string;
+  /** Pre-fill the input. The user must backspace to change it. */
   readonly initialValue?: string;
+  /**
+   * Dimmed hint shown when the input is empty. Idiomatic clack: pair with
+   * `defaultValue` so the user sees the suggestion and Enter accepts it.
+   */
   readonly placeholder?: string;
+  /**
+   * Returned when the user submits an empty input. Used together with
+   * `placeholder` to implement the canonical "press Enter to accept the
+   * default" pattern (create-astro / create-svelte / create-t3-app).
+   */
+  readonly defaultValue?: string;
   readonly validate?: (value: string) => string | undefined;
 }
 
@@ -118,6 +129,25 @@ export interface SpinnerOptions {
   readonly indicator?: 'dots' | 'timer';
 }
 
+/**
+ * Inline-text decorators for emphasized substrings inside log/note/recap
+ * bodies. The TTY adapter wires real ANSI color (picocolors); the test fake
+ * wires identity so unit tests stay assertable as plain strings. Adding a
+ * named decorator here is preferred over importing picocolors in use-cases —
+ * keeps the use-case layer free of presentation deps and gives a single
+ * vocabulary the whole wizard speaks.
+ */
+export interface Highlighter {
+  /** Plugin / feature names — bright cyan + bold. */
+  name(text: string): string;
+  /** URLs — underlined cyan, link-feel. */
+  url(text: string): string;
+  /** User-chosen values in the recap (paths, choices) — bold. */
+  value(text: string): string;
+  /** Numeric counts in note titles ("7 lossy translations") — bold. */
+  count(text: string): string;
+}
+
 export interface Prompter {
   intro(title: string): void;
   outro(message: string): void;
@@ -148,4 +178,10 @@ export interface Prompter {
    * blocking prompt or the next render will overlap.
    */
   spinner(options: SpinnerOptions): SpinnerHandle;
+  /**
+   * Inline-text decorators (color/weight/underline). See {@link Highlighter}.
+   * Use cases consume this rather than importing picocolors directly so
+   * presentation stays in the adapter and tests see plain strings.
+   */
+  readonly highlight: Highlighter;
 }
