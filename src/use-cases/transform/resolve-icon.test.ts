@@ -92,6 +92,43 @@ describe('resolveIcon', () => {
     });
   });
 
+  it('uses Starlight built-in icons added in 0.36+ for shortcodes that previously fell back to seti file-icons or generic proxies', () => {
+    // Pinned upgrades: each of these used to map to a poor proxy
+    // (seti:clock for time, seti:db for database, seti:terraform for
+    // server, `random` for lock, `comment-alt` for question, `preview`
+    // for monitor/cellphone, `forward-slash` for git-branch). Starlight
+    // 0.36+ adds dedicated icons; switching to them removes the most
+    // visually misleading mappings in the curated table.
+    const cases: ReadonlyArray<readonly [string, string]> = [
+      [':material-clock:', 'clock'],
+      [':fontawesome-solid-clock:', 'clock'],
+      [':octicons-clock:', 'clock'],
+      [':material-monitor:', 'desktop'],
+      [':material-laptop:', 'desktop'],
+      [':material-cellphone:', 'mobile-android'],
+      [':material-database:', 'database'],
+      [':octicons-database:', 'database'],
+      [':material-server:', 'server'],
+      [':octicons-server:', 'server'],
+      [':octicons-git-branch:', 'code-branch'],
+      [':material-help:', 'question'],
+      [':material-help-circle:', 'question-circle'],
+      [':fontawesome-solid-question-circle:', 'question-circle'],
+      [':fontawesome-solid-circle-question:', 'question-circle'],
+      [':material-lock:', 'padlock'],
+      [':fontawesome-solid-lock:', 'padlock'],
+      [':octicons-lock:', 'padlock'],
+      [':simple-solidjs:', 'solidjs'],
+    ];
+    for (const [shortcode, expected] of cases) {
+      const result = resolveIcon({ shortcode });
+      expect(result?.kind, `for ${shortcode}`).toBe('starlight-builtin');
+      if (result?.kind === 'starlight-builtin') {
+        expect(result.name, `for ${shortcode}`).toBe(expected);
+      }
+    }
+  });
+
   it('returns null for bare identifier shortcodes that are not icon-shaped', () => {
     // Bare `:identifier:` (no hyphen) is not an icon attempt — it is most
     // likely a token from a different markdown extension (mkautodoc's

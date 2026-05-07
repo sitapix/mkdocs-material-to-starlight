@@ -26,7 +26,7 @@ describe('mapAdmonitionToAside', () => {
     });
     expect(mapAdmonitionToAside('question')).toEqual({
       asideType: 'note',
-      iconHint: 'comment-alt',
+      iconHint: 'question',
     });
     expect(mapAdmonitionToAside('bug')).toEqual({
       asideType: 'danger',

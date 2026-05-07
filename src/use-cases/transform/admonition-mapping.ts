@@ -30,7 +30,7 @@ const TABLE: Readonly<Record<AdmonitionType, MappedAdmonition>> = {
   info: { asideType: 'note', iconHint: 'information' },
   tip: { asideType: 'tip' },
   success: { asideType: 'tip', iconHint: 'approve-check' },
-  question: { asideType: 'note', iconHint: 'comment-alt' },
+  question: { asideType: 'note', iconHint: 'question' },
   warning: { asideType: 'caution' },
   failure: { asideType: 'danger' },
   danger: { asideType: 'danger' },
