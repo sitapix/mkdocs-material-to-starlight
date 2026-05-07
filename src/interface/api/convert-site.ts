@@ -25,7 +25,6 @@ import type { FileSystem } from '../../domain/ports/file-system.js';
 import { err, ok, type Result } from '../../domain/result.js';
 import { mapAnalyticsToHeadEntries } from '../../domain/starlight/analytics-mapping.js';
 import { mapMaterialPaletteToStarlight } from '../../domain/starlight/palette-mapping.js';
-import { classifyThemeFeature } from '../../domain/starlight/theme-feature-catalog.js';
 import { atomicCopyFile, atomicWriteText } from '../../infrastructure/fs/atomic-write.js';
 import { createNodeConfigDiscoverer } from '../../infrastructure/fs/node-config-discoverer.js';
 import { createNodeDirectoryReader } from '../../infrastructure/fs/node-directory-reader.js';
@@ -62,6 +61,7 @@ import {
   extractHookPaths,
 } from '../../use-cases/detect-features/diagnose-hooks.js';
 import { diagnosePalette } from '../../use-cases/detect-features/diagnose-palette.js';
+import { diagnoseThemeFeatures } from '../../use-cases/detect-features/diagnose-theme-features.js';
 import {
   extractI18nConfig,
   extractI18nLocales,
@@ -516,123 +516,15 @@ export async function convertSiteFromDisk(
     hookPaths: extractHookPaths(config.value.extras),
   });
 
-  const themeFeatureDiagnostics: Array<{
-    sourcePath: string;
-    diagnostic: ReturnType<typeof createDiagnostic>;
-  }> = [];
-  if (hasTabsLink) {
-    themeFeatureDiagnostics.push({
-      sourcePath: 'mkdocs.yml',
-      diagnostic: createDiagnostic({
-        severity: 'info',
-        ruleId: 'feature-tabs-link-detected',
-        source: 'mkdocs-material-to-starlight',
-        message:
-          "theme.features `content.tabs.link` detected. Generated `<Tabs>` components include a derived `syncKey` so identically-labelled tab groups stay synchronised across pages, matching Material's behaviour.",
-      }),
-    });
-  }
-  if (config.value.copyright !== null) {
-    themeFeatureDiagnostics.push({
-      sourcePath: 'mkdocs.yml',
-      diagnostic: createDiagnostic({
-        severity: 'info',
-        ruleId: 'copyright-text-detected',
-        source: 'mkdocs-material-to-starlight',
-        message: `mkdocs.yml \`copyright:\` text detected: "${config.value.copyright}". Starlight has no first-class \`copyright\` config option. Recreate by overriding Footer.astro under \`src/components/overrides/\` with the supplied text rendered inside a \`<footer class="sl-flex">\` block, then register the override via Starlight \`components: { Footer: "./src/components/overrides/Footer.astro" }\`.`,
-      }),
-    });
-  }
-  if (config.value.repoUrl !== null) {
-    const repoName = config.value.repoName ?? '(host inferred from URL)';
-    themeFeatureDiagnostics.push({
-      sourcePath: 'mkdocs.yml',
-      diagnostic: createDiagnostic({
-        severity: 'info',
-        ruleId: 'repo-button-recommendation',
-        source: 'mkdocs-material-to-starlight',
-        message: `mkdocs.yml \`repo_url\` is set${config.value.repoName !== null ? ` (repo_name: "${repoName}")` : ''}. The converter wires the URL into starlight \`editLink.baseUrl\`, but does not auto-synthesise a header repo-button — Starlight surfaces repo links via the \`social: [...]\` config. To match Material's repo button, add an entry like \`{ icon: "github", label: "${config.value.repoName ?? 'GitHub'}", href: "${config.value.repoUrl}" }\` to your starlight \`social\` array in astro.config (skip if you already added the same entry to mkdocs.yml's \`extra.social[]\`).`,
-      }),
-    });
-  }
-  // theme.icon.* overrides — Material lets users swap UI chrome icons
-  // (menu/search/repo/edit/etc.) and per-admonition / per-tag icons.
-  // Starlight uses its own icon catalog and slot mechanism; most overrides
-  // must be reproduced via component overrides or per-occurrence props.
-  const themeIcons = (() => {
-    const ti = config.value.theme?.options['icon'];
-    return typeof ti === 'object' && ti !== null && !Array.isArray(ti)
-      ? (ti as Record<string, unknown>)
-      : null;
-  })();
-  if (themeIcons !== null && Object.keys(themeIcons).length > 0) {
-    const keys = Object.keys(themeIcons).sort().join(', ');
-    themeFeatureDiagnostics.push({
-      sourcePath: 'mkdocs.yml',
-      diagnostic: createDiagnostic({
-        severity: 'info',
-        ruleId: 'theme-icon-overrides-detected',
-        source: 'mkdocs-material-to-starlight',
-        message: `mkdocs.yml \`theme.icon\` overrides detected (${keys}). Starlight has its own icon catalog and slot system; UI-chrome icons (menu/search/repo/edit/view/previous/next/top/close) cannot be remapped via config. \`theme.icon.admonition.<type>\` overrides should be reproduced per-aside via \`<Aside icon="…">\`. \`theme.icon.tag.<id>\` overrides require a custom Tag.astro component (see \`extra-tags-alias-map\` diagnostic). \`theme.icon.logo\` is honoured if you set \`logo: { src }\` in starlight() — pass an SVG asset.`,
-      }),
-    });
-  }
-  const themeDirection = (() => {
-    const d = config.value.theme?.options['direction'];
-    return typeof d === 'string' ? d.toLowerCase() : null;
-  })();
-  if (themeDirection === 'rtl') {
-    themeFeatureDiagnostics.push({
-      sourcePath: 'mkdocs.yml',
-      diagnostic: createDiagnostic({
-        severity: 'info',
-        ruleId: 'theme-direction-rtl',
-        source: 'mkdocs-material-to-starlight',
-        message:
-          "theme.direction `rtl` detected. Add `dir: 'rtl'` to the relevant Starlight `locales: { <code>: { label, lang, dir: 'rtl' } }` entry so the layout flips for right-to-left languages. Starlight has no top-level direction switch — the setting is per-locale.",
-      }),
-    });
-  }
-  if (hasNavigationTabs) {
-    themeFeatureDiagnostics.push({
-      sourcePath: 'mkdocs.yml',
-      diagnostic: createDiagnostic({
-        severity: 'info',
-        ruleId: 'feature-navigation-tabs-recommend-topics',
-        source: 'mkdocs-material-to-starlight',
-        message:
-          'theme.features `navigation.tabs` detected. Install `starlight-sidebar-topics` and split the generated sidebar into one topic per top-level group for the equivalent UX.',
-      }),
-    });
-  }
-  for (const feature of themeFeatures) {
-    const classification = classifyThemeFeature(feature);
-    if (classification === null) {
-      themeFeatureDiagnostics.push({
-        sourcePath: 'mkdocs.yml',
-        diagnostic: createDiagnostic({
-          severity: 'warning',
-          ruleId: 'theme-feature-unknown',
-          source: 'mkdocs-material-to-starlight',
-          message: `theme.features \`${feature}\` was not recognized as a Material feature flag — typo or post-catalog addition.`,
-        }),
-      });
-      continue;
-    }
-    if (classification.kind === 'handled-elsewhere') continue;
-    themeFeatureDiagnostics.push({
-      sourcePath: 'mkdocs.yml',
-      diagnostic: createDiagnostic({
-        severity: classification.kind === 'unsupported' ? 'warning' : 'info',
-        ruleId:
-          classification.kind === 'unsupported'
-            ? 'theme-feature-unsupported'
-            : 'theme-feature-replaced',
-        source: 'mkdocs-material-to-starlight',
-        message: `theme.features \`${feature}\`: ${classification.note}`,
-      }),
-    });
-  }
+  const themeFeatureDiagnostics = diagnoseThemeFeatures({
+    hasTabsLink,
+    hasNavigationTabs,
+    themeFeatures,
+    copyright: config.value.copyright,
+    repoUrl: config.value.repoUrl,
+    repoName: config.value.repoName,
+    themeOptions: config.value.theme?.options ?? {},
+  });
 
   // Per-flag info diagnostics for long-tail theme.features entries not covered
   // by the primary classifier. Each entry gets its own diagnostic with a rich

@@ -14,40 +14,29 @@
  */
 
 import { createDiagnostic, type Diagnostic } from '../../domain/diagnostics/diagnostic.js';
-import { isFenceLine } from '../../domain/syntax/fence.js';
+import { type LineScanner, runLineScanners } from '../../domain/scanners/line-scanner.js';
+
 const HEADING_ATTR_RE = /^#{1,6} [^\n{]+\{([^}\n]*)\}\s*#*\s*$/;
 const CLASS_TOKEN_RE = /(?:^|\s)\.[A-Za-z][A-Za-z0-9_-]*/;
 
-export function scanHeadingBadges(source: string): ReadonlyArray<Diagnostic> {
-  const diagnostics: Diagnostic[] = [];
-  const lines = source.split('\n');
-  let inFence = false;
-  let lineNumber = 0;
-
-  for (const line of lines) {
-    lineNumber += 1;
-    if (isFenceLine(line)) {
-      inFence = !inFence;
-      continue;
-    }
-    if (inFence) continue;
-
+const headingBadgeScanner: LineScanner = {
+  ruleId: 'heading-badge-class-detected',
+  scan: (line, lineNumber) => {
     const match = line.match(HEADING_ATTR_RE);
-    if (match === null) continue;
+    if (match === null) return null;
     const attrBody = match[1] ?? '';
-    if (!CLASS_TOKEN_RE.test(attrBody)) continue;
+    if (!CLASS_TOKEN_RE.test(attrBody)) return null;
+    return createDiagnostic({
+      severity: 'info',
+      ruleId: 'heading-badge-class-detected',
+      source: 'normalize/scan-heading-badges',
+      message:
+        'Heading carries an `attr_list` CSS class which Starlight has no built-in equivalent for; the class was stripped. If this was a Material heading badge, install `starlight-heading-badges` and re-add as inline `<Badge>` JSX. If the class served another purpose (e.g. TOC exclusion, layout hint), reproduce it via custom CSS or a rehype plugin.',
+      place: { line: lineNumber, column: 1 },
+    });
+  },
+};
 
-    diagnostics.push(
-      createDiagnostic({
-        severity: 'info',
-        ruleId: 'heading-badge-class-detected',
-        source: 'normalize/scan-heading-badges',
-        message:
-          'Heading carries an `attr_list` CSS class which Starlight has no built-in equivalent for; the class was stripped. If this was a Material heading badge, install `starlight-heading-badges` and re-add as inline `<Badge>` JSX. If the class served another purpose (e.g. TOC exclusion, layout hint), reproduce it via custom CSS or a rehype plugin.',
-        place: { line: lineNumber, column: 1 },
-      }),
-    );
-  }
-
-  return diagnostics;
+export function scanHeadingBadges(source: string): ReadonlyArray<Diagnostic> {
+  return runLineScanners(source, [headingBadgeScanner]);
 }
