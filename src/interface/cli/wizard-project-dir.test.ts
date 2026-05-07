@@ -37,6 +37,52 @@ describe('readProjectDirInteractively — happy path', () => {
     expect(result.configValue.siteName).toBe('Test Site');
   });
 
+  it('skips the picker when cwd has mkdocs.yml — surfaces a confirm so the user can opt out', async () => {
+    // Running from inside a project with mkdocs.yml is the common case.
+    // The wizard should detect it, log what it found, and ask "use this
+    // project?" with default-yes — so the user is aware AND has an
+    // out if they actually wanted a different project.
+    writeMkdocs(workspace);
+    const prompter = createFakePrompter({ confirm: [true] });
+
+    const result = await readProjectDirInteractively(prompter, workspace);
+
+    expect(result).not.toBe('cancelled');
+    if (result === 'cancelled') return;
+    expect(result.projectDir).toBe(workspace);
+    // Picker must not fire — the auto-detect made it unnecessary.
+    expect(prompter.calls.find((c) => c.kind === 'path')).toBeUndefined();
+    // The "Use this project?" confirm DID fire so the user knows.
+    expect(
+      prompter.calls.find((c) => c.kind === 'confirm' && /use this project/i.test(c.message)),
+    ).toBeDefined();
+    // A log step surfaced the detected path with the cwd in it.
+    expect(
+      prompter.logs.find((l) => l.level === 'step' && l.message.includes(workspace)),
+    ).toBeDefined();
+  });
+
+  it('falls through to the picker when the user declines the auto-detected project', async () => {
+    writeMkdocs(workspace);
+    const otherDir = mkdtempSync(join(tmpdir(), 'other-'));
+    writeMkdocs(otherDir);
+    try {
+      const prompter = createFakePrompter({
+        confirm: [false], // decline the auto-detection
+        path: [otherDir], // pick a different project at the picker
+      });
+
+      const result = await readProjectDirInteractively(prompter, workspace);
+
+      expect(result).not.toBe('cancelled');
+      if (result === 'cancelled') return;
+      expect(result.projectDir).toBe(otherDir);
+      expect(prompter.calls.find((c) => c.kind === 'path')).toBeDefined();
+    } finally {
+      rmSync(otherDir, { recursive: true, force: true });
+    }
+  });
+
   it('reports the loaded config path via spinner.stop', async () => {
     writeMkdocs(workspace);
     const prompter = createFakePrompter({ path: [workspace] });

@@ -36,10 +36,10 @@ export async function runTier0(
     // have to backspace through a pre-filled value to type their own.
     placeholder: suggested,
     defaultValue: suggested,
-    validate: (value) => {
-      if (value.trim().length === 0) return 'Please enter a path.';
-      return undefined;
-    },
+    // No validate: empty submission is intentional (it accepts the
+    // defaultValue placeholder). A required-non-empty validator would
+    // block bare Enter and break the create-astro idiom we're matching.
+    // Whitespace-only typed input is the user's choice; trust them.
   });
   if (outputDir === null) return err(WIZARD_CANCELLED);
 

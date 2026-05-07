@@ -48,6 +48,30 @@ export async function readProjectDirInteractively(
   initialHint: string,
 ): Promise<LoadedConfig | 'cancelled'> {
   const yaml = createJsYamlDecoder();
+
+  // Fast path: when the user is already in a directory with mkdocs.yml at
+  // root, surface the detection and let them confirm. Pre-selects "yes"
+  // because that matches the cwd they typed `npx ...` from, but the prompt
+  // is still there so they're never surprised about which project the
+  // wizard is acting on. Decline → fall through to the picker.
+  const directConfig = join(initialHint, 'mkdocs.yml');
+  if (await fileExists(directConfig)) {
+    prompter.log.step(
+      `Found mkdocs.yml in ${prompter.highlight.value(initialHint)} (your current directory).`,
+    );
+    const useIt = await prompter.confirm({
+      message: 'Use this project?',
+      initialValue: true,
+      active: 'Yes (convert this project)',
+      inactive: 'No (let me pick a different one)',
+    });
+    if (useIt === null) return 'cancelled';
+    if (useIt === true) {
+      const loaded = await loadAndParseConfig(prompter, yaml, initialHint, directConfig);
+      if (loaded !== null) return loaded;
+    }
+  }
+
   let hint = initialHint;
   for (let attempt = 0; attempt < PROJECT_DIR_MAX_ATTEMPTS; attempt++) {
     const inputDir = await prompter.path({
@@ -55,7 +79,7 @@ export async function readProjectDirInteractively(
       initialValue: hint,
       directory: true,
       validate: (value) => {
-        if (value.trim().length === 0) return 'Path is required.';
+        if (value.trim().length === 0) return 'Please enter a path.';
         return undefined;
       },
     });
@@ -74,34 +98,14 @@ export async function readProjectDirInteractively(
       continue;
     }
 
-    const { effectiveDir, configPath } = resolved;
-    const spin = prompter.spinner({ initialMessage: `Reading ${configPath}` });
-    let configText: string;
-    try {
-      configText = await readFile(configPath, 'utf8');
-    } catch {
-      spin.error(`No mkdocs.yml at ${configPath}.`);
-      hint = inputDir;
-      continue;
-    }
-    spin.message('Parsing mkdocs.yml');
-    const decoded = yaml.decode(configText);
-    if (!decoded.ok) {
-      spin.error(`mkdocs.yml is not valid YAML: ${decoded.error.message}`);
-      hint = inputDir;
-      continue;
-    }
-    const config = parseMkdocsConfig(decoded.value);
-    if (!config.ok) {
-      spin.error(`mkdocs.yml is missing required fields: ${config.error.message}`);
-      hint = inputDir;
-      continue;
-    }
-    spin.stop(`Loaded ${configPath}`);
-    return {
-      projectDir: effectiveDir,
-      configValue: config.value,
-    };
+    const loaded = await loadAndParseConfig(
+      prompter,
+      yaml,
+      resolved.effectiveDir,
+      resolved.configPath,
+    );
+    if (loaded !== null) return loaded;
+    hint = inputDir;
   }
   prompter.log.error(
     `Could not locate mkdocs.yml after ${String(PROJECT_DIR_MAX_ATTEMPTS)} attempts. ` +
@@ -183,4 +187,39 @@ async function pickFromMany(
   });
   if (choice === null) return 'cancelled';
   return all.find((c) => c.relPath === choice) ?? null;
+}
+
+/**
+ * Read + parse a known config file under a spinner. Returns null on any
+ * failure (file unreadable, YAML invalid, schema invalid) so the caller
+ * can fall through to the retry loop. Errors surface via spinner.error
+ * before the null is returned, so the user always sees what went wrong.
+ */
+async function loadAndParseConfig(
+  prompter: Prompter,
+  yaml: ReturnType<typeof createJsYamlDecoder>,
+  effectiveDir: string,
+  configPath: string,
+): Promise<LoadedConfig | null> {
+  const spin = prompter.spinner({ initialMessage: `Reading ${configPath}` });
+  let configText: string;
+  try {
+    configText = await readFile(configPath, 'utf8');
+  } catch {
+    spin.error(`No mkdocs.yml at ${configPath}.`);
+    return null;
+  }
+  spin.message('Parsing mkdocs.yml');
+  const decoded = yaml.decode(configText);
+  if (!decoded.ok) {
+    spin.error(`mkdocs.yml is not valid YAML: ${decoded.error.message}`);
+    return null;
+  }
+  const config = parseMkdocsConfig(decoded.value);
+  if (!config.ok) {
+    spin.error(`mkdocs.yml is missing required fields: ${config.error.message}`);
+    return null;
+  }
+  spin.stop(`Loaded ${configPath}`);
+  return { projectDir: effectiveDir, configValue: config.value };
 }

@@ -73,7 +73,12 @@ export function createClackPrompter(): Prompter {
     intro: (title: string) => clackIntro(pc.bgCyan(pc.black(` ${title} `))),
     outro: (message: string) => clackOutro(message),
     cancel: (message: string) => clackCancel(message),
-    note: (body: string, title?: string) => clackNote(body, title),
+    // clack 1.3.0 defaults the note formatter to `pc.dim(line)`, which washes
+    // out the boxed body next to surrounding log.step lines. Override with an
+    // identity formatter so picocolors styling on content (bold-cyan names,
+    // underlined-cyan URLs) renders at full intensity. picocolors honors
+    // NO_COLOR / non-TTY automatically, so this stays accessible.
+    note: (body: string, title?: string) => clackNote(body, title, { format: (line) => line }),
     log,
     text: async (o: TextOptions) => {
       const clackOptions: Parameters<typeof clackText>[0] = {
