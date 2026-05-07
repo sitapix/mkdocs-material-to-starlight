@@ -73,13 +73,16 @@ export async function runWizard(
   // Cancel is always Ctrl+C / Esc — we don't surface it as a third option to
   // keep the menu binary and the "happy path" obvious.
   //
-  // selectKey lets the user hit `c` or `a` without pressing Enter — one
-  // keystroke for the most common decision point in the whole flow.
-  const next = await prompter.selectKey<'c' | 'a'>({
+  // Plain `select` (not `selectKey`): the inverted-block letter cells that
+  // selectKey renders are visually jarring next to the rest of the wizard's
+  // ◇ prompts. The user picks with arrows + Enter, same as every other
+  // prompt — the default ('c' = convert) is the loudest answer so a bare
+  // Enter does the right thing.
+  const next = await prompter.select<'c' | 'a'>({
     message: 'Convert now, or review advanced options first?',
     options: [
-      { value: 'c', label: 'Convert now (press c)' },
-      { value: 'a', label: 'Review advanced options first (press a)' },
+      { value: 'c', label: 'Convert now' },
+      { value: 'a', label: 'Review advanced options first' },
     ],
     initialValue: 'c',
   });

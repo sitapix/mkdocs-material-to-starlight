@@ -43,9 +43,7 @@ describe('runWizard — Tier 0 only (vanilla site)', () => {
       // not. The downstream pipeline mkdir-recursives it on first write.
       text: ['/o'],
       confirm: [true],
-      // Tier 0 packageManager. The convert/advanced gate is selectKey, not select.
-      select: ['npm'],
-      selectKey: ['c'],
+      select: ['npm', 'c'],
     });
 
     const result = await runWizard({
@@ -72,8 +70,7 @@ describe('runWizard — Tier 0 only (vanilla site)', () => {
       // exercising the canonical clack init-prompt pattern used by
       // create-astro / create-svelte.
       confirm: [true],
-      select: ['npm'],
-      selectKey: ['c'],
+      select: ['npm', 'c'],
     });
     const result = await runWizard({
       projectDir: '/p',
@@ -119,8 +116,7 @@ describe('runWizard — Tier 0 only (vanilla site)', () => {
     const prompter = createFakePrompter({
       text: ['/o'],
       confirm: [true],
-      select: ['npm'],
-      selectKey: [null], // cancel at the gate
+      select: ['npm', null],
     });
     const result = await runWizard({
       projectDir: '/p',
@@ -134,6 +130,29 @@ describe('runWizard — Tier 0 only (vanilla site)', () => {
   });
 });
 
+describe('runWizard — convert/advanced gate prompt kind', () => {
+  // Regression: the gate used clack `selectKey`, which renders each option's
+  // letter inside an inverted block (bgWhite). That block is jarring next to
+  // the rest of the wizard's `select` prompts, which use clean radio glyphs.
+  // The gate is now a regular `select` so the visual matches.
+  it('the gate is a select prompt (not selectKey)', async () => {
+    const plan = makePlan();
+    const defaults = deriveDefaults(plan.config, { userAgent: undefined, env: {} });
+    const prompter = createFakePrompter({
+      text: ['/o'],
+      confirm: [true],
+      // Two select answers: package manager + gate. Order matters — the
+      // packageManager prompt fires before the gate.
+      select: ['npm', 'c'],
+    });
+    await runWizard({ projectDir: '/p', cwd: '/cwd', plan, defaults, prompter });
+    const gate = prompter.calls.find(
+      (c) => typeof c.message === 'string' && c.message.includes('Convert now'),
+    );
+    expect(gate?.kind).toBe('select');
+  });
+});
+
 describe('runWizard — Tier 1 conditional (content.tabs.link → tabs prompt)', () => {
   it('asks the tabs question when content.tabs.link is detected', async () => {
     const plan = makePlan({
@@ -143,8 +162,7 @@ describe('runWizard — Tier 1 conditional (content.tabs.link → tabs prompt)',
     const prompter = createFakePrompter({
       text: ['/o'],
       confirm: [true],
-      select: ['npm', 'mdx'],
-      selectKey: ['c'],
+      select: ['npm', 'mdx', 'c'],
     });
     const result = await runWizard({
       projectDir: '/p',
@@ -164,8 +182,7 @@ describe('runWizard — Tier 1 conditional (content.tabs.link → tabs prompt)',
     const prompter = createFakePrompter({
       text: ['/o'],
       confirm: [true],
-      select: ['npm'],
-      selectKey: ['c'],
+      select: ['npm', 'c'],
     });
     await runWizard({
       projectDir: '/p',
@@ -187,8 +204,7 @@ describe('runWizard — additional Tier 1 prompts', () => {
     const prompter = createFakePrompter({
       text: ['/o'],
       confirm: [true, true], // check, sidebar-topics
-      select: ['npm'],
-      selectKey: ['c'],
+      select: ['npm', 'c'],
     });
     const result = await runWizard({
       projectDir: '/p',
@@ -210,8 +226,7 @@ describe('runWizard — additional Tier 1 prompts', () => {
     const prompter = createFakePrompter({
       text: ['/o'],
       confirm: [true, true], // check, rss
-      select: ['npm'],
-      selectKey: ['c'],
+      select: ['npm', 'c'],
     });
     const result = await runWizard({
       projectDir: '/p',
@@ -234,8 +249,7 @@ describe('runWizard — additional Tier 1 prompts', () => {
     const prompter = createFakePrompter({
       text: ['/o'],
       confirm: [true],
-      select: ['npm'],
-      selectKey: ['c'],
+      select: ['npm', 'c'],
       multiselect: [['en', 'fr']],
     });
     const result = await runWizard({
@@ -257,8 +271,7 @@ describe('runWizard — additional Tier 1 prompts', () => {
     const prompter = createFakePrompter({
       text: ['/o'],
       confirm: [true],
-      select: ['npm'],
-      selectKey: ['c'],
+      select: ['npm', 'c'],
       autocompleteMultiselect: [['en', 'de']],
     });
     const result = await runWizard({
@@ -282,10 +295,8 @@ describe('runWizard — Tier 2 advanced opt-in', () => {
       text: ['/o'],
       // Tier 0 check, Tier 2 linksValidator
       confirm: [true, false],
-      // Tier 0 packageManager, Tier 2 cards/mdxMode/configFormat
-      select: ['npm', 'html', 'auto', 'mjs'],
-      // gate: 'a' for advanced
-      selectKey: ['a'],
+      // Tier 0 packageManager, gate ('a' = advanced), Tier 2 cards/mdxMode/configFormat
+      select: ['npm', 'a', 'html', 'auto', 'mjs'],
     });
     const result = await runWizard({
       projectDir: '/p',
@@ -304,7 +315,7 @@ describe('runWizard — Tier 2 advanced opt-in', () => {
     // Critical: the gate is asked exactly once. There must NOT be a second
     // "Convert now?" prompt after Tier 2.
     const gatePrompts = prompter.calls.filter(
-      (c) => c.kind === 'selectKey' && c.message.toLowerCase().includes('convert now'),
+      (c) => c.kind === 'select' && c.message.toLowerCase().includes('convert now'),
     );
     expect(gatePrompts.length).toBe(1);
   });
@@ -319,8 +330,7 @@ describe('runWizard — accessibility / colorblind-friendly UX', () => {
     const prompter = createFakePrompter({
       text: ['/o'],
       confirm: [true],
-      select: ['npm', 'mdx'],
-      selectKey: ['c'],
+      select: ['npm', 'mdx', 'c'],
     });
     await runWizard({ projectDir: '/p', cwd: '/cwd', plan, defaults, prompter });
     expect(
@@ -339,8 +349,7 @@ describe('runWizard — accessibility / colorblind-friendly UX', () => {
     const wrapped = createFakePrompter({
       text: ['/o'],
       confirm: [true],
-      select: ['npm', 'mdx'],
-      selectKey: ['c'],
+      select: ['npm', 'mdx', 'c'],
     });
     const realSelect = wrapped.select.bind(wrapped);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -372,12 +381,11 @@ describe('runWizard — pre-convert recap', () => {
     const prompter = createFakePrompter({
       text: ['/o'],
       confirm: [true],
-      select: ['npm'],
-      selectKey: ['c'],
+      select: ['npm', 'c'],
     });
     await runWizard({ projectDir: '/p', cwd: '/cwd', plan, defaults, prompter });
 
-    // Exactly one note fires, and it precedes the gate's selectKey call.
+    // Exactly one note fires, and it precedes the gate's select call.
     expect(prompter.notes.length).toBeGreaterThanOrEqual(1);
     const recap = prompter.notes[prompter.notes.length - 1];
     expect(recap).toBeDefined();
@@ -398,8 +406,7 @@ describe('runWizard — pre-convert recap', () => {
     const prompter = createFakePrompter({
       text: ['/o'],
       confirm: [true],
-      select: ['npm', 'mdx'],
-      selectKey: ['c'],
+      select: ['npm', 'mdx', 'c'],
     });
     await runWizard({ projectDir: '/p', cwd: '/cwd', plan, defaults, prompter });
     const recap = prompter.notes[prompter.notes.length - 1];
@@ -431,8 +438,7 @@ describe('runWizard — every Tier 1 detection step includes a docs URL', () => 
     const prompter = createFakePrompter({
       text: ['/o'],
       confirm: [true],
-      select: ['npm', 'mdx'],
-      selectKey: ['c'],
+      select: ['npm', 'mdx', 'c'],
     });
     await runWizard({ projectDir: '/p', cwd: '/cwd', plan, defaults, prompter });
     expectStepHasUrl(prompter.logs, /content\.tabs\.link/i);
@@ -446,8 +452,7 @@ describe('runWizard — every Tier 1 detection step includes a docs URL', () => 
     const prompter = createFakePrompter({
       text: ['/o'],
       confirm: [true, true],
-      select: ['npm'],
-      selectKey: ['c'],
+      select: ['npm', 'c'],
     });
     await runWizard({ projectDir: '/p', cwd: '/cwd', plan, defaults, prompter });
     expectStepHasUrl(prompter.logs, /navigation\.tabs/i);
@@ -459,8 +464,7 @@ describe('runWizard — every Tier 1 detection step includes a docs URL', () => 
     const prompter = createFakePrompter({
       text: ['/o'],
       confirm: [true, true],
-      select: ['npm'],
-      selectKey: ['c'],
+      select: ['npm', 'c'],
     });
     await runWizard({ projectDir: '/p', cwd: '/cwd', plan, defaults, prompter });
     expectStepHasUrl(prompter.logs, /rss plugin/i);
@@ -475,8 +479,7 @@ describe('runWizard — every Tier 1 detection step includes a docs URL', () => 
     const prompter = createFakePrompter({
       text: ['/o'],
       confirm: [true],
-      select: ['npm'],
-      selectKey: ['c'],
+      select: ['npm', 'c'],
       multiselect: [['docs/_snippets']],
     });
     await runWizard({ projectDir: '/p', cwd: '/cwd', plan, defaults, prompter });
@@ -492,8 +495,7 @@ describe('runWizard — every Tier 1 detection step includes a docs URL', () => 
     const prompter = createFakePrompter({
       text: ['/o'],
       confirm: [true],
-      select: ['npm'],
-      selectKey: ['c'],
+      select: ['npm', 'c'],
       multiselect: [['en', 'fr']],
     });
     await runWizard({ projectDir: '/p', cwd: '/cwd', plan, defaults, prompter });
@@ -506,8 +508,7 @@ describe('runWizard — every Tier 1 detection step includes a docs URL', () => 
     const prompter = createFakePrompter({
       text: ['/o', 'v1,v2,latest'],
       confirm: [true],
-      select: ['npm'],
-      selectKey: ['c'],
+      select: ['npm', 'c'],
     });
     await runWizard({ projectDir: '/p', cwd: '/cwd', plan, defaults, prompter });
     expectStepHasUrl(prompter.logs, /mike/i);
@@ -524,8 +525,7 @@ describe('runWizard — every Tier 1 detection step includes a docs URL', () => 
     const prompter = createFakePrompter({
       text: ['/o'],
       confirm: [true],
-      select: ['npm', 'translate'],
-      selectKey: ['c'],
+      select: ['npm', 'translate', 'c'],
     });
     await runWizard({ projectDir: '/p', cwd: '/cwd', plan, defaults, prompter });
     expectStepHasUrl(prompter.logs, /theme\.palette/i);
@@ -540,8 +540,7 @@ describe('runWizard — every Tier 1 detection step includes a docs URL', () => 
     const prompter = createFakePrompter({
       text: ['/o'],
       confirm: [true],
-      select: ['npm'],
-      selectKey: ['c'],
+      select: ['npm', 'c'],
       multiselect: [['custom.css']],
     });
     await runWizard({ projectDir: '/p', cwd: '/cwd', plan, defaults, prompter });
@@ -748,8 +747,7 @@ describe('runWizard — Tier 1 snippets path', () => {
     const prompter = createFakePrompter({
       text: ['/o'],
       confirm: [true],
-      select: ['npm'],
-      selectKey: ['c'],
+      select: ['npm', 'c'],
       multiselect: [['docs/_snippets']],
     });
     const result = await runWizard({ projectDir: '/p', cwd: '/cwd', plan, defaults, prompter });
@@ -766,8 +764,7 @@ describe('runWizard — Tier 1 snippets path', () => {
     const prompter = createFakePrompter({
       text: ['/o'],
       confirm: [true],
-      select: ['npm'],
-      selectKey: ['c'],
+      select: ['npm', 'c'],
     });
     const result = await runWizard({ projectDir: '/p', cwd: '/cwd', plan, defaults, prompter });
     expect(result.ok).toBe(true);
@@ -780,8 +777,7 @@ describe('runWizard — Tier 1 snippets path', () => {
     const prompter = createFakePrompter({
       text: ['/o'],
       confirm: [true],
-      select: ['npm'],
-      selectKey: ['c'],
+      select: ['npm', 'c'],
     });
     await runWizard({ projectDir: '/p', cwd: '/cwd', plan, defaults, prompter });
     expect(prompter.calls.some((c) => c.message.toLowerCase().includes('snippet'))).toBe(false);
@@ -795,8 +791,7 @@ describe('runWizard — Tier 1 mike path', () => {
     const prompter = createFakePrompter({
       text: ['/o', ' v1, v2 ,  ,latest '],
       confirm: [true],
-      select: ['npm'],
-      selectKey: ['c'],
+      select: ['npm', 'c'],
     });
     const result = await runWizard({ projectDir: '/p', cwd: '/cwd', plan, defaults, prompter });
     expect(result.ok).toBe(true);
@@ -809,8 +804,7 @@ describe('runWizard — Tier 1 mike path', () => {
     const prompter = createFakePrompter({
       text: ['/o', ''],
       confirm: [true],
-      select: ['npm'],
-      selectKey: ['c'],
+      select: ['npm', 'c'],
     });
     const result = await runWizard({ projectDir: '/p', cwd: '/cwd', plan, defaults, prompter });
     expect(result.ok).toBe(true);
@@ -835,8 +829,7 @@ describe('runWizard — Tier 1 palette path', () => {
       const prompter = createFakePrompter({
         text: ['/o'],
         confirm: [true],
-        select: ['npm', choice],
-        selectKey: ['c'],
+        select: ['npm', choice, 'c'],
       });
       const result = await runWizard({ projectDir: '/p', cwd: '/cwd', plan, defaults, prompter });
       expect(result.ok).toBe(true);
@@ -856,8 +849,7 @@ describe('runWizard — Tier 1 extra-assets path', () => {
     const prompter = createFakePrompter({
       text: ['/o'],
       confirm: [true],
-      select: ['npm'],
-      selectKey: ['c'],
+      select: ['npm', 'c'],
       multiselect: [['a.css', 'c.css']],
     });
     const result = await runWizard({ projectDir: '/p', cwd: '/cwd', plan, defaults, prompter });
@@ -876,8 +868,7 @@ describe('runWizard — Tier 1 extra-assets path', () => {
     const prompter = createFakePrompter({
       text: ['/o'],
       confirm: [true],
-      select: ['npm'],
-      selectKey: ['c'],
+      select: ['npm', 'c'],
       autocompleteMultiselect: [['asset0.css', 'asset1.css']],
     });
     const result = await runWizard({ projectDir: '/p', cwd: '/cwd', plan, defaults, prompter });
@@ -891,8 +882,7 @@ describe('runWizard — Tier 1 extra-assets path', () => {
     const prompter = createFakePrompter({
       text: ['/o'],
       confirm: [true],
-      select: ['npm'],
-      selectKey: ['c'],
+      select: ['npm', 'c'],
     });
     await runWizard({ projectDir: '/p', cwd: '/cwd', plan, defaults, prompter });
     expect(prompter.calls.some((c) => c.message.toLowerCase().includes('extra'))).toBe(false);
@@ -906,8 +896,7 @@ describe('runWizard — Tier 1 i18n no-locale edge case', () => {
     const prompter = createFakePrompter({
       text: ['/o'],
       confirm: [true],
-      select: ['npm'],
-      selectKey: ['c'],
+      select: ['npm', 'c'],
     });
     await runWizard({ projectDir: '/p', cwd: '/cwd', plan, defaults, prompter });
     expect(prompter.calls.some((c) => c.message.toLowerCase().includes('locale'))).toBe(false);
@@ -921,8 +910,7 @@ describe('runWizard — Tier 2 cancellation paths', () => {
     const prompter = createFakePrompter({
       text: ['/o'],
       confirm: [true, null],
-      select: ['npm'],
-      selectKey: ['a'],
+      select: ['npm', 'a'],
     });
     const result = await runWizard({ projectDir: '/p', cwd: '/cwd', plan, defaults, prompter });
     expect(result.ok).toBe(false);
@@ -935,8 +923,8 @@ describe('runWizard — Tier 2 cancellation paths', () => {
     const prompter = createFakePrompter({
       text: ['/o'],
       confirm: [true, false],
-      select: ['npm', null],
-      selectKey: ['a'],
+      // Order: tier0 packageManager, gate ('a' = advanced), tier2 cards (null → cancel).
+      select: ['npm', 'a', null],
     });
     const result = await runWizard({ projectDir: '/p', cwd: '/cwd', plan, defaults, prompter });
     expect(result.ok).toBe(false);
@@ -949,8 +937,8 @@ describe('runWizard — Tier 2 cancellation paths', () => {
     const prompter = createFakePrompter({
       text: ['/o'],
       confirm: [true, false],
-      select: ['npm', 'html', null],
-      selectKey: ['a'],
+      // Order: tier0 npm, gate 'a', tier2 cards 'html', tier2 mdxMode (null → cancel).
+      select: ['npm', 'a', 'html', null],
     });
     const result = await runWizard({ projectDir: '/p', cwd: '/cwd', plan, defaults, prompter });
     expect(result.ok).toBe(false);
@@ -963,8 +951,8 @@ describe('runWizard — Tier 2 cancellation paths', () => {
     const prompter = createFakePrompter({
       text: ['/o'],
       confirm: [true, false],
-      select: ['npm', 'html', 'auto', null],
-      selectKey: ['a'],
+      // Order: tier0 npm, gate 'a', tier2 cards 'html', mdxMode 'auto', configFormat (null → cancel).
+      select: ['npm', 'a', 'html', 'auto', null],
     });
     const result = await runWizard({ projectDir: '/p', cwd: '/cwd', plan, defaults, prompter });
     expect(result.ok).toBe(false);
