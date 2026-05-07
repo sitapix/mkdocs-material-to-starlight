@@ -238,7 +238,13 @@ describe('runWizard — additional Tier 1 prompts', () => {
       selectKey: ['c'],
       multiselect: [['en', 'fr']],
     });
-    const result = await runWizard({ plan: planWithLocales, projectDir: '/p', cwd: '/cwd', defaults, prompter });
+    const result = await runWizard({
+      plan: planWithLocales,
+      projectDir: '/p',
+      cwd: '/cwd',
+      defaults,
+      prompter,
+    });
     expect(result.ok).toBe(true);
     if (result.ok) expect(result.value.locales).toEqual(['en', 'fr']);
   });
@@ -255,7 +261,13 @@ describe('runWizard — additional Tier 1 prompts', () => {
       selectKey: ['c'],
       autocompleteMultiselect: [['en', 'de']],
     });
-    const result = await runWizard({ plan: planWithLocales, projectDir: '/p', cwd: '/cwd', defaults, prompter });
+    const result = await runWizard({
+      plan: planWithLocales,
+      projectDir: '/p',
+      cwd: '/cwd',
+      defaults,
+      prompter,
+    });
     expect(result.ok).toBe(true);
     if (result.ok) expect(result.value.locales).toEqual(['en', 'de']);
     expect(prompter.calls.some((c) => c.kind === 'autocompleteMultiselect')).toBe(true);

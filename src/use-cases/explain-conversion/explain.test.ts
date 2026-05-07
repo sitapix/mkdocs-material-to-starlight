@@ -90,16 +90,12 @@ describe('explainConversion', () => {
   });
 
   it('fires a plugin row when the matching plugin is configured', () => {
-    const rows = explainConversion(
-      makeConfig({ plugins: [{ name: 'privacy', options: {} }] }),
-    );
+    const rows = explainConversion(makeConfig({ plugins: [{ name: 'privacy', options: {} }] }));
     expect(rows.some((row) => row.featureId === 'plugin-privacy')).toBe(true);
   });
 
   it('fires comment-system only when theme.custom_dir is set', () => {
-    const without = explainConversion(
-      makeConfig({ theme: { name: 'material', options: {} } }),
-    );
+    const without = explainConversion(makeConfig({ theme: { name: 'material', options: {} } }));
     expect(without.some((row) => row.featureId === 'comment-system')).toBe(false);
 
     const withOverrides = explainConversion(

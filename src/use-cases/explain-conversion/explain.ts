@@ -29,8 +29,6 @@ export function explainConversion(config: MkdocsConfig): ReadonlyArray<MappingRo
     (row) =>
       row.requiredExtensions.every((required) => enabledExtensions.has(required)) &&
       (row.requiredPlugins ?? []).every((required) => enabledPlugins.has(required)) &&
-      (row.requiredThemeOptions ?? []).every((key) =>
-        Object.prototype.hasOwnProperty.call(themeOptions, key),
-      ),
+      (row.requiredThemeOptions ?? []).every((key) => Object.hasOwn(themeOptions, key)),
   );
 }

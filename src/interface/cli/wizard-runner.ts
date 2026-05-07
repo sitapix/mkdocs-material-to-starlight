@@ -86,9 +86,7 @@ export async function runWizardFlow(
     }
     // Saved flags failed to re-parse (CLI surface drift since they were
     // written). Fall through to the normal wizard rather than blocking.
-    prompter.log.warn(
-      "Saved answers don't match the current CLI. Starting fresh.",
-    );
+    prompter.log.warn("Saved answers don't match the current CLI. Starting fresh.");
   }
 
   // Preflight: validate `docs_dir` resolves before asking any prompt. Mirrors
@@ -102,7 +100,7 @@ export async function runWizardFlow(
     createNodeDirectoryReader(),
   );
   if (!preflight.ok) {
-    prompter.note(preflight.error.message, "Found a problem with your project");
+    prompter.note(preflight.error.message, 'Found a problem with your project');
     prompter.cancel('Fix the issue above and try again.');
     return { kind: 'cancelled' };
   }

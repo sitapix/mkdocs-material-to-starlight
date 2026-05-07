@@ -14,12 +14,12 @@
 
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
+import { err, ok, type Result } from '../../domain/result.js';
 import type {
   WizardPrefs,
   WizardPrefsStore,
   WizardPrefsStoreError,
 } from '../../domain/wizard/ports/wizard-prefs-store.js';
-import { err, ok, type Result } from '../../domain/result.js';
 import { atomicWriteText } from './atomic-write.js';
 
 const PREFS_FILE = '.mkdocs-material-to-starlight.json';

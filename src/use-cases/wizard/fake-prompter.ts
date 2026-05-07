@@ -127,9 +127,12 @@ export function createFakePrompter(script: ScriptedAnswers = {}): FakePrompter {
       // Build incrementally so optional fields stay absent (not `undefined`)
       // when not provided — required by `exactOptionalPropertyTypes: true`.
       const call: RecordedCall = { kind: 'text', message: o.message };
-      if (o.initialValue !== undefined) (call as { initialValue?: unknown }).initialValue = o.initialValue;
-      if (o.placeholder !== undefined) (call as { placeholder?: string }).placeholder = o.placeholder;
-      if (o.defaultValue !== undefined) (call as { defaultValue?: string }).defaultValue = o.defaultValue;
+      if (o.initialValue !== undefined)
+        (call as { initialValue?: unknown }).initialValue = o.initialValue;
+      if (o.placeholder !== undefined)
+        (call as { placeholder?: string }).placeholder = o.placeholder;
+      if (o.defaultValue !== undefined)
+        (call as { defaultValue?: string }).defaultValue = o.defaultValue;
       calls.push(call);
       // Mirror clack's submit-on-empty contract: defaultValue wins when the
       // user just presses Enter. Tests opt into that path by omitting a `text`
