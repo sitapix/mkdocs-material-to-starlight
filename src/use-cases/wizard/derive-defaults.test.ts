@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { deriveDefaults, guessPackageManager } from './derive-defaults.js';
 import type { MkdocsConfig } from '../../domain/config/mkdocs-config.js';
+import { deriveDefaults, guessPackageManager } from './derive-defaults.js';
 
 const baseConfig: MkdocsConfig = {
   siteName: 'My Docs',
@@ -20,7 +20,7 @@ const baseConfig: MkdocsConfig = {
 };
 
 describe('deriveDefaults', () => {
-  it('produces all defaults equal to today\'s converter behavior (no overrides)', () => {
+  it("produces all defaults equal to today's converter behavior (no overrides)", () => {
     const d = deriveDefaults(baseConfig, { userAgent: undefined, env: {} });
     expect(d.packageManager).toBe('npm');
     expect(d.check).toBe(true);

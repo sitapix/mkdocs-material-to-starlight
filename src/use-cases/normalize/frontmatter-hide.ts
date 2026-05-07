@@ -43,7 +43,10 @@ export function normalizeFrontmatterHide(source: string): string {
 function extractHideValues(fmBody: string): ReadonlyArray<string> | null {
   const inline = fmBody.match(INLINE_HIDE_RE);
   if (inline !== null) {
-    return (inline[1] ?? '').split(',').map((v) => v.trim()).filter((v) => v.length > 0);
+    return (inline[1] ?? '')
+      .split(',')
+      .map((v) => v.trim())
+      .filter((v) => v.length > 0);
   }
   const block = fmBody.match(BLOCK_HIDE_RE);
   if (block !== null) {

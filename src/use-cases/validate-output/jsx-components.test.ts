@@ -45,12 +45,7 @@ describe('validateJsxComponents', () => {
   });
 
   it('honors `as` aliases in named imports', () => {
-    const src = [
-      "import { Foo as Bar } from './x';",
-      '',
-      '<Bar />',
-      '',
-    ].join('\n');
+    const src = ["import { Foo as Bar } from './x';", '', '<Bar />', ''].join('\n');
     expect(validateJsxComponents(src, 'page.mdx')).toEqual([]);
   });
 
@@ -74,12 +69,7 @@ describe('validateJsxComponents', () => {
   });
 
   it('handles dotted member access by validating the root', () => {
-    const src = [
-      "import { Foo } from './x';",
-      '',
-      '<Foo.Sub>body</Foo.Sub>',
-      '',
-    ].join('\n');
+    const src = ["import { Foo } from './x';", '', '<Foo.Sub>body</Foo.Sub>', ''].join('\n');
     expect(validateJsxComponents(src, 'page.mdx')).toEqual([]);
   });
 });

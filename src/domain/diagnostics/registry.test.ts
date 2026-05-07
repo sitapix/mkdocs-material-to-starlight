@@ -1,11 +1,7 @@
-import { describe, expect, it } from 'vitest';
-import { readFileSync, readdirSync, statSync } from 'node:fs';
+import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
-import {
-  getAllRegisteredRuleIds,
-  isRegisteredRuleId,
-  getRegisteredRuleId,
-} from './registry.js';
+import { describe, expect, it } from 'vitest';
+import { getAllRegisteredRuleIds, getRegisteredRuleId, isRegisteredRuleId } from './registry.js';
 
 function collectTsFiles(dir: string, files: string[] = []): string[] {
   for (const entry of readdirSync(dir)) {
@@ -142,8 +138,7 @@ describe('diagnostic registry', () => {
     const blockRe = /createDiagnostic\(\s*\{([\s\S]*?)\}\s*\)/g;
     const shorthandRuleRe = /(^|[\s,{])ruleId(\s*[,}])/;
     const literalRe = /^['"][^'"]+['"]$/;
-    const ternaryOfLiteralsRe =
-      /^[^?]+\?\s*['"][^'"]+['"]\s*:\s*['"][^'"]+['"]$/;
+    const ternaryOfLiteralsRe = /^[^?]+\?\s*['"][^'"]+['"]\s*:\s*['"][^'"]+['"]$/;
     const constTableForwardRe = /^[A-Za-z_][\w]*\.ruleId$/;
 
     const offenders: string[] = [];
@@ -161,7 +156,9 @@ describe('diagnostic registry', () => {
         if (literalRe.test(collapsed)) continue;
         if (ternaryOfLiteralsRe.test(collapsed)) continue;
         if (constTableForwardRe.test(collapsed)) continue;
-        offenders.push(`${file}: ruleId \`${collapsed}\` — must be a string literal, ternary of literals, or const-table forward`);
+        offenders.push(
+          `${file}: ruleId \`${collapsed}\` — must be a string literal, ternary of literals, or const-table forward`,
+        );
       }
     }
     expect(offenders, offenders.join('\n')).toEqual([]);

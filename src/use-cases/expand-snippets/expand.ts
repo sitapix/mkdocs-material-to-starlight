@@ -392,13 +392,13 @@ function extractSection(
   let startIdx = -1;
   let endIdx = -1;
   for (let i = 0; i < lines.length; i += 1) {
-    const startMatch = lines[i]!.match(SECTION_START);
-    if (startMatch !== null && startMatch[1] === section) {
+    const startMatch = lines[i]?.match(SECTION_START);
+    if (startMatch && startMatch[1] === section) {
       startIdx = i + 1;
       continue;
     }
-    const endMatch = lines[i]!.match(SECTION_END);
-    if (endMatch !== null && endMatch[1] === section) {
+    const endMatch = lines[i]?.match(SECTION_END);
+    if (endMatch && endMatch[1] === section) {
       endIdx = i;
       break;
     }

@@ -19,28 +19,24 @@
  * Schema: https://github.com/delucis/astro-og-canvas#options
  */
 
-export function translateOgCanvasOptions(
-  options: Readonly<Record<string, unknown>>,
-): string {
+export function translateOgCanvasOptions(options: Readonly<Record<string, unknown>>): string {
   const parts: string[] = [];
 
-  if (typeof options['background_color'] === 'string') {
-    parts.push(`bgGradient: [${quote(options['background_color'])}]`);
+  if (typeof options.background_color === 'string') {
+    parts.push(`bgGradient: [${quote(options.background_color)}]`);
   }
-  if (typeof options['background_image'] === 'string') {
-    parts.push(`bgImage: { path: [${quote(options['background_image'])}] }`);
+  if (typeof options.background_image === 'string') {
+    parts.push(`bgImage: { path: [${quote(options.background_image)}] }`);
   }
-  if (typeof options['color'] === 'string') {
-    parts.push(`color: ${quote(options['color'])}`);
+  if (typeof options.color === 'string') {
+    parts.push(`color: ${quote(options.color)}`);
   }
-  if (typeof options['font_family'] === 'string') {
-    const fam = quote(options['font_family']);
-    parts.push(
-      `font: { title: { families: [${fam}] }, description: { families: [${fam}] } }`,
-    );
+  if (typeof options.font_family === 'string') {
+    const fam = quote(options.font_family);
+    parts.push(`font: { title: { families: [${fam}] }, description: { families: [${fam}] } }`);
   }
-  if (typeof options['logo'] === 'string') {
-    parts.push(`logo: { path: [${quote(options['logo'])}] }`);
+  if (typeof options.logo === 'string') {
+    parts.push(`logo: { path: [${quote(options.logo)}] }`);
   }
 
   if (parts.length === 0) return '{}';

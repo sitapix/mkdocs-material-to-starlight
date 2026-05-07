@@ -1,14 +1,7 @@
-import { describe, expect, it, beforeEach, afterEach } from 'vitest';
-import {
-  mkdtempSync,
-  mkdirSync,
-  rmSync,
-  writeFileSync,
-  readFileSync,
-  readdirSync,
-} from 'node:fs';
-import { join, relative } from 'node:path';
+import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
+import { join, relative } from 'node:path';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { convertSiteFromDisk } from '../../src/interface/api/convert-site.js';
 
 /**
@@ -121,7 +114,7 @@ describe('converted output is leak-free across all known PyMdown shapes', () => 
               pattern: name,
               file: relative(outputDir, file),
               line: i + 1,
-              text: line.length > 100 ? line.slice(0, 100) + '…' : line,
+              text: line.length > 100 ? `${line.slice(0, 100)}…` : line,
             });
           }
         }
@@ -254,13 +247,21 @@ describe('converted output is leak-free across all known PyMdown shapes', () => 
     if (leaks.length > 0) {
       const grouped = leaks.reduce<Record<string, typeof leaks>>((acc, l) => {
         acc[l.pattern] = acc[l.pattern] ?? [];
-        acc[l.pattern]!.push(l);
+        acc[l.pattern]?.push(l);
         return acc;
       }, {});
       const summary = Object.entries(grouped)
-        .map(([k, v]) => `  ${k}: ${v.length}\n${v.slice(0, 3).map((x) => `    ${x.file}:${x.line}: ${x.text}`).join('\n')}`)
+        .map(
+          ([k, v]) =>
+            `  ${k}: ${v.length}\n${v
+              .slice(0, 3)
+              .map((x) => `    ${x.file}:${x.line}: ${x.text}`)
+              .join('\n')}`,
+        )
         .join('\n');
-      throw new Error(`Found ${String(leaks.length)} leaks of literal source syntax in converted output:\n${summary}`);
+      throw new Error(
+        `Found ${String(leaks.length)} leaks of literal source syntax in converted output:\n${summary}`,
+      );
     }
   });
 });

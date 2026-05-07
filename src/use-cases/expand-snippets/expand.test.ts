@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { expandSnippets } from './expand.js';
 import type { FileSystem } from '../../domain/ports/file-system.js';
-import { ok, err } from '../../domain/result.js';
+import { err, ok } from '../../domain/result.js';
+import { expandSnippets } from './expand.js';
 
 function makeFs(files: Record<string, string>): FileSystem {
   return {
@@ -13,7 +13,7 @@ function makeFs(files: Record<string, string>): FileSystem {
       return ok(content);
     },
     async exists(path) {
-      return Object.prototype.hasOwnProperty.call(files, path);
+      return Object.hasOwn(files, path);
     },
     async realpath(path) {
       return ok(path);
@@ -111,9 +111,7 @@ describe('expandSnippets', () => {
       fs,
       maxDepth: 3,
     });
-    expect(result.diagnostics.some((d) => d.ruleId === 'snippet-depth-exceeded')).toBe(
-      true,
-    );
+    expect(result.diagnostics.some((d) => d.ruleId === 'snippet-depth-exceeded')).toBe(true);
   });
 
   it('is idempotent — expanding twice produces the same text as expanding once', async () => {
@@ -137,9 +135,7 @@ describe('expandSnippets', () => {
         'docs/a.md': 'first body',
         'docs/b.md': 'second body',
       });
-      const src = ['Pre.', '', '--8<--', 'a.md', 'b.md', '--8<--', '', 'Post.', ''].join(
-        '\n',
-      );
+      const src = ['Pre.', '', '--8<--', 'a.md', 'b.md', '--8<--', '', 'Post.', ''].join('\n');
       const result = await expandSnippets({
         source: src,
         basePaths: ['docs'],
@@ -323,9 +319,7 @@ describe('expandSnippets', () => {
         basePaths: ['docs'],
         fs,
       });
-      expect(
-        result.diagnostics.some((d) => d.ruleId === 'snippet-url-not-supported'),
-      ).toBe(true);
+      expect(result.diagnostics.some((d) => d.ruleId === 'snippet-url-not-supported')).toBe(true);
       expect(result.text).toContain('https://example.com/snippet.md');
     });
 
@@ -370,9 +364,7 @@ describe('expandSnippets', () => {
         basePaths: ['docs'],
         fs,
       });
-      expect(
-        result.diagnostics.some((d) => d.ruleId === 'snippet-malformed'),
-      ).toBe(true);
+      expect(result.diagnostics.some((d) => d.ruleId === 'snippet-malformed')).toBe(true);
     });
   });
 });

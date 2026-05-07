@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { normalize } from './normalize.js';
-import { normalizeAdmonitions, ADMONITION_FENCE_DEPTH } from './admonitions.js';
+import { ADMONITION_FENCE_DEPTH, normalizeAdmonitions } from './admonitions.js';
 import { normalizeContentTabs } from './content-tabs.js';
+import { normalize } from './normalize.js';
 
 const F = ':'.repeat(ADMONITION_FENCE_DEPTH);
 
@@ -55,15 +55,7 @@ describe('normalize (composed pre-parse pipeline)', () => {
   });
 
   it('shields fenced code from both normalizers', () => {
-    const src = [
-      '```',
-      '!!! note',
-      '    body',
-      '=== "tab"',
-      '    body',
-      '```',
-      '',
-    ].join('\n');
+    const src = ['```', '!!! note', '    body', '=== "tab"', '    body', '```', ''].join('\n');
     expect(normalize(src)).toBe(src);
   });
 
@@ -84,13 +76,9 @@ describe('normalize (composed pre-parse pipeline)', () => {
   });
 
   it('downgrades Material annotations to footnote refs/defs', () => {
-    const src = [
-      'See marker (1) here.',
-      '{ .annotate }',
-      '',
-      '1.  Annotation body.',
-      '',
-    ].join('\n');
+    const src = ['See marker (1) here.', '{ .annotate }', '', '1.  Annotation body.', ''].join(
+      '\n',
+    );
     const out = normalize(src);
     expect(out).toContain('[^anno-1-1]');
     expect(out).toContain('[^anno-1-1]: Annotation body.');
@@ -122,11 +110,7 @@ describe('normalize (composed pre-parse pipeline)', () => {
   });
 
   it('rewrites Python-Markdown definition lists into <dl> HTML', () => {
-    const src = [
-      'Apple',
-      ':   A red fruit.',
-      '',
-    ].join('\n');
+    const src = ['Apple', ':   A red fruit.', ''].join('\n');
     const out = normalize(src);
     expect(out).toContain('<dl>');
     expect(out).toContain('<dt>Apple</dt>');

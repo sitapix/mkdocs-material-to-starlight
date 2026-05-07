@@ -28,10 +28,7 @@ export function serializeSidebar(entries: ReadonlyArray<SidebarEntry>): string {
   return renderArray(entries, 0);
 }
 
-function renderArray(
-  entries: ReadonlyArray<SidebarEntry>,
-  depth: number,
-): string {
+function renderArray(entries: ReadonlyArray<SidebarEntry>, depth: number): string {
   const inner = entries.map((e) => `${pad(depth + 1)}${renderEntry(e, depth + 1)},`);
   return `[\n${inner.join('\n')}\n${pad(depth)}]`;
 }

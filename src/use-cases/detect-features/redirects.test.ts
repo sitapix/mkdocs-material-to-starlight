@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { extractRedirects } from './redirects.js';
 import type { MkdocsPlugin } from '../../domain/config/mkdocs-config.js';
+import { extractRedirects } from './redirects.js';
 
 function pluginsWith(plugin: MkdocsPlugin): ReadonlyArray<MkdocsPlugin> {
   return [plugin];
@@ -13,9 +13,7 @@ describe('extractRedirects', () => {
   });
 
   it('returns an empty map when the redirects plugin has no redirect_maps', () => {
-    expect(
-      extractRedirects(pluginsWith({ name: 'redirects', options: {} })),
-    ).toEqual({});
+    expect(extractRedirects(pluginsWith({ name: 'redirects', options: {} }))).toEqual({});
   });
 
   it('translates a single .md redirect mapping into Starlight slug pairs', () => {

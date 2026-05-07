@@ -17,19 +17,14 @@
  * to know about them anyway. The behavior is locked in by test.
  */
 
-import {
-  createDiagnostic,
-  type Diagnostic,
-} from '../../domain/diagnostics/diagnostic.js';
+import { createDiagnostic, type Diagnostic } from '../../domain/diagnostics/diagnostic.js';
 
 const SOURCE = 'detect-macros/scan';
 const VARIABLE_RE = /\{\{[^}]+\}\}/g;
 const STATEMENT_RE = /\{%[\s\S]+?%\}/g;
 const INCLUDE_TAG_RE = /^\{%\s*(include-markdown|include)\b/;
 
-export function scanMacroOccurrences(
-  source: string,
-): ReadonlyArray<Diagnostic> {
+export function scanMacroOccurrences(source: string): ReadonlyArray<Diagnostic> {
   const diagnostics: Diagnostic[] = [];
   collectMatches(source, VARIABLE_RE, diagnostics);
   collectStatements(source, diagnostics);
@@ -38,11 +33,7 @@ export function scanMacroOccurrences(
   return [...diagnostics].sort(byPlace);
 }
 
-function collectMatches(
-  source: string,
-  re: RegExp,
-  out: Diagnostic[],
-): void {
+function collectMatches(source: string, re: RegExp, out: Diagnostic[]): void {
   for (const match of source.matchAll(re)) {
     const index = match.index ?? 0;
     const place = lineColumnAt(source, index);
@@ -60,10 +51,7 @@ function collectStatements(source: string, out: Diagnostic[]): void {
   }
 }
 
-function buildDiagnostic(
-  expression: string,
-  place: { line: number; column: number },
-): Diagnostic {
+function buildDiagnostic(expression: string, place: { line: number; column: number }): Diagnostic {
   return createDiagnostic({
     severity: 'warning',
     ruleId: 'plugin-macros-occurrence',
@@ -73,10 +61,7 @@ function buildDiagnostic(
   });
 }
 
-function lineColumnAt(
-  source: string,
-  index: number,
-): { line: number; column: number } {
+function lineColumnAt(source: string, index: number): { line: number; column: number } {
   let line = 1;
   let lastNewline = -1;
   for (let i = 0; i < index; i += 1) {

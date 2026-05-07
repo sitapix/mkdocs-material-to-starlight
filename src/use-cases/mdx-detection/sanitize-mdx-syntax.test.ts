@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { sanitizeMdxSyntax, type SanitizeReport } from './sanitize-mdx-syntax.js';
+import { type SanitizeReport, sanitizeMdxSyntax } from './sanitize-mdx-syntax.js';
 
 describe('sanitizeMdxSyntax', () => {
   describe('HTML comments', () => {
     it('rewrites a single-line <!-- ... --> comment as an MDX {/* ... */} comment', () => {
       // MDX parses `<!-- ` as the start of a JSX element whose name begins with
-      // `!` — invalid. Real-world pydantic regression: `<!-- markdownlint-... -->`
+      // `!` — invalid. Real-world regression: `<!-- markdownlint-... -->`
       // crashed the build on every page that used markdownlint hints.
       const src = 'before\n<!-- markdownlint-disable-next-line strong-style -->\nafter\n';
       const out = sanitizeMdxSyntax(src);
@@ -30,11 +30,11 @@ describe('sanitizeMdxSyntax', () => {
   describe('Markdown autolinks', () => {
     it('rewrites <https://example.com> to a Markdown link', () => {
       // MDX parses `<` as start of JSX. `<https://...>` becomes a JSX tag named
-      // `https` — invalid because of `:` and `/`. Real-world pydantic
+      // `https` — invalid because of `:` and `/`. Real-world
       // migration.mdx regression.
-      const src = 'See <https://docs.pydantic.dev/1.10/> for details.\n';
+      const src = 'See <https://docs.example.com/1.10/> for details.\n';
       const out = sanitizeMdxSyntax(src);
-      expect(out).toContain('[https://docs.pydantic.dev/1.10/](https://docs.pydantic.dev/1.10/)');
+      expect(out).toContain('[https://docs.example.com/1.10/](https://docs.example.com/1.10/)');
       expect(out).not.toMatch(/<https:\/\//);
     });
 
@@ -63,7 +63,9 @@ describe('sanitizeMdxSyntax', () => {
     it('rewrites a real-world hyphenated email autolink', () => {
       const src = 'Or contact: <camdimmersivemedialab@northeastern.edu>\n';
       const out = sanitizeMdxSyntax(src);
-      expect(out).toContain('[camdimmersivemedialab@northeastern.edu](mailto:camdimmersivemedialab@northeastern.edu)');
+      expect(out).toContain(
+        '[camdimmersivemedialab@northeastern.edu](mailto:camdimmersivemedialab@northeastern.edu)',
+      );
     });
 
     it('does not treat <not-an-email> as an email autolink', () => {
@@ -86,7 +88,7 @@ describe('sanitizeMdxSyntax', () => {
     it('escapes `{#anchor-id}` so MDX does not parse it as a JS expression', () => {
       // `{#anchor}` is Material's heading-anchor syntax. MDX parses `{` as JS
       // expression opener and `#` is invalid JS — build fails. Real-world
-      // pydantic validators.mdx and sqlmodel insert.mdx regression.
+      // validators.mdx / insert.mdx regression.
       const src = 'paragraph text\n  {#field-after-validator}\n\nmore.\n';
       const out = sanitizeMdxSyntax(src);
       expect(out).not.toMatch(/(?<!\\)\{#field-after-validator\}/);
@@ -110,7 +112,7 @@ describe('sanitizeMdxSyntax', () => {
     it('escapes anchor IDs that contain backslash-escaped underscores', () => {
       // remark-stringify escapes `_` in heading anchor labels to prevent
       // emphasis interpretation, producing `{#some\_id}`. Real-world
-      // pydantic serialization.mdx regression: `{#modelmodel\_dump}` crashed
+      // serialization.mdx regression: `{#modelmodel\_dump}` crashed
       // the build because `\_` is not a valid JS identifier character.
       const src = 'paragraph\n  {#modelmodel\\_dump}\n';
       const out = sanitizeMdxSyntax(src);
@@ -122,7 +124,7 @@ describe('sanitizeMdxSyntax', () => {
     it('wraps {!file.md!} in inline backticks so MDX does not parse the {! as JS', () => {
       // mkdocs-include-markdown plugin syntax. MDX parses `{` as JS expression
       // opener, sees `!./path` and chokes (`!` is a valid JS prefix but `./`
-      // isn't valid syntax after it). Real-world sqlmodel regression.
+      // isn't valid syntax after it). Real-world include-macro regression.
       const src = 'before\n{!./docs/page.md!}\nafter\n';
       const out = sanitizeMdxSyntax(src);
       expect(out).toContain('`{!./docs/page.md!}`');
@@ -144,7 +146,7 @@ describe('sanitizeMdxSyntax', () => {
   describe('void HTML elements', () => {
     it('self-closes <br> so MDX does not look for </br>', () => {
       // MDX requires void elements to be explicitly self-closed. `<br>` alone
-      // raises "Expected a closing tag for `<br>`". Real-world pydantic
+      // raises "Expected a closing tag for `<br>`". Real-world
       // alias.mdx regression: `<br>` after each list item.
       const src = 'first<br>\nsecond<br>\n';
       const out = sanitizeMdxSyntax(src);
@@ -329,7 +331,8 @@ describe('sanitizeMdxSyntax', () => {
       // but contain characters JSX rejects in attribute-name position
       // (`*`, `:`, `.`). Without escaping, MDX raises
       // "Unexpected character `.` (U+002E) in attribute name".
-      const src = '<VirtualHost *:443>\n  <IfModule mod_ssl.c>\n    body\n  </IfModule>\n</VirtualHost>\n';
+      const src =
+        '<VirtualHost *:443>\n  <IfModule mod_ssl.c>\n    body\n  </IfModule>\n</VirtualHost>\n';
       const out = sanitizeMdxSyntax(src);
       // Brackets escaped on the openers AND matching closers — otherwise
       // MDX would still error on the orphan `</IfModule>` / `</VirtualHost>`
@@ -774,9 +777,38 @@ describe('sanitizeMdxSyntax', () => {
       // remark stringifies underscore as `\_` because `_user_id_` would
       // otherwise read as emphasis. JS does not recognize `\_` as an escape;
       // acorn raises "Could not parse expression".
-      const src = '| status | data |\n| --- | --- |\n| OK | {"user\\_id": 12391, "message": "success"} |\n';
+      const src =
+        '| status | data |\n| --- | --- |\n| OK | {"user\\_id": 12391, "message": "success"} |\n';
       const out = sanitizeMdxSyntax(src);
       expect(out).toContain('&#123;"user\\_id"');
+    });
+
+    it('escapes prose-style placeholder `{Your Username}` (capitalized multi-word)', () => {
+      // Real-world (IDinsight/experiments-engine personal-vs-team.md):
+      // doc authors write `"{Your Username}'s Workspace"` to mean
+      // "replace this with your actual username". MDX parses the braces
+      // as a JSX expression, sees two adjacent identifiers `Your`
+      // and `Username` with whitespace between (invalid JS), and
+      // acorn errors with "Could not parse expression with acorn".
+      const out = sanitizeMdxSyntax('name "{Your Username}\'s Workspace"\n');
+      expect(out).toContain('&#123;Your Username}');
+    });
+
+    it('escapes `{API Key}` (capitalized + acronym + word)', () => {
+      const out = sanitizeMdxSyntax('Replace {API Key} with your actual key.\n');
+      expect(out).toContain('&#123;API Key}');
+    });
+
+    it('leaves `{user.name}` (real JSX expression) untouched', () => {
+      // Valid JSX — must not match the placeholder heuristic.
+      const out = sanitizeMdxSyntax('Hello {user.name}\n');
+      expect(out).toContain('{user.name}');
+      expect(out).not.toContain('&#123;user.name');
+    });
+
+    it('leaves `{count}` (single identifier) untouched', () => {
+      const out = sanitizeMdxSyntax('Count: {count}\n');
+      expect(out).toContain('{count}');
     });
 
     it('leaves `{` followed by valid JSX expression alone', () => {
@@ -795,7 +827,7 @@ describe('sanitizeMdxSyntax', () => {
       const src = '| char | desc |\n| --- | --- |\n| {  | repetition opener |\n';
       const out = sanitizeMdxSyntax(src);
       expect(out).toContain('&#123;');
-      expect(out).not.toMatch(/\| \{  \|/);
+      expect(out).not.toMatch(/\| \{ {2}\|/);
     });
 
     it('escapes regex-syntax `{n,}` / `{n,m}` literals in markdown table cells', () => {
@@ -871,6 +903,46 @@ describe('sanitizeMdxSyntax', () => {
       const out = sanitizeMdxSyntax(src);
       // The `<` after the fence is in prose and must be escaped.
       expect(out).toContain('8&lt;-- text');
+    });
+
+    it('escapes a stray `</small>` closer that has no matching opener', () => {
+      // Real-world (cv4x/svstudio-manual/docs/index.md): a "Last update"
+      // link is followed by `</small>` with no matching `<small>` opener
+      // in the same paragraph (the opener belongs to a previous heading
+      // and is already balanced there). MDX errors with
+      //   Unexpected closing slash `/` in tag, expected an open tag first
+      // at the orphan closer. Escaping it as `&lt;/small>` keeps the
+      // visible output identical (browser decodes the entity) while
+      // letting MDX parse the document.
+      const src = ['## Heading <small>(meta)</small>', '', 'Some prose</small> trailing.', ''].join(
+        '\n',
+      );
+      const out = sanitizeMdxSyntax(src);
+      expect(out).toContain('Some prose&lt;/small> trailing.');
+      // The balanced pair from the heading is untouched.
+      expect(out).toContain('<small>(meta)</small>');
+    });
+
+    it('does NOT inject `</span>` when the only unbalanced `<span>` is inside an inline backtick span', () => {
+      // Real-world regression (timvink/mkdocs-git-revision-date-localized-plugin
+      // howto/custom-styling.md): a paragraph mentions the literal HTML element
+      // name in inline code (`<span>`), and a later code fence contains
+      // `<span class="…">…</span>`. Without code-shielded counting, the global
+      // tag balance reads {open: 2, close: 1} and the per-paragraph walker
+      // appends a stray `</span>` to the prose paragraph — which then crashes
+      // MDX with "Unexpected closing slash `/` in tag, expected an open tag
+      // first". The inline-code occurrence is *prose about HTML*, not HTML.
+      const src = [
+        'To allow for easier styling date outputs are wrapped in `<span>` elements.',
+        '',
+        '```django',
+        'Last update:',
+        '<span class="x">28 November</span>',
+        '```',
+        '',
+      ].join('\n');
+      const out = sanitizeMdxSyntax(src);
+      expect(out).not.toMatch(/elements\.<\/span>/);
     });
 
     it('auto-closes orphan `<span>` openers at the next paragraph break', () => {

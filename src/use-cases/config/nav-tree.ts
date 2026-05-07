@@ -13,8 +13,8 @@
  * surface the failure as a diagnostic and skip the entry.
  */
 
-import { ok, err, type Result } from '../../domain/result.js';
 import type { MkdocsNavEntry } from '../../domain/config/mkdocs-config.js';
+import { err, ok, type Result } from '../../domain/result.js';
 
 export interface NavParseError {
   readonly message: string;
@@ -103,9 +103,5 @@ function sanitizeExternalUrl(href: string): string {
 }
 
 function isExternalUrl(value: string): boolean {
-  return (
-    value.startsWith('http://') ||
-    value.startsWith('https://') ||
-    value.startsWith('mailto:')
-  );
+  return value.startsWith('http://') || value.startsWith('https://') || value.startsWith('mailto:');
 }

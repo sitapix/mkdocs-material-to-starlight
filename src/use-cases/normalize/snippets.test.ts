@@ -19,9 +19,7 @@ describe('detectSnippets', () => {
   });
 
   it('detects a multi-file block snippet', () => {
-    const src = ['Intro.', '', '--8<--', 'a.md', 'b.md', '--8<--', '', 'After.'].join(
-      '\n',
-    );
+    const src = ['Intro.', '', '--8<--', 'a.md', 'b.md', '--8<--', '', 'After.'].join('\n');
     const result = detectSnippets(src);
     expect(result).toHaveLength(1);
     const first = result[0];

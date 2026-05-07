@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { convertSite } from './convert.js';
 import type { FileSystem } from '../../domain/ports/file-system.js';
-import { ok, err } from '../../domain/result.js';
+import { err, ok } from '../../domain/result.js';
+import { convertSite } from './convert.js';
 
 function makeFs(files: Record<string, string>): FileSystem {
   return {
@@ -13,7 +13,7 @@ function makeFs(files: Record<string, string>): FileSystem {
       return ok(content);
     },
     async exists(path) {
-      return Object.prototype.hasOwnProperty.call(files, path);
+      return Object.hasOwn(files, path);
     },
     async realpath(path) {
       return ok(path);
@@ -24,8 +24,7 @@ function makeFs(files: Record<string, string>): FileSystem {
 describe('convertSite', () => {
   it('autolinks #N / @user / owner/repo#N when repoContext is provided', async () => {
     const fs = makeFs({
-      'docs/index.md':
-        'See #123 and thanks @alice and cross-ref foo/bar#7.\n',
+      'docs/index.md': 'See #123 and thanks @alice and cross-ref foo/bar#7.\n',
     });
     const result = await convertSite({
       docsDir: 'docs',
@@ -77,10 +76,7 @@ describe('convertSite', () => {
     });
     expect(result.ok).toBe(true);
     if (result.ok) {
-      expect(Object.keys(result.value.files).sort()).toEqual([
-        'api/auth.md',
-        'index.md',
-      ]);
+      expect(Object.keys(result.value.files).sort()).toEqual(['api/auth.md', 'index.md']);
       // Body H1 stripped (matches synthesized title); title preserved in
       // frontmatter so Starlight still renders it.
       expect(result.value.files['index.md']).toContain('title: Welcome');
@@ -252,7 +248,7 @@ describe('convertSite', () => {
     }
   });
 
-  it('renames per-locale source paths to Starlight\'s directory layout when i18nLocales is provided', async () => {
+  it("renames per-locale source paths to Starlight's directory layout when i18nLocales is provided", async () => {
     const fs = makeFs({
       'docs/page.md': '# English\n',
       'docs/page.fr.md': '# Français\n',

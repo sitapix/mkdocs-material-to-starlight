@@ -104,10 +104,7 @@ interface TabsBlock {
  * Returns the parsed tabs and the raw lines for pass-through, or null if
  * the block cannot be fully parsed.
  */
-function collectTabsBlock(
-  lines: ReadonlyArray<string>,
-  startIndex: number,
-): TabsBlock | null {
+function collectTabsBlock(lines: ReadonlyArray<string>, startIndex: number): TabsBlock | null {
   const raw: string[] = [];
   const tabs: TabEntry[] = [];
   let i = startIndex;

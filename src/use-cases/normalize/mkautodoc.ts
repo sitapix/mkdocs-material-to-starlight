@@ -68,10 +68,7 @@ export function normalizeMkautodocBlocks(source: string): string {
   return out.join('\n');
 }
 
-function scanBodyEnd(
-  lines: ReadonlyArray<string>,
-  startIndex: number,
-): number | null {
+function scanBodyEnd(lines: ReadonlyArray<string>, startIndex: number): number | null {
   let lastIndentedLine: number | null = null;
   let j = startIndex;
   let sawAnyIndented = false;

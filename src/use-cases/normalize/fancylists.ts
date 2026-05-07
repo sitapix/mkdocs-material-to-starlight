@@ -47,9 +47,7 @@ function classifyRun(markers: ReadonlyArray<Marker>): ListType | null {
   // classify the whole run as Roman (matching case). Otherwise it's alpha,
   // which only supports single-letter markers (multi-letter alpha is alpha
   // by accident — `aa.`, `ab.` — but those don't form lists in PyMdown).
-  const anyMultiRoman = markers.some(
-    (m) => m.marker.length >= 2 && ROMAN_RE.test(m.marker),
-  );
+  const anyMultiRoman = markers.some((m) => m.marker.length >= 2 && ROMAN_RE.test(m.marker));
   if (anyMultiRoman) {
     return c === 'lower' ? 'i' : 'I';
   }

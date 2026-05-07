@@ -17,16 +17,12 @@ describe('renameI18nPath', () => {
   });
 
   it('rewrites a nested guide path preserving the directory tree', () => {
-    expect(renameI18nPath('guides/intro.de.md', ['fr', 'de'])).toBe(
-      'de/guides/intro.md',
-    );
+    expect(renameI18nPath('guides/intro.de.md', ['fr', 'de'])).toBe('de/guides/intro.md');
   });
 
   it('handles longer regional locale codes (zh-CN, pt-BR)', () => {
     expect(renameI18nPath('page.zh-CN.md', ['zh-CN'])).toBe('zh-CN/page.md');
-    expect(renameI18nPath('docs/api.pt-BR.md', ['pt-BR'])).toBe(
-      'pt-BR/docs/api.md',
-    );
+    expect(renameI18nPath('docs/api.pt-BR.md', ['pt-BR'])).toBe('pt-BR/docs/api.md');
   });
 
   it('does not collide on filenames with multiple dots', () => {

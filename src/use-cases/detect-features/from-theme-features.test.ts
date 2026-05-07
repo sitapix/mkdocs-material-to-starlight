@@ -13,18 +13,13 @@ describe('detectFeaturesFromThemeFeatures', () => {
   });
 
   it('returns multiple features when both flags are present', () => {
-    const out = detectFeaturesFromThemeFeatures([
-      'announce.dismiss',
-      'content.action.view',
-    ]);
+    const out = detectFeaturesFromThemeFeatures(['announce.dismiss', 'content.action.view']);
     expect(out.has('announcement')).toBe(true);
     expect(out.has('page-actions')).toBe(true);
   });
 
   it('returns empty set when no recognized flags are present', () => {
     expect(detectFeaturesFromThemeFeatures([]).size).toBe(0);
-    expect(
-      detectFeaturesFromThemeFeatures(['navigation.tabs', 'content.code.copy']).size,
-    ).toBe(0);
+    expect(detectFeaturesFromThemeFeatures(['navigation.tabs', 'content.code.copy']).size).toBe(0);
   });
 });

@@ -33,13 +33,12 @@ export function diagnosePalette(
           severity: 'info',
           ruleId: 'palette-translated',
           source: SOURCE,
-          message:
-            `Material palette primary "${palette.sourceName}" translated to Starlight accent CSS variables (hue=${String(palette.accentHue)}).`,
+          message: `Material palette primary "${palette.sourceName}" translated to Starlight accent CSS variables (hue=${String(palette.accentHue)}).`,
         }),
       },
     ];
   }
-  if (palette !== null && palette.isCustom) {
+  if (palette?.isCustom) {
     return [
       {
         sourcePath: 'mkdocs.yml',

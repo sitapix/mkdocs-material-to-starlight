@@ -1,14 +1,7 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import {
-  mkdtempSync,
-  mkdirSync,
-  writeFileSync,
-  readFileSync,
-  existsSync,
-  rmSync,
-} from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { convertSiteFromDisk } from '../../src/interface/api/convert-site.js';
 
 let project: string;
@@ -149,10 +142,7 @@ describe('mkdocs-exclude integration — files excluded by glob never reach the 
     if (!result.ok) return;
 
     // index.md is the home page slug — read it and confirm the body survived.
-    const indexBody = readFileSync(
-      join(out, 'src', 'content', 'docs', 'index.md'),
-      'utf8',
-    );
+    const indexBody = readFileSync(join(out, 'src', 'content', 'docs', 'index.md'), 'utf8');
     expect(indexBody).toContain('Home');
   });
 });

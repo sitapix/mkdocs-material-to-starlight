@@ -12,9 +12,9 @@
  */
 
 import type { SidebarEntry } from '../../domain/starlight/sidebar.js';
-import { serializeSidebar } from './sidebar.js';
-import type { DetectedFeature } from './package-json.js';
 import { translateBlogOptions } from './blog-options.js';
+import type { DetectedFeature } from './package-json.js';
+import { serializeSidebar } from './sidebar.js';
 import { translateTagsOptions } from './tags-options.js';
 
 export interface AstroConfigInput {
@@ -55,7 +55,9 @@ export interface AstroConfigInput {
   /** Favicon path (relative to project root, served from /). */
   readonly favicon?: string;
   /** Table of contents config: `false` to disable, or `{ min, max }`. */
-  readonly tableOfContents?: false | { readonly minHeadingLevel: number; readonly maxHeadingLevel: number };
+  readonly tableOfContents?:
+    | false
+    | { readonly minHeadingLevel: number; readonly maxHeadingLevel: number };
   /** When true, register starlight-links-validator plugin. */
   readonly enableLinksValidator?: boolean;
   /** Additional CSS files to register via Starlight's customCss. */
@@ -257,26 +259,20 @@ export function serializeAstroConfig(input: AstroConfigInput): string {
     if (/^https?:\/\//i.test(e)) externalCssUrls.push(e);
     else cssEntries.push(e);
   }
-  lines.push(
-    `      customCss: [${cssEntries.map(quote).join(', ')}],`,
-  );
+  lines.push(`      customCss: [${cssEntries.map(quote).join(', ')}],`);
   const extraJs = input.extraJsEntries ?? [];
   const extraHead = input.extraHeadEntries ?? [];
   if (extraJs.length > 0 || extraHead.length > 0 || externalCssUrls.length > 0) {
     lines.push('      head: [');
     for (const href of externalCssUrls) {
-      lines.push(
-        `        { tag: 'link', attrs: { rel: 'stylesheet', href: ${quote(href)} } },`,
-      );
+      lines.push(`        { tag: 'link', attrs: { rel: 'stylesheet', href: ${quote(href)} } },`);
     }
     for (const js of extraJs) {
       const attrs: string[] = [`src: ${quote(js.src)}`];
       if (js.type !== undefined) attrs.push(`type: ${quote(js.type)}`);
       if (js.async === true) attrs.push('async: true');
       if (js.defer === true) attrs.push('defer: true');
-      lines.push(
-        `        { tag: 'script', attrs: { ${attrs.join(', ')} } },`,
-      );
+      lines.push(`        { tag: 'script', attrs: { ${attrs.join(', ')} } },`);
     }
     for (const entry of extraHead) {
       const parts: string[] = [`tag: ${quote(entry.tag)}`];
@@ -349,7 +345,9 @@ export function serializeAstroConfig(input: AstroConfigInput): string {
       // breaks `astro:config:setup` because the slug has no matching
       // docs/<version>/ tree. Re-run with `--mike-versions <slug>`
       // (repeatable) to enable the plugin.
-      lines.push('        // TODO: starlightVersions({ versions: [{ slug: \'1.0\' }] }) — fill in real version slugs and uncomment.');
+      lines.push(
+        "        // TODO: starlightVersions({ versions: [{ slug: '1.0' }] }) — fill in real version slugs and uncomment.",
+      );
     } else if (versionSlugs.length === 0) {
       lines.push('        starlightVersions({ versions: [] }),');
     } else {
@@ -370,7 +368,9 @@ export function serializeAstroConfig(input: AstroConfigInput): string {
     // entry flagged `default: true`. Material's `pymdownx.keys` doesn't
     // carry layout metadata, so emit a single default type the user can
     // extend.
-    lines.push("        starlightKbd({ types: [{ id: 'default', label: 'Keyboard', default: true }] }),");
+    lines.push(
+      "        starlightKbd({ types: [{ id: 'default', label: 'Keyboard', default: true }] }),",
+    );
   }
   if (hasGithubAlerts) {
     lines.push('        starlightGithubAlerts(),');
@@ -378,7 +378,9 @@ export function serializeAstroConfig(input: AstroConfigInput): string {
   if (hasAnnouncement) {
     // Plugin requires user to fill in announcement text/schedule; converter
     // emits a placeholder so users know exactly what to fill in.
-    lines.push('        starlightAnnouncement({ title: \'Announcement\', message: \'Configure starlight-announcement options here.\' }),');
+    lines.push(
+      "        starlightAnnouncement({ title: 'Announcement', message: 'Configure starlight-announcement options here.' }),",
+    );
   }
   if (hasPageActions) {
     lines.push('        starlightPageActions(),');
@@ -390,7 +392,9 @@ export function serializeAstroConfig(input: AstroConfigInput): string {
     // The converter has no git port, so it cannot enumerate authors at
     // conversion time. Emit a placeholder `list: []` the user fills in
     // post-install — same pattern as starlight-announcement above.
-    lines.push("        // TODO: populate `list` with your contributors (each: { name, url, avatar }).");
+    lines.push(
+      '        // TODO: populate `list` with your contributors (each: { name, url, avatar }).',
+    );
     lines.push('        starlightContributorList({ list: [] }),');
   }
   if (enableLinksValidator) {
@@ -479,7 +483,5 @@ function indentSidebar(serialized: string): string {
   if (lines.length <= 1) {
     return serialized;
   }
-  return lines
-    .map((line, idx) => (idx === 0 ? line : `      ${line}`))
-    .join('\n');
+  return lines.map((line, idx) => (idx === 0 ? line : `      ${line}`)).join('\n');
 }

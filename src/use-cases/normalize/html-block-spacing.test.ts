@@ -61,6 +61,31 @@ describe('normalizeHtmlBlockSpacing', () => {
     expect(normalizeHtmlBlockSpacing(src)).toBe(src);
   });
 
+  it('pads before a PascalCase JSX/MDX component closer like `</Tip>`', () => {
+    // Real-world (cognesy_instructor-php cookbook): source uses Mintlify-
+    // style `<Tip>...</Tip>` to wrap multi-paragraph content. The closer
+    // sits on its own line but with no blank line before it, so remark
+    // glues it onto the previous prose paragraph and MDX errors with
+    // "Expected the closing tag `</Tip>` either after the end of paragraph
+    // or another opening tag". Padding the closer only is sufficient and
+    // avoids breaking nested-component patterns like `<TabItem>` inside
+    // `<Tabs>` (which sit at indent > 0 and don't need padding).
+    const src = ['<Tip>', '### Heading', '', 'Some prose.', '</Tip>', ''].join('\n');
+    const out = normalizeHtmlBlockSpacing(src);
+    expect(out).toContain('Some prose.\n\n</Tip>');
+  });
+
+  it('does NOT pad an indented PascalCase tag (nested component)', () => {
+    // `<TabItem>` indented inside `<Tabs>` is a nested JSX component.
+    // Padding here would insert blank lines between the outer and inner
+    // openers, then promote indented body to a fenced code block on the
+    // re-stringify pass — breaking pipeline idempotency.
+    const src = ['<Tabs>', '  <TabItem label="A">', '    body', '  </TabItem>', '</Tabs>', ''].join(
+      '\n',
+    );
+    expect(normalizeHtmlBlockSpacing(src)).toBe(src);
+  });
+
   it('pads a tag with multiple attributes', () => {
     const src = '<section id="x" class="y">\nbody\n</section>\n';
     const out = normalizeHtmlBlockSpacing(src);

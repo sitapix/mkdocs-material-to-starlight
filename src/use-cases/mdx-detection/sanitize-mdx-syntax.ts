@@ -20,8 +20,20 @@ import { quoteUnquotedHtmlAttrs } from './quote-unquoted-attrs.js';
 
 /** HTML void elements per the WHATWG spec. MDX requires explicit self-close. */
 const VOID_ELEMENTS: ReadonlySet<string> = new Set([
-  'area', 'base', 'br', 'col', 'embed', 'hr', 'img', 'input',
-  'link', 'meta', 'param', 'source', 'track', 'wbr',
+  'area',
+  'base',
+  'br',
+  'col',
+  'embed',
+  'hr',
+  'img',
+  'input',
+  'link',
+  'meta',
+  'param',
+  'source',
+  'track',
+  'wbr',
 ]);
 
 /**
@@ -37,22 +49,125 @@ const VOID_ELEMENTS: ReadonlySet<string> = new Set([
  */
 const KNOWN_HTML_ELEMENTS: ReadonlySet<string> = new Set([
   // HTML structural / sectioning
-  'a', 'abbr', 'address', 'article', 'aside', 'b', 'bdi', 'bdo', 'blockquote',
-  'body', 'button', 'canvas', 'caption', 'cite', 'code', 'colgroup', 'data',
-  'datalist', 'dd', 'del', 'details', 'dfn', 'dialog', 'div', 'dl', 'dt',
-  'em', 'fieldset', 'figcaption', 'figure', 'footer', 'form', 'h1', 'h2',
-  'h3', 'h4', 'h5', 'h6', 'head', 'header', 'hgroup', 'html', 'i', 'iframe',
-  'ins', 'kbd', 'label', 'legend', 'li', 'main', 'map', 'mark', 'menu',
-  'meter', 'nav', 'noscript', 'object', 'ol', 'optgroup', 'option', 'output',
-  'p', 'picture', 'pre', 'progress', 'q', 'rp', 'rt', 'ruby', 's', 'samp',
-  'script', 'search', 'section', 'select', 'slot', 'small', 'span', 'strong',
-  'style', 'sub', 'summary', 'sup', 'table', 'tbody', 'td', 'template',
-  'textarea', 'tfoot', 'th', 'thead', 'time', 'title', 'tr', 'u', 'ul',
-  'var', 'video', 'audio',
+  'a',
+  'abbr',
+  'address',
+  'article',
+  'aside',
+  'b',
+  'bdi',
+  'bdo',
+  'blockquote',
+  'body',
+  'button',
+  'canvas',
+  'caption',
+  'cite',
+  'code',
+  'colgroup',
+  'data',
+  'datalist',
+  'dd',
+  'del',
+  'details',
+  'dfn',
+  'dialog',
+  'div',
+  'dl',
+  'dt',
+  'em',
+  'fieldset',
+  'figcaption',
+  'figure',
+  'footer',
+  'form',
+  'h1',
+  'h2',
+  'h3',
+  'h4',
+  'h5',
+  'h6',
+  'head',
+  'header',
+  'hgroup',
+  'html',
+  'i',
+  'iframe',
+  'ins',
+  'kbd',
+  'label',
+  'legend',
+  'li',
+  'main',
+  'map',
+  'mark',
+  'menu',
+  'meter',
+  'nav',
+  'noscript',
+  'object',
+  'ol',
+  'optgroup',
+  'option',
+  'output',
+  'p',
+  'picture',
+  'pre',
+  'progress',
+  'q',
+  'rp',
+  'rt',
+  'ruby',
+  's',
+  'samp',
+  'script',
+  'search',
+  'section',
+  'select',
+  'slot',
+  'small',
+  'span',
+  'strong',
+  'style',
+  'sub',
+  'summary',
+  'sup',
+  'table',
+  'tbody',
+  'td',
+  'template',
+  'textarea',
+  'tfoot',
+  'th',
+  'thead',
+  'time',
+  'title',
+  'tr',
+  'u',
+  'ul',
+  'var',
+  'video',
+  'audio',
   // Common SVG bare tags
-  'svg', 'g', 'path', 'circle', 'rect', 'line', 'text', 'defs', 'use',
+  'svg',
+  'g',
+  'path',
+  'circle',
+  'rect',
+  'line',
+  'text',
+  'defs',
+  'use',
   // MathML
-  'math', 'mi', 'mn', 'mo', 'mrow', 'msub', 'msup', 'mfrac', 'msqrt',
+  'math',
+  'mi',
+  'mn',
+  'mo',
+  'mrow',
+  'msub',
+  'msup',
+  'mfrac',
+  'msqrt',
 ]);
 
 /**
@@ -114,6 +229,12 @@ export function sanitizeMdxSyntax(source: string, report?: SanitizeReport): stri
   // and the build fails with "Expected a closing tag for `<span>`".
   // Real-world (thoughtspot/cs_tools/guides/process-searchable.md).
   out = autoCloseOrphanInlineTags(out);
+  // Inverse of autoCloseOrphanInlineTags: when the source has an UNMATCHED
+  // closer (more `</small>` than `<small>`, etc.), escape the excess
+  // closers so MDX doesn't error with "Unexpected closing slash `/` in
+  // tag, expected an open tag first". Real-world (cv4x/svstudio-manual):
+  // a stray `</small>` in prose has no matching `<small>` opener.
+  out = escapeOrphanInlineClosers(out);
   return out;
 }
 
@@ -130,9 +251,35 @@ export function sanitizeMdxSyntax(source: string, report?: SanitizeReport): stri
  */
 function autoCloseOrphanInlineTags(source: string): string {
   const INLINE_TAGS: ReadonlySet<string> = new Set([
-    'span', 'b', 'i', 'sup', 'sub', 'em', 'strong', 'mark', 'small',
-    'big', 'code', 'kbd', 'q', 'abbr', 'cite', 'dfn', 'var', 'samp', 'u',
+    'span',
+    'b',
+    'i',
+    'sup',
+    'sub',
+    'em',
+    'strong',
+    'mark',
+    'small',
+    'big',
+    'code',
+    'kbd',
+    'q',
+    'abbr',
+    'cite',
+    'dfn',
+    'var',
+    'samp',
+    'u',
   ]);
+  // Mask inline-code spans and fenced code blocks before counting tags —
+  // `<span>` mentioned in prose-about-HTML (`` `<span>` ``) and tag literals
+  // inside ```django fences are *content*, not JSX, and must not contribute
+  // to the orphan balance. Real-world (timvink/mkdocs-git-revision-date-
+  // localized-plugin howto/custom-styling.md): backticked `<span>` plus a
+  // `<span class="x">…</span>` inside a django fence read as {open: 2,
+  // close: 1} without masking, falsely flagging `span` as orphaned and
+  // injecting a stray `</span>` into the prose paragraph.
+  const masked = maskCodeRegions(source);
   // Document-level pass first: count opener vs closer pairs per tag
   // name. Only the names with MORE openers than closers globally have
   // unmatched orphans we should auto-close. This keeps a per-paragraph
@@ -141,14 +288,14 @@ function autoCloseOrphanInlineTags(source: string): string {
   const balance = new Map<string, number>();
   const OPEN_RE = /<([A-Za-z][A-Za-z0-9-]*)(\s[^>]*)?>/g;
   const CLOSE_RE = /<\/([A-Za-z][A-Za-z0-9-]*)\s*>/g;
-  for (const m of source.matchAll(OPEN_RE)) {
+  for (const m of masked.matchAll(OPEN_RE)) {
     const name = (m[1] ?? '').toLowerCase();
     const attrs = m[2] ?? '';
     if (attrs.trimEnd().endsWith('/')) continue;
     if (!INLINE_TAGS.has(name)) continue;
     balance.set(name, (balance.get(name) ?? 0) + 1);
   }
-  for (const m of source.matchAll(CLOSE_RE)) {
+  for (const m of masked.matchAll(CLOSE_RE)) {
     const name = (m[1] ?? '').toLowerCase();
     if (!INLINE_TAGS.has(name)) continue;
     balance.set(name, (balance.get(name) ?? 0) - 1);
@@ -160,17 +307,24 @@ function autoCloseOrphanInlineTags(source: string): string {
   if (orphanedNames.size === 0) return source;
 
   // Per-paragraph pass: for each paragraph block, walk events and emit
-  // closers only for tags whose name is in `orphanedNames`.
+  // closers only for tags whose name is in `orphanedNames`. The block
+  // mask is the same character offsets as `block` (maskCodeRegions
+  // preserves length), so positions extracted from the mask map 1:1
+  // back into `block`.
   const parts = source.split(/(\n\s*\n)/);
-  return parts.map((part) => {
-    if (/^\n\s*\n$/.test(part)) return part;
-    if (!part.includes('<')) return part;
-    return autoCloseInBlock(part, INLINE_TAGS, orphanedNames);
-  }).join('');
+  return parts
+    .map((part) => {
+      if (/^\n\s*\n$/.test(part)) return part;
+      if (!part.includes('<')) return part;
+      const blockMask = maskCodeRegions(part);
+      return autoCloseInBlock(part, blockMask, INLINE_TAGS, orphanedNames);
+    })
+    .join('');
 }
 
 function autoCloseInBlock(
   block: string,
+  blockMask: string,
   inlineTags: ReadonlySet<string>,
   orphanedNames: ReadonlySet<string>,
 ): string {
@@ -179,14 +333,14 @@ function autoCloseInBlock(
   const CLOSE_RE = /<\/([A-Za-z][A-Za-z0-9-]*)\s*>/g;
   type Event = { pos: number; kind: 'open' | 'close'; name: string };
   const events: Event[] = [];
-  for (const m of block.matchAll(OPEN_RE)) {
+  for (const m of blockMask.matchAll(OPEN_RE)) {
     const name = m[1] ?? '';
     const attrs = m[2] ?? '';
     if (attrs.trimEnd().endsWith('/')) continue;
     if (!inlineTags.has(name.toLowerCase())) continue;
     events.push({ pos: m.index ?? 0, kind: 'open', name });
   }
-  for (const m of block.matchAll(CLOSE_RE)) {
+  for (const m of blockMask.matchAll(CLOSE_RE)) {
     const name = m[1] ?? '';
     if (!inlineTags.has(name.toLowerCase())) continue;
     events.push({ pos: m.index ?? 0, kind: 'close', name });
@@ -208,7 +362,10 @@ function autoCloseInBlock(
   const trailingMatch = block.match(/(\s*)$/);
   const trail = trailingMatch?.[0] ?? '';
   const head = block.slice(0, block.length - trail.length);
-  const closers = toClose.reverse().map((n) => `</${n}>`).join('');
+  const closers = toClose
+    .reverse()
+    .map((n) => `</${n}>`)
+    .join('');
   return `${head}${closers}${trail}`;
 }
 
@@ -217,10 +374,7 @@ function autoCloseInBlock(
  *  fires when the next char is `/` or a letter and the run looks like a
  *  closing/opening tag of a single identifier. */
 function unescapeBackslashedJsxTags(source: string): string {
-  return source.replace(
-    /\\(<\/?[A-Za-z][A-Za-z0-9-]*(?:\s[^>]*)?>)/g,
-    (_full, tag: string) => tag,
-  );
+  return source.replace(/\\(<\/?[A-Za-z][A-Za-z0-9-]*(?:\s[^>]*)?>)/g, (_full, tag: string) => tag);
 }
 
 /**
@@ -647,7 +801,7 @@ function escapeOrphanOpenBrace(source: string): string {
     // Heuristic 2: `{...}` with a backslash-escape inside the body — body
     // looks like remark-stringified table content, not JS.
     const body = src.slice(i + 1, close);
-    if (body.includes('\\') && /\\[_*:()\[\]|<]/.test(body)) {
+    if (body.includes('\\') && /\\[_*:()[\]|<]/.test(body)) {
       out.push('&#123;');
       return i + 1;
     }
@@ -667,6 +821,23 @@ function escapeOrphanOpenBrace(source: string): string {
     // describing the regex grammar. A trailing comma at the end of a JSX
     // expression body is a syntax error in JS — never valid JSX.
     if (/,\s*$/.test(body)) {
+      out.push('&#123;');
+      return i + 1;
+    }
+    // Heuristic 5: prose-placeholder pattern. `{Capitalized Phrase}` —
+    // body starts with an uppercase letter, contains at least one space,
+    // and uses only alphanumerics/spaces/underscores/hyphens (no JS
+    // operators, no property-access). Doc authors use this idiom to
+    // signal user-replaced text:
+    //   "{Your Username}'s Workspace"
+    //   "Replace {API Key} with your actual key"
+    //   "Set the path to {Project Root}/config"
+    // acorn parses `{Your Username}` as an expression with two adjacent
+    // identifiers and crashes with "Could not parse expression with acorn".
+    // Real-world (IDinsight/experiments-engine getting-started/.../personal-
+    // vs-team.md). The capital-first guard keeps real JSX like
+    // `{user.name}`, `{count}`, `{props}` untouched.
+    if (/^[A-Z][A-Za-z0-9_-]*(?:\s+[A-Za-z0-9_-]+)+$/.test(body.trim())) {
       out.push('&#123;');
       return i + 1;
     }
@@ -817,13 +988,10 @@ function stripSpanAnchorInHeadings(source: string, report?: SanitizeReport): str
  * verbatim. Also handles `<style>` with attributes (e.g. `<style lang="css">`).
  */
 function escapeStyleBlockBraces(source: string): string {
-  return source.replace(
-    /(<style\b[^>]*>)([\s\S]*?)(<\/style>)/gi,
-    (_match, open, body, close) => {
-      const escaped = (body as string).replace(/\{/g, '&lcub;').replace(/\}/g, '&rcub;');
-      return `${open}${escaped}${close}`;
-    },
-  );
+  return source.replace(/(<style\b[^>]*>)([\s\S]*?)(<\/style>)/gi, (_match, open, body, close) => {
+    const escaped = (body as string).replace(/\{/g, '&lcub;').replace(/\}/g, '&rcub;');
+    return `${open}${escaped}${close}`;
+  });
 }
 
 /**
@@ -937,7 +1105,7 @@ function classifyAngleBracketed(
   const hasEqualsOrQuote = /[="']/.test(inner);
   const hasMidSlash = /[^/]\/[^>]/.test(inner); // path-like content with mid-token slash
   const hasHash = /#/.test(inner); // anchored cross-references like `page#section`
-  const prevChar = i > 0 ? src[i - 1] ?? '' : '';
+  const prevChar = i > 0 ? (src[i - 1] ?? '') : '';
   const followsLetterOrParen = /[A-Za-z)]/.test(prevChar);
   const followsEscapeSemi = prevChar === ';'; // likely `&lt;` or another HTML entity
 
@@ -1077,12 +1245,7 @@ function escapeAmbiguousLessThan(source: string): string {
  */
 function walkOutsideCode(
   source: string,
-  transform: (
-    out: string[],
-    source: string,
-    i: number,
-    atLineStart: boolean,
-  ) => number | null,
+  transform: (out: string[], source: string, i: number, atLineStart: boolean) => number | null,
 ): string {
   const out: string[] = [];
   let i = 0;
@@ -1132,10 +1295,7 @@ function walkOutsideCode(
           if (openFence === null) {
             // Opening a new fence.
             openFence = marker;
-          } else if (
-            marker.char === openFence.char &&
-            marker.length >= openFence.length
-          ) {
+          } else if (marker.char === openFence.char && marker.length >= openFence.length) {
             // Valid closer: same marker, ≥ length.
             openFence = null;
           }
@@ -1216,6 +1376,238 @@ function walkOutsideCode(
     i += 1;
   }
 
+  return out.join('');
+}
+
+/**
+ * Escape any inline-tag closer (`</span>`, `</small>`, `</b>`, etc.) whose
+ * matching opener never appears in the document. The mirror of
+ * `autoCloseOrphanInlineTags`: instead of synthesising a missing closer
+ * for an extra opener, we *escape* an extra closer so MDX stops trying
+ * to match it. The escape is `&lt;/name>` — invisible in rendered HTML
+ * (browser decodes the entity back to `<`), no JSX semantics.
+ *
+ * Real-world (cv4x/svstudio-manual): a "Last update" link line ends with
+ * a stray `</small>` that has no matching `<small>` earlier in the same
+ * paragraph. Without this pass, MDX errors with "Unexpected closing
+ * slash `/` in tag, expected an open tag first" at the orphan closer.
+ *
+ * Conservative: only fires on the inline-style tag set, only for tag
+ * names with a *global* excess of closers (so balanced `<small>...
+ * </small>` usage is untouched), and only on closers that have no
+ * matching opener on the per-paragraph stack at the moment they appear.
+ * Code regions are masked, so `` `</small>` `` in prose-about-HTML is
+ * counted as text, not as a tag occurrence.
+ */
+function escapeOrphanInlineClosers(source: string): string {
+  const INLINE_TAGS: ReadonlySet<string> = new Set([
+    'span',
+    'b',
+    'i',
+    'sup',
+    'sub',
+    'em',
+    'strong',
+    'mark',
+    'small',
+    'big',
+    'code',
+    'kbd',
+    'q',
+    'abbr',
+    'cite',
+    'dfn',
+    'var',
+    'samp',
+    'u',
+  ]);
+  const masked = maskCodeRegions(source);
+  const balance = new Map<string, number>();
+  const OPEN_RE = /<([A-Za-z][A-Za-z0-9-]*)(\s[^>]*)?>/g;
+  const CLOSE_RE = /<\/([A-Za-z][A-Za-z0-9-]*)\s*>/g;
+  for (const m of masked.matchAll(OPEN_RE)) {
+    const name = (m[1] ?? '').toLowerCase();
+    const attrs = m[2] ?? '';
+    if (attrs.trimEnd().endsWith('/')) continue;
+    if (!INLINE_TAGS.has(name)) continue;
+    balance.set(name, (balance.get(name) ?? 0) + 1);
+  }
+  for (const m of masked.matchAll(CLOSE_RE)) {
+    const name = (m[1] ?? '').toLowerCase();
+    if (!INLINE_TAGS.has(name)) continue;
+    balance.set(name, (balance.get(name) ?? 0) - 1);
+  }
+  const orphanedCloserNames = new Set<string>();
+  for (const [name, count] of balance) {
+    if (count < 0) orphanedCloserNames.add(name);
+  }
+  if (orphanedCloserNames.size === 0) return source;
+
+  // Per-paragraph stack walk. The mask preserves offsets so `match.index`
+  // points into both `part` and the masked `partMask` interchangeably.
+  const parts = source.split(/(\n\s*\n)/);
+  return parts
+    .map((part) => {
+      if (/^\n\s*\n$/.test(part)) return part;
+      if (!part.includes('</')) return part;
+      const partMask = maskCodeRegions(part);
+      type Event = {
+        pos: number;
+        end: number;
+        kind: 'open' | 'close';
+        name: string;
+        raw: string;
+      };
+      const events: Event[] = [];
+      for (const m of partMask.matchAll(OPEN_RE)) {
+        const name = m[1] ?? '';
+        const attrs = m[2] ?? '';
+        if (attrs.trimEnd().endsWith('/')) continue;
+        if (!INLINE_TAGS.has(name.toLowerCase())) continue;
+        events.push({
+          pos: m.index ?? 0,
+          end: (m.index ?? 0) + m[0].length,
+          kind: 'open',
+          name,
+          raw: m[0],
+        });
+      }
+      for (const m of partMask.matchAll(CLOSE_RE)) {
+        const name = m[1] ?? '';
+        if (!INLINE_TAGS.has(name.toLowerCase())) continue;
+        events.push({
+          pos: m.index ?? 0,
+          end: (m.index ?? 0) + m[0].length,
+          kind: 'close',
+          name,
+          raw: m[0],
+        });
+      }
+      events.sort((a, b) => a.pos - b.pos);
+      const stack: string[] = [];
+      const orphanCloserPositions: Event[] = [];
+      for (const e of events) {
+        if (e.kind === 'open') {
+          stack.push(e.name.toLowerCase());
+          continue;
+        }
+        const idx = stack.lastIndexOf(e.name.toLowerCase());
+        if (idx === -1 && orphanedCloserNames.has(e.name.toLowerCase())) {
+          orphanCloserPositions.push(e);
+        } else if (idx !== -1) {
+          stack.length = idx;
+        }
+      }
+      if (orphanCloserPositions.length === 0) return part;
+      // Apply replacements right-to-left so earlier offsets stay valid.
+      let result = part;
+      for (let k = orphanCloserPositions.length - 1; k >= 0; k -= 1) {
+        const e = orphanCloserPositions[k];
+        if (e === undefined) continue;
+        result = `${result.slice(0, e.pos)}&lt;/${e.name}>${result.slice(e.end)}`;
+      }
+      return result;
+    })
+    .join('');
+}
+
+/**
+ * Return a same-length copy of `source` where every character that lives
+ * inside an inline backtick code span or a fenced code block is replaced
+ * with a space. Newlines are preserved verbatim so line/column offsets
+ * line up with the original. Use when a regex-based scan needs to ignore
+ * tag-shaped text that is actually code content (e.g. counting `<span>`
+ * openers without picking up `` `<span>` `` prose mentions).
+ *
+ * Conservative: the masker reuses `walkOutsideCode`'s state machine, so
+ * the same fence-marker, run-length, and paragraph-reset rules apply.
+ */
+function maskCodeRegions(source: string): string {
+  const out: string[] = [];
+  let openFence: { char: '`' | '~'; length: number } | null = null;
+  let openInlineCodeRun: number | null = null;
+  let atLineStart = true;
+  let i = 0;
+  while (i < source.length) {
+    if (atLineStart) {
+      if (openInlineCodeRun === null) {
+        const eol = source.indexOf('\n', i);
+        const line = source.slice(i, eol === -1 ? source.length : eol);
+        const marker = fenceMarker(line);
+        if (marker !== null) {
+          let opening = false;
+          if (openFence === null) {
+            openFence = marker;
+            opening = true;
+          } else if (marker.char === openFence.char && marker.length >= openFence.length) {
+            openFence = null;
+          }
+          // Preserve the fence delimiter line verbatim when opening so the
+          // tag scanner doesn't see fence punctuation as `<` content; mask
+          // it when closing too. Either way, simplest is to blank the line
+          // body but keep the trailing newline.
+          const consumed = eol === -1 ? source.length - i : eol - i + 1;
+          for (let k = i; k < i + consumed; k += 1) {
+            out.push(source[k] === '\n' ? '\n' : ' ');
+          }
+          i += consumed;
+          atLineStart = true;
+          // If we just opened a fence, mark `opening` was used for clarity
+          // but state already updated above.
+          void opening;
+          continue;
+        }
+      }
+      atLineStart = false;
+    }
+    const ch = source[i];
+    if (ch === '\n') {
+      out.push(ch);
+      i += 1;
+      atLineStart = true;
+      if (openInlineCodeRun !== null && (source[i] === '\n' || source[i] === undefined)) {
+        openInlineCodeRun = null;
+      }
+      continue;
+    }
+    if (openFence !== null) {
+      out.push(' ');
+      i += 1;
+      continue;
+    }
+    if (ch === '`') {
+      if (countTrailingBackslashes(source, i) % 2 === 1) {
+        out.push(ch);
+        i += 1;
+        continue;
+      }
+      let runEnd = i;
+      while (runEnd < source.length && source[runEnd] === '`') runEnd += 1;
+      const runLength = runEnd - i;
+      if (openInlineCodeRun === null) {
+        openInlineCodeRun = runLength;
+        // Mask the opening run itself — backticks aren't tag chars but
+        // staying consistent with closing run handling keeps offsets
+        // self-explanatory.
+        for (let k = i; k < runEnd; k += 1) out.push(' ');
+      } else if (runLength === openInlineCodeRun) {
+        openInlineCodeRun = null;
+        for (let k = i; k < runEnd; k += 1) out.push(' ');
+      } else {
+        // Non-matching run inside an open span — content; mask it.
+        for (let k = i; k < runEnd; k += 1) out.push(' ');
+      }
+      i = runEnd;
+      continue;
+    }
+    if (openInlineCodeRun !== null) {
+      out.push(' ');
+      i += 1;
+      continue;
+    }
+    out.push(ch ?? '');
+    i += 1;
+  }
   return out.join('');
 }
 
@@ -1303,7 +1695,9 @@ function rewriteAutolinks(source: string): string {
     // accepts the email-safe punctuation set; the domain is dot-separated
     // labels of letters/digits with optional hyphens (not at edges).
     if (
-      /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/.test(inner)
+      /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/.test(
+        inner,
+      )
     ) {
       out.push(`[${inner}](mailto:${inner})`);
       return end + 1;
@@ -1353,7 +1747,7 @@ function escapeMkdocsIncludeMacros(source: string): string {
     const end = src.indexOf('!}', i + 2);
     if (end === -1) return null;
     const block = src.slice(i, end + 2);
-    out.push('`' + block + '`');
+    out.push(`\`${block}\``);
     return end + 2;
   });
 }
@@ -1378,7 +1772,7 @@ function selfCloseVoidElements(source: string): string {
       return null;
     }
     const inner = src.slice(i + 1, end);
-    if (inner.endsWith('/')) return null;  // already self-closed
+    if (inner.endsWith('/')) return null; // already self-closed
     const nameMatch = inner.match(/^([a-z][a-z0-9-]*)(\s|$)/i);
     if (nameMatch === null) return null;
     const tagName = (nameMatch[1] ?? '').toLowerCase();

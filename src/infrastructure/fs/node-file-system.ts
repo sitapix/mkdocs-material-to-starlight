@@ -12,11 +12,8 @@
  */
 
 import { readFile, realpath, stat } from 'node:fs/promises';
-import { ok, err, type Result } from '../../domain/result.js';
-import type {
-  FileSystem,
-  FileSystemError,
-} from '../../domain/ports/file-system.js';
+import type { FileSystem, FileSystemError } from '../../domain/ports/file-system.js';
+import { err, ok, type Result } from '../../domain/result.js';
 
 export function createNodeFileSystem(): FileSystem {
   return {

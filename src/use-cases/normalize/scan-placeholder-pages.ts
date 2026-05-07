@@ -20,8 +20,10 @@
 
 import { createDiagnostic, type Diagnostic } from '../../domain/diagnostics/diagnostic.js';
 
-const PLACEHOLDER_PHRASE_RE = /placeholder for (?:the\s+)?[a-z0-9_-]+(?:\s+repo|['']s\s+(?:docs|content))/i;
-const ERROR_PHRASE_RE = /(?:you (?:can )?see this (?:page|content) (?:there has been|because of) an error|report (?:the issue|this) on gitlab)/i;
+const PLACEHOLDER_PHRASE_RE =
+  /placeholder for (?:the\s+)?[a-z0-9_-]+(?:\s+repo|['']s\s+(?:docs|content))/i;
+const ERROR_PHRASE_RE =
+  /(?:you (?:can )?see this (?:page|content) (?:there has been|because of) an error|report (?:the issue|this) on gitlab)/i;
 
 export function scanPlaceholderPage(source: string): Diagnostic | null {
   if (source.length === 0) return null;
@@ -34,6 +36,6 @@ export function scanPlaceholderPage(source: string): Diagnostic | null {
     ruleId: 'placeholder-page-detected',
     source: 'normalize/scan-placeholder-pages',
     message:
-      'This page contains only a placeholder stub — the actual content is normally fetched from another repository at MkDocs build time by `mkdocs-monorepo-plugin` (or a similar multi-repo stitching plugin). The converter does not replicate that fetch, so post-conversion the page renders the placeholder text only. Either (a) clone the source repository\'s content into the page before running the converter, (b) delete the placeholder file from the converted output and remove it from the sidebar, or (c) replace it with a link to the external repository\'s real docs site.',
+      "This page contains only a placeholder stub — the actual content is normally fetched from another repository at MkDocs build time by `mkdocs-monorepo-plugin` (or a similar multi-repo stitching plugin). The converter does not replicate that fetch, so post-conversion the page renders the placeholder text only. Either (a) clone the source repository's content into the page before running the converter, (b) delete the placeholder file from the converted output and remove it from the sidebar, or (c) replace it with a link to the external repository's real docs site.",
   });
 }

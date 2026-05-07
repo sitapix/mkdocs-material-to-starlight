@@ -7,21 +7,21 @@
  * CI never load @clack/prompts or picocolors.
  */
 
-import { resolveInteractivity } from '../../infrastructure/env/tty-detection.js';
-import { deriveDefaults } from '../../use-cases/wizard/derive-defaults.js';
-import { runWizard } from '../../use-cases/wizard/run-wizard.js';
-import { answersToFlags } from '../../use-cases/wizard/answers-to-flags.js';
-import { needsAttentionPreview } from '../../use-cases/wizard/needs-attention-preview.js';
-import { confirmOverwriteIfNeeded } from '../../use-cases/wizard/confirm-overwrite.js';
-import { formatEquivalentCommand } from '../../use-cases/wizard/format-equivalent-command.js';
 import { getTranslationDepth } from '../../domain/conversion-mapping/table.js';
-import { parseArgs, type Command } from './parse-args.js';
-import { createNodeDirInspector } from '../../infrastructure/fs/dir-inspector.js';
-import { explainConversion } from '../../use-cases/explain-conversion/explain.js';
-import { extractSnippetBasePaths } from '../../use-cases/config/snippet-base-paths.js';
-import { readProjectDirInteractively } from './wizard-project-dir.js';
 import type { ConversionPlan } from '../../domain/wizard/plan.js';
+import { resolveInteractivity } from '../../infrastructure/env/tty-detection.js';
+import { createNodeDirInspector } from '../../infrastructure/fs/dir-inspector.js';
+import { extractSnippetBasePaths } from '../../use-cases/config/snippet-base-paths.js';
+import { explainConversion } from '../../use-cases/explain-conversion/explain.js';
+import { answersToFlags } from '../../use-cases/wizard/answers-to-flags.js';
+import { confirmOverwriteIfNeeded } from '../../use-cases/wizard/confirm-overwrite.js';
+import { deriveDefaults } from '../../use-cases/wizard/derive-defaults.js';
+import { formatEquivalentCommand } from '../../use-cases/wizard/format-equivalent-command.js';
+import { needsAttentionPreview } from '../../use-cases/wizard/needs-attention-preview.js';
+import { runWizard } from '../../use-cases/wizard/run-wizard.js';
 import type { CliIo } from './main.js';
+import { type Command, parseArgs } from './parse-args.js';
+import { readProjectDirInteractively } from './wizard-project-dir.js';
 
 export interface WizardRunResult {
   readonly kind: 'success';
@@ -49,9 +49,7 @@ export async function runWizardFlow(
   if (!decision.interactive) return { kind: 'non-interactive' };
 
   // Lazy-import clack here so the non-interactive path never pays for it.
-  const { createClackPrompter } = await import(
-    '../../infrastructure/prompts/clack-prompter.js'
-  );
+  const { createClackPrompter } = await import('../../infrastructure/prompts/clack-prompter.js');
   const prompter = createClackPrompter();
 
   prompter.intro('mkdocs-material-to-starlight');
@@ -94,12 +92,8 @@ export async function runWizardFlow(
   // lossy or manual BEFORE the conversion runs, so the user knows what
   // post-conversion work to expect. Full / passthrough / recommend-dep rows
   // are silent — those are the happy-path translations.
-  const lossyRows = plan.mappingRows.filter(
-    (row) => getTranslationDepth(row) === 'lossy-named',
-  );
-  const manualRows = plan.mappingRows.filter(
-    (row) => getTranslationDepth(row) === 'manual',
-  );
+  const lossyRows = plan.mappingRows.filter((row) => getTranslationDepth(row) === 'lossy-named');
+  const manualRows = plan.mappingRows.filter((row) => getTranslationDepth(row) === 'manual');
   if (lossyRows.length > 0) {
     prompter.note(
       lossyRows.map((r) => `• ${r.featureId} — ${r.starlightOutput}`).join('\n'),
@@ -158,9 +152,6 @@ export async function runWizardFlow(
   // Show the equivalent CLI invocation as a framed note so the user can save
   // it for unattended re-runs. Rendered while the prompter session is still
   // active — once we return, the shell prints the diagnostic report unframed.
-  prompter.note(
-    formatEquivalentCommand(flags),
-    'Equivalent command (save to re-run unattended)',
-  );
+  prompter.note(formatEquivalentCommand(flags), 'Equivalent command (save to re-run unattended)');
   return { kind: 'success', command: reparsed, equivalentFlags: flags };
 }

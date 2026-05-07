@@ -17,7 +17,5 @@
 const FENCE_LINE_RE = /^(\s*)\\(:{3,})\s*$/gm;
 
 export function unescapeDirectiveFences(text: string): string {
-  return text.replace(FENCE_LINE_RE, (_, indent: string, colons: string) =>
-    `${indent}${colons}`,
-  );
+  return text.replace(FENCE_LINE_RE, (_, indent: string, colons: string) => `${indent}${colons}`);
 }

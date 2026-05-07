@@ -20,11 +20,7 @@
  */
 
 type FileExtension = 'md' | 'mdx' | 'mdoc';
-type ConversionType =
-  | 'passthrough'
-  | 'text-pre-parse'
-  | 'ast-transform'
-  | 'recommended-dep';
+type ConversionType = 'passthrough' | 'text-pre-parse' | 'ast-transform' | 'recommended-dep';
 type Risk = 'low' | 'medium' | 'high';
 
 /**
@@ -40,12 +36,7 @@ type Risk = 'low' | 'medium' | 'high';
  *                    integration; UX is equivalent post-install.
  *   `manual`       — flagged via diagnostic only; user must hand-port.
  */
-export type TranslationDepth =
-  | 'full'
-  | 'lossy-named'
-  | 'passthrough'
-  | 'recommend-dep'
-  | 'manual';
+export type TranslationDepth = 'full' | 'lossy-named' | 'passthrough' | 'recommend-dep' | 'manual';
 
 export interface MappingRow {
   /** Stable identifier; used as ruleId for diagnostics and as filter key. */
@@ -95,7 +86,8 @@ const TABLE: ReadonlyArray<MappingRow> = [
     featureId: 'admonition-block',
     materialInput: '!!! type "Title" — twelve admonition types via the legacy syntax',
     requiredExtensions: ['admonition'],
-    starlightOutput: ':::type[Title] — Starlight aside directive (`<Aside>` for the four matching types)',
+    starlightOutput:
+      ':::type[Title] — Starlight aside directive (`<Aside>` for the four matching types)',
     fileExt: 'md',
     conversionType: 'text-pre-parse',
     risk: 'low',
@@ -203,7 +195,8 @@ const TABLE: ReadonlyArray<MappingRow> = [
     featureId: 'buttons',
     materialInput: '[label](url){ .md-button[ .md-button--primary] }',
     requiredExtensions: ['attr_list'],
-    starlightOutput: '`<LinkButton href="url" variant="secondary|primary">label</LinkButton>` Starlight built-in component; file promoted to `.mdx`. Inline icon shortcodes (e.g. `:material-rocket:`) are extracted into the `icon=` prop when they resolve to a Starlight built-in icon.',
+    starlightOutput:
+      '`<LinkButton href="url" variant="secondary|primary">label</LinkButton>` Starlight built-in component; file promoted to `.mdx`. Inline icon shortcodes (e.g. `:material-rocket:`) are extracted into the `icon=` prop when they resolve to a Starlight built-in icon.',
     fileExt: 'mdx',
     conversionType: 'text-pre-parse',
     risk: 'low',
@@ -221,7 +214,8 @@ const TABLE: ReadonlyArray<MappingRow> = [
     featureId: 'inline-sub',
     materialInput: 'H~2~O — PyMdown tilde subscript',
     requiredExtensions: ['pymdownx.tilde'],
-    starlightOutput: 'H<sub>2</sub>O inline HTML (text-level pre-parse avoids the strikethrough clash)',
+    starlightOutput:
+      'H<sub>2</sub>O inline HTML (text-level pre-parse avoids the strikethrough clash)',
     fileExt: 'md',
     conversionType: 'text-pre-parse',
     risk: 'medium',
@@ -239,7 +233,8 @@ const TABLE: ReadonlyArray<MappingRow> = [
     featureId: 'keys',
     materialInput: '++ctrl+alt+del++ — PyMdown keyboard chord',
     requiredExtensions: ['pymdownx.keys'],
-    starlightOutput: '<kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>Del</kbd> per-key splitting; `key_map` (custom key index) and `camel_case` PyMdown options are dropped',
+    starlightOutput:
+      '<kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>Del</kbd> per-key splitting; `key_map` (custom key index) and `camel_case` PyMdown options are dropped',
     fileExt: 'md',
     conversionType: 'text-pre-parse',
     risk: 'medium',
@@ -249,14 +244,16 @@ const TABLE: ReadonlyArray<MappingRow> = [
     featureId: 'critic-markup',
     materialInput: '{++ ++} {-- --} {== ==} {~~ ~> ~~} {>> <<} — Critic Markup',
     requiredExtensions: ['pymdownx.critic'],
-    starlightOutput: '<ins> / <del> / <mark> / <del>+<ins> / <span class="critic-comment"> inline HTML',
+    starlightOutput:
+      '<ins> / <del> / <mark> / <del>+<ins> / <span class="critic-comment"> inline HTML',
     fileExt: 'md',
     conversionType: 'text-pre-parse',
     risk: 'medium',
   },
   {
     featureId: 'grids-cards',
-    materialInput: '<div class="grid cards" markdown> + Markdown list (with --- as title/body separator)',
+    materialInput:
+      '<div class="grid cards" markdown> + Markdown list (with --- as title/body separator)',
     requiredExtensions: ['attr_list', 'md_in_html'],
     starlightOutput: '<CardGrid><Card title="..." icon="..."> JSX',
     fileExt: 'mdx',
@@ -267,7 +264,8 @@ const TABLE: ReadonlyArray<MappingRow> = [
     featureId: 'icons',
     materialInput: ':material-foo: / :fontawesome-...: / :octicons-...: / :simple-...: shortcodes',
     requiredExtensions: ['pymdownx.emoji', 'attr_list'],
-    starlightOutput: '<Icon name="..."> with fallback chain → npm-package SVG → diagnostic placeholder. Material has 10K+ icons; Starlight\'s built-in set is ~250 — unmapped icons emit `icon-unmapped` diagnostic',
+    starlightOutput:
+      '<Icon name="..."> with fallback chain → npm-package SVG → diagnostic placeholder. Material has 10K+ icons; Starlight\'s built-in set is ~250 — unmapped icons emit `icon-unmapped` diagnostic',
     fileExt: 'mdx',
     conversionType: 'ast-transform',
     risk: 'high',
@@ -313,7 +311,8 @@ const TABLE: ReadonlyArray<MappingRow> = [
     featureId: 'plugin-mike',
     materialInput: 'mkdocs.yml plugins: [mike] (versioning plugin)',
     requiredExtensions: [],
-    starlightOutput: 'starlight-versions Starlight plugin auto-wired (versions list left as a stub); starlight-changelogs companion package added to package.json deps so users can publish release notes alongside the version switcher',
+    starlightOutput:
+      'starlight-versions Starlight plugin auto-wired (versions list left as a stub); starlight-changelogs companion package added to package.json deps so users can publish release notes alongside the version switcher',
     fileExt: 'md',
     conversionType: 'recommended-dep',
     risk: 'medium',
@@ -323,7 +322,8 @@ const TABLE: ReadonlyArray<MappingRow> = [
     featureId: 'annotations',
     materialInput: '(N) markers + { .annotate } + trailing ordered list — Material annotations',
     requiredExtensions: ['attr_list', 'md_in_html', 'pymdownx.superfences'],
-    starlightOutput: 'rewritten as footnote refs/defs ([^anno-block-N]); remark-gfm renders the popovers',
+    starlightOutput:
+      'rewritten as footnote refs/defs ([^anno-block-N]); remark-gfm renders the popovers',
     fileExt: 'md',
     conversionType: 'text-pre-parse',
     risk: 'high',
@@ -331,7 +331,8 @@ const TABLE: ReadonlyArray<MappingRow> = [
   },
   {
     featureId: 'code-annotations',
-    materialInput: '``` { .lang .annotate }` fence with (N)! markers in body + trailing ordered list',
+    materialInput:
+      '``` { .lang .annotate }` fence with (N)! markers in body + trailing ordered list',
     requiredExtensions: ['attr_list', 'pymdownx.superfences', 'pymdownx.highlight'],
     starlightOutput:
       'fence info string stripped of `.annotate`; (N)! markers downgraded to (N); trailing list left as a regular legend (popover UX is lost — diagnostic surfaces it)',
@@ -376,7 +377,7 @@ const TABLE: ReadonlyArray<MappingRow> = [
       '![alt](url){ align=left|right width="N" loading=lazy } and #only-light/#only-dark URL fragments',
     requiredExtensions: ['attr_list'],
     starlightOutput:
-      'raw <img> HTML preserving align (as md-align-* class), width, loading; #only-light/dark hash promoted to class for CSS-driven theme swap (Astro\'s image-pipeline optimization is bypassed for the swap variants)',
+      "raw <img> HTML preserving align (as md-align-* class), width, loading; #only-light/dark hash promoted to class for CSS-driven theme swap (Astro's image-pipeline optimization is bypassed for the swap variants)",
     fileExt: 'md',
     conversionType: 'text-pre-parse',
     risk: 'medium',
@@ -384,10 +385,10 @@ const TABLE: ReadonlyArray<MappingRow> = [
   },
   {
     featureId: 'smartsymbols',
-    materialInput:
-      '(c) (r) (tm) +/- =/= c/o --> <-- <--> 1/2 1/4 3/4 etc. (pymdownx.smartsymbols)',
+    materialInput: '(c) (r) (tm) +/- =/= c/o --> <-- <--> 1/2 1/4 3/4 etc. (pymdownx.smartsymbols)',
     requiredExtensions: ['pymdownx.smartsymbols'],
-    starlightOutput: 'replaced with the corresponding Unicode glyphs (©, ®, ™, ±, ≠, ℅, →, ←, ↔, ½, ¼, ¾, …)',
+    starlightOutput:
+      'replaced with the corresponding Unicode glyphs (©, ®, ™, ±, ≠, ℅, →, ←, ↔, ½, ¼, ¾, …)',
     fileExt: 'md',
     conversionType: 'text-pre-parse',
     risk: 'low',
@@ -403,9 +404,11 @@ const TABLE: ReadonlyArray<MappingRow> = [
   },
   {
     featureId: 'admonition-type-option',
-    materialInput: '/// admonition | Title \\n    type: warning — option-block override of the directive type',
+    materialInput:
+      '/// admonition | Title \\n    type: warning — option-block override of the directive type',
     requiredExtensions: ['pymdownx.blocks.admonition'],
-    starlightOutput: 'effective directive name resolved from the type: option (e.g., :::caution); options block is stripped',
+    starlightOutput:
+      'effective directive name resolved from the type: option (e.g., :::caution); options block is stripped',
     fileExt: 'md',
     conversionType: 'text-pre-parse',
     risk: 'low',
@@ -469,7 +472,8 @@ const TABLE: ReadonlyArray<MappingRow> = [
   },
   {
     featureId: 'snippets-auto-append',
-    materialInput: 'pymdownx.snippets.auto_append in markdown_extensions (site-wide glossary file list)',
+    materialInput:
+      'pymdownx.snippets.auto_append in markdown_extensions (site-wide glossary file list)',
     requiredExtensions: ['pymdownx.snippets'],
     starlightOutput:
       'auto-append content read once and concatenated to every source body before snippet expansion (mirrors Material runtime behavior)',
@@ -629,14 +633,15 @@ const TABLE: ReadonlyArray<MappingRow> = [
       'mkdocs.yml `plugins: optimize` (Material optimize plugin — minifies HTML/CSS/JS and recompresses images at build)',
     requiredExtensions: [],
     starlightOutput:
-      'no-op — Astro\'s build pipeline already minifies HTML/CSS/JS, fingerprints assets, and supports image optimization via `astro:assets`. Diagnostic confirms the plugin was detected and replaced by built-ins; per-asset `optimize.cache_dir` and concurrency knobs are dropped',
+      "no-op — Astro's build pipeline already minifies HTML/CSS/JS, fingerprints assets, and supports image optimization via `astro:assets`. Diagnostic confirms the plugin was detected and replaced by built-ins; per-asset `optimize.cache_dir` and concurrency knobs are dropped",
     fileExt: 'md',
     conversionType: 'passthrough',
     risk: 'low',
   },
   {
     featureId: 'plugin-offline',
-    materialInput: 'mkdocs.yml `plugins: offline` (Material offline-bundle plugin — single-file site for filesystem viewing)',
+    materialInput:
+      'mkdocs.yml `plugins: offline` (Material offline-bundle plugin — single-file site for filesystem viewing)',
     requiredExtensions: [],
     starlightOutput:
       'no automatic conversion — Astro has no equivalent file:// bundler. Diagnostic recommends a manual remediation: build with `astro build`, then either ship the `dist/` directory verbatim or wrap it in a service worker via `@vite-pwa/astro` for offline PWA delivery',
@@ -757,8 +762,7 @@ const TABLE: ReadonlyArray<MappingRow> = [
   },
   {
     featureId: 'progressbar',
-    materialInput:
-      '`[=85% "85%"]` / `[=1/2 "Half"]` syntax from `pymdownx.progressbar`',
+    materialInput: '`[=85% "85%"]` / `[=1/2 "Half"]` syntax from `pymdownx.progressbar`',
     requiredExtensions: ['pymdownx.progressbar'],
     starlightOutput:
       'raw `<progress value="N" max="100">label</progress>` HTML element; Material `.progress-bar` / `.progress-label` CSS classes are not preserved',
@@ -804,7 +808,7 @@ const TABLE: ReadonlyArray<MappingRow> = [
     materialInput: '`pymdownx.b64` — base64-inline image references',
     requiredExtensions: ['pymdownx.b64'],
     starlightOutput:
-      'no-op — Astro\'s asset pipeline (`astro:assets`) handles image bundling via the build graph rather than data: URLs',
+      "no-op — Astro's asset pipeline (`astro:assets`) handles image bundling via the build graph rather than data: URLs",
     fileExt: 'md',
     conversionType: 'passthrough',
     risk: 'low',
@@ -814,7 +818,7 @@ const TABLE: ReadonlyArray<MappingRow> = [
     materialInput: '`mkdocs-minify-plugin` (HTML/CSS/JS minification at build)',
     requiredExtensions: [],
     starlightOutput:
-      'no-op — Astro/Vite minify HTML/CSS/JS by default in production builds. Plugin\'s `minify_html_options` etc. are dropped',
+      "no-op — Astro/Vite minify HTML/CSS/JS by default in production builds. Plugin's `minify_html_options` etc. are dropped",
     fileExt: 'md',
     conversionType: 'passthrough',
     risk: 'low',
@@ -824,7 +828,7 @@ const TABLE: ReadonlyArray<MappingRow> = [
     materialInput: '`mkdocs-glossary-plugin` (hover-tooltip glossary terms)',
     requiredExtensions: [],
     starlightOutput:
-      'recommend the converter\'s `abbr` handling (`*[TERM]: definition`) for plain-text definitions, or a custom MDX `<Glossary>` component for richer tooltips',
+      "recommend the converter's `abbr` handling (`*[TERM]: definition`) for plain-text definitions, or a custom MDX `<Glossary>` component for richer tooltips",
     fileExt: 'md',
     conversionType: 'recommended-dep',
     risk: 'medium',
@@ -841,7 +845,8 @@ const TABLE: ReadonlyArray<MappingRow> = [
   },
   {
     featureId: 'plugin-puml',
-    materialInput: '`mkdocs-puml` / `plantuml-markdown` (PlantUML diagrams via `@startuml...@enduml`)',
+    materialInput:
+      '`mkdocs-puml` / `plantuml-markdown` (PlantUML diagrams via `@startuml...@enduml`)',
     requiredExtensions: [],
     starlightOutput:
       'recommend `astro-plantuml` integration; the same `@startuml...@enduml` fenced syntax is supported',
@@ -877,7 +882,7 @@ const TABLE: ReadonlyArray<MappingRow> = [
       '`mkdocs-monorepo-plugin` (multiple sub-docs trees stitched into one site at MkDocs build time)',
     requiredExtensions: [],
     starlightOutput:
-      'no automatic conversion — the plugin\'s build-time fetch is not replicated. Source-side placeholder pages render with their stub text only. Recommended migration: clone external content locally before conversion, OR replace placeholder pages with links to the external docs sites, OR use Astro content collections + a custom loader',
+      "no automatic conversion — the plugin's build-time fetch is not replicated. Source-side placeholder pages render with their stub text only. Recommended migration: clone external content locally before conversion, OR replace placeholder pages with links to the external docs sites, OR use Astro content collections + a custom loader",
     fileExt: 'md',
     conversionType: 'recommended-dep',
     risk: 'high',
@@ -924,7 +929,7 @@ const TABLE: ReadonlyArray<MappingRow> = [
       'ATX heading with attr_list class flagged as a badge marker (e.g., `## Title { .badge }`, `### Beta { .new }`) — detected by `scan-heading-badges`',
     requiredExtensions: ['attr_list'],
     starlightOutput:
-      '`starlight-heading-badges` community plugin auto-wired in astro.config.mjs; the heading\'s `{ .class }` is preserved as a badge marker the plugin renders into a `<Badge>` next to the heading text',
+      "`starlight-heading-badges` community plugin auto-wired in astro.config.mjs; the heading's `{ .class }` is preserved as a badge marker the plugin renders into a `<Badge>` next to the heading text",
     fileExt: 'md',
     conversionType: 'recommended-dep',
     risk: 'low',

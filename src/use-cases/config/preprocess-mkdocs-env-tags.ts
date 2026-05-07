@@ -20,12 +20,7 @@
  */
 
 export function preprocessMkdocsEnvTags(source: string): string {
-  return stripRelativeTags(
-    source
-      .split('\n')
-      .map(rewriteLine)
-      .join('\n'),
-  );
+  return stripRelativeTags(source.split('\n').map(rewriteLine).join('\n'));
 }
 
 /**

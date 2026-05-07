@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parseAdmonitionType, ADMONITION_TYPES, type AdmonitionType } from './admonition-type.js';
+import { ADMONITION_TYPES, type AdmonitionType, parseAdmonitionType } from './admonition-type.js';
 
 describe('parseAdmonitionType', () => {
   it('recognizes every Material for MkDocs admonition type qualifier', () => {

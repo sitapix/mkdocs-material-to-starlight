@@ -1,10 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import {
-  applyExcludePatterns,
-  extractExcludePatterns,
-  isExcluded,
-} from './exclude-config.js';
 import type { MkdocsPlugin } from '../../domain/config/mkdocs-config.js';
+import { applyExcludePatterns, extractExcludePatterns, isExcluded } from './exclude-config.js';
 
 function plugin(name: string, options: Record<string, unknown> = {}): MkdocsPlugin {
   return { name, options };
@@ -28,9 +24,7 @@ describe('extractExcludePatterns', () => {
   });
 
   it('ignores non-string entries in glob/regex lists', () => {
-    const out = extractExcludePatterns([
-      plugin('exclude', { glob: ['*.tmp', 42, null, '*.md'] }),
-    ]);
+    const out = extractExcludePatterns([plugin('exclude', { glob: ['*.tmp', 42, null, '*.md'] })]);
     expect(out.glob).toEqual(['*.tmp', '*.md']);
   });
 
@@ -95,18 +89,15 @@ describe('applyExcludePatterns', () => {
   });
 
   it('filters out matching paths via glob', () => {
-    const out = applyExcludePatterns(
-      ['a.md', 'b.tmp', 'c.md'],
-      { glob: ['*.tmp'], regex: [] },
-    );
+    const out = applyExcludePatterns(['a.md', 'b.tmp', 'c.md'], { glob: ['*.tmp'], regex: [] });
     expect(out).toEqual(['a.md', 'c.md']);
   });
 
   it('combines glob and regex matches (any match excludes)', () => {
-    const out = applyExcludePatterns(
-      ['a.md', 'b.tmp', 'private/c.md', 'd.draft.md'],
-      { glob: ['*.tmp', 'private/*'], regex: ['\\.draft\\.'] },
-    );
+    const out = applyExcludePatterns(['a.md', 'b.tmp', 'private/c.md', 'd.draft.md'], {
+      glob: ['*.tmp', 'private/*'],
+      regex: ['\\.draft\\.'],
+    });
     expect(out).toEqual(['a.md']);
   });
 
@@ -131,10 +122,10 @@ describe('applyExcludePatterns', () => {
   });
 
   it('preserves input order in the filtered output', () => {
-    const out = applyExcludePatterns(
-      ['z.md', 'a.tmp', 'm.md', 'b.tmp', 'c.md'],
-      { glob: ['*.tmp'], regex: [] },
-    );
+    const out = applyExcludePatterns(['z.md', 'a.tmp', 'm.md', 'b.tmp', 'c.md'], {
+      glob: ['*.tmp'],
+      regex: [],
+    });
     expect(out).toEqual(['z.md', 'm.md', 'c.md']);
   });
 });
@@ -174,7 +165,7 @@ describe('isExcluded — pattern edge cases', () => {
     expect(isExcluded('any/path.md', p)).toBe(true);
   });
 
-  it('regex anchoring is the user\'s responsibility — partial matches still exclude', () => {
+  it("regex anchoring is the user's responsibility — partial matches still exclude", () => {
     const p = { glob: [], regex: ['draft'] };
     expect(isExcluded('foo-draft.md', p)).toBe(true);
     expect(isExcluded('drafty/x.md', p)).toBe(true);

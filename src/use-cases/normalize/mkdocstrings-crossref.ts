@@ -18,11 +18,9 @@
  * Idempotent: output `` `X` `` contains no `][`.
  */
 
-import {
-  createDiagnostic,
-  type Diagnostic,
-} from '../../domain/diagnostics/diagnostic.js';
+import { createDiagnostic, type Diagnostic } from '../../domain/diagnostics/diagnostic.js';
 import { isFenceLine } from '../../domain/syntax/fence.js';
+
 // Matches [`X`][] or [`X`][target] where X is the content of the backtick
 // and target is an optional fully-qualified Python path.
 // Captures group 1 = the inner code text (without backticks).
@@ -33,9 +31,7 @@ export interface ScanCrossRefsResult {
   readonly diagnostics: ReadonlyArray<Diagnostic>;
 }
 
-export function normalizeMkdocstringsCrossRefs(
-  source: string,
-): ScanCrossRefsResult {
+export function normalizeMkdocstringsCrossRefs(source: string): ScanCrossRefsResult {
   const lines = source.split('\n');
   const out: string[] = [];
   const diagnostics: Diagnostic[] = [];
@@ -69,7 +65,7 @@ export function normalizeMkdocstringsCrossRefs(
           severity: 'info',
           ruleId: 'mkdocstrings-cross-ref-stripped',
           source: 'normalize/mkdocstrings-crossref',
-          message: `mkdocstrings cross-ref \`[${"`"}${codeText}${"`"}][...]\` reduced to inline code \`${codeText}\`.`,
+          message: `mkdocstrings cross-ref \`[${'`'}${codeText}${'`'}][...]\` reduced to inline code \`${codeText}\`.`,
           place: { line: lineNumber, column: (match.index ?? 0) + 1 },
         }),
       );

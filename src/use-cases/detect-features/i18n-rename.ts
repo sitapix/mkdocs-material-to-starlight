@@ -11,10 +11,7 @@
  * or non-`.md` extension). Pure.
  */
 
-export function renameI18nPath(
-  sourcePath: string,
-  locales: ReadonlyArray<string>,
-): string | null {
+export function renameI18nPath(sourcePath: string, locales: ReadonlyArray<string>): string | null {
   if (!sourcePath.endsWith('.md') || locales.length === 0) {
     return null;
   }

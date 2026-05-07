@@ -19,9 +19,10 @@
  * Idempotent: emitted output has no `===` markers.
  */
 
-import { parseTabLine, type TabOpening } from '../../domain/syntax/tab-line.js';
-import { readIndentedBlock } from '../../domain/syntax/indented-block.js';
 import { isFenceLine } from '../../domain/syntax/fence.js';
+import { readIndentedBlock } from '../../domain/syntax/indented-block.js';
+import { parseTabLine, type TabOpening } from '../../domain/syntax/tab-line.js';
+
 const BODY_INDENT = 4;
 
 interface CollectedTab {

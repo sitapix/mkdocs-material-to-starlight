@@ -25,9 +25,7 @@ export interface NeedsAttentionItem {
   readonly docsUrl: string;
 }
 
-export function needsAttentionPreview(
-  config: MkdocsConfig,
-): ReadonlyArray<NeedsAttentionItem> {
+export function needsAttentionPreview(config: MkdocsConfig): ReadonlyArray<NeedsAttentionItem> {
   const diagnostics = diagnosePlugins(config.plugins, config.markdownExtensions);
   const items: NeedsAttentionItem[] = [];
   const seenRules = new Set<string>();
@@ -91,7 +89,10 @@ function ruleAppliesTo(ruleId: string, name: string): boolean {
  */
 function ruleHits(ruleId: string, name: string): boolean {
   const aliases: ReadonlyArray<readonly [string, ReadonlyArray<string>]> = [
-    ['plugin-swagger-ui-mapped', ['swagger-ui-tag', 'mkdocs-swagger-ui-tag', 'mkdocs-redoc-tag', 'render-swagger']],
+    [
+      'plugin-swagger-ui-mapped',
+      ['swagger-ui-tag', 'mkdocs-swagger-ui-tag', 'mkdocs-redoc-tag', 'render-swagger'],
+    ],
     ['plugin-pdf-export-mapped', ['pdf-export', 'with-pdf']],
     ['plugin-git-authors-mapped', ['git-authors', 'git-committers']],
     ['plugin-click-no-equivalent', ['click', 'mkdocs-click']],

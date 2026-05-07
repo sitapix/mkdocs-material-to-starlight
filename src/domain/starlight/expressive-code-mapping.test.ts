@@ -23,9 +23,9 @@ describe('mapPygmentsHighlightToExpressiveCode', () => {
   });
 
   it('maps the github family symmetrically regardless of which side the user picked', () => {
-    expect(
-      mapPygmentsHighlightToExpressiveCode({ pygments_style: 'github-dark' })?.themes,
-    ).toEqual(['github-light', 'github-dark']);
+    expect(mapPygmentsHighlightToExpressiveCode({ pygments_style: 'github-dark' })?.themes).toEqual(
+      ['github-light', 'github-dark'],
+    );
     expect(
       mapPygmentsHighlightToExpressiveCode({ pygments_style: 'github-light' })?.themes,
     ).toEqual(['github-light', 'github-dark']);

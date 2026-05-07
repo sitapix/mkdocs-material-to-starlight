@@ -38,9 +38,7 @@ const VALID_EXTENSIONS = ['.md', '.mdx'] as const;
  * suffixes are excluded from the check (they're stripped by the slug
  * derivation either way).
  */
-export function findSlugIncompatibleSegments(
-  sourcePath: string,
-): ReadonlyArray<string> {
+export function findSlugIncompatibleSegments(sourcePath: string): ReadonlyArray<string> {
   const stripped = stripExtension(sourcePath);
   const segments = stripped.split('/').filter((s) => s.length > 0);
   const out: string[] = [];

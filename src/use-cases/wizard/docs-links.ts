@@ -78,18 +78,15 @@ export const PLUGIN_DOCS: Readonly<Record<string, string>> = {
   'mkdocs-bibtex': 'https://github.com/shyamd/mkdocs-bibtex',
 
   // PyMdown extensions surfaced as diagnostics.
-  'pymdownx.arithmatex':
-    'https://katex.org/docs/autorender.html',
+  'pymdownx.arithmatex': 'https://katex.org/docs/autorender.html',
   'pymdownx.progressbar':
     'https://facelessuser.github.io/pymdown-extensions/extensions/progressbar/',
-  'pymdownx.striphtml':
-    'https://facelessuser.github.io/pymdown-extensions/extensions/striphtml/',
+  'pymdownx.striphtml': 'https://facelessuser.github.io/pymdown-extensions/extensions/striphtml/',
   'pymdownx.blocks.dialog':
     'https://facelessuser.github.io/pymdown-extensions/extensions/blocks/plugins/dialog/',
   'pymdownx.blocks.grid':
     'https://facelessuser.github.io/pymdown-extensions/extensions/blocks/plugins/grid/',
-  'pymdownx.escapeall':
-    'https://facelessuser.github.io/pymdown-extensions/extensions/escapeall/',
+  'pymdownx.escapeall': 'https://facelessuser.github.io/pymdown-extensions/extensions/escapeall/',
   'pymdownx.pathconverter':
     'https://facelessuser.github.io/pymdown-extensions/extensions/pathconverter/',
   'pymdownx.saneheaders':

@@ -26,9 +26,7 @@ describe('normalizeFrontmatterTitleCoercion', () => {
   it('quotes bareword YAML booleans (yes/no/true/false/on/off)', () => {
     for (const v of ['true', 'false', 'yes', 'no', 'on', 'off', 'TRUE', 'On']) {
       const src = `---\ntitle: ${v}\n---\n`;
-      expect(normalizeFrontmatterTitleCoercion(src)).toBe(
-        `---\ntitle: '${v}'\n---\n`,
-      );
+      expect(normalizeFrontmatterTitleCoercion(src)).toBe(`---\ntitle: '${v}'\n---\n`);
     }
   });
 
@@ -58,9 +56,7 @@ describe('normalizeFrontmatterTitleCoercion', () => {
   it('also coerces description and tagline fields', () => {
     const src = '---\ntitle: My Site\ndescription: 2025-01-01\ntagline: 42\n---\n';
     const out = normalizeFrontmatterTitleCoercion(src);
-    expect(out).toBe(
-      "---\ntitle: My Site\ndescription: '2025-01-01'\ntagline: '42'\n---\n",
-    );
+    expect(out).toBe("---\ntitle: My Site\ndescription: '2025-01-01'\ntagline: '42'\n---\n");
   });
 
   it('leaves block-scalar values alone', () => {

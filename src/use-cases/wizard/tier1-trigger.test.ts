@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { triggerSet, type Tier1Trigger } from './tier1-trigger.js';
-import type { ConversionPlan } from '../../domain/wizard/plan.js';
 import type { MkdocsConfig } from '../../domain/config/mkdocs-config.js';
+import type { ConversionPlan } from '../../domain/wizard/plan.js';
+import { type Tier1Trigger, triggerSet } from './tier1-trigger.js';
 
 function plan(over: Partial<MkdocsConfig> = {}): ConversionPlan {
   const config: MkdocsConfig = {

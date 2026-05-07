@@ -18,19 +18,19 @@
  * straight switch with no information loss.
  */
 
-import { ok, err, type Result } from '../../domain/result.js';
-import type { FileSystem } from '../../domain/ports/file-system.js';
-import type { DirectoryReader } from '../../domain/ports/directory-reader.js';
-import type { YamlDecoder } from '../../domain/ports/yaml-decoder.js';
-import type { ConfigDiscoverer } from '../../domain/ports/config-discoverer.js';
+import { join } from 'node:path';
 import type { MkdocsConfig } from '../../domain/config/mkdocs-config.js';
-import { resolveProjectDir } from '../discover-config/resolve-project-dir.js';
+import type { ConfigDiscoverer } from '../../domain/ports/config-discoverer.js';
+import type { DirectoryReader } from '../../domain/ports/directory-reader.js';
+import type { FileSystem } from '../../domain/ports/file-system.js';
+import type { YamlDecoder } from '../../domain/ports/yaml-decoder.js';
+import { err, ok, type Result } from '../../domain/result.js';
+import { expandMetaBundles } from '../config/expand-meta-bundles.js';
 import { resolveInherits } from '../config/inherit-config.js';
+import { parseMkdocsConfig } from '../config/parse-mkdocs.js';
 import { preprocessMkdocsEnvTags } from '../config/preprocess-mkdocs-env-tags.js';
 import { preprocessMkdocsPythonTags } from '../config/preprocess-mkdocs-python-tags.js';
-import { parseMkdocsConfig } from '../config/parse-mkdocs.js';
-import { expandMetaBundles } from '../config/expand-meta-bundles.js';
-import { join } from 'node:path';
+import { resolveProjectDir } from '../discover-config/resolve-project-dir.js';
 
 export interface LoadMkdocsConfigPorts {
   readonly fs: FileSystem;
@@ -91,16 +91,25 @@ export async function loadMkdocsConfig(
   const projectDir = resolved.value.projectDir;
   const autoDiscovery = resolved.value.autoDiscovery;
 
-  const configPath = join(projectDir, 'mkdocs.yml');
-  const configRead = await fs.readText(configPath);
+  // Try both filename variants; MkDocs accepts either. We keep
+  // `mkdocs.yml` first to match the canonical extension and historical
+  // behaviour, falling back to `mkdocs.yaml` only when the canonical
+  // form is absent.
+  let configPath = join(projectDir, 'mkdocs.yml');
+  let configRead = await fs.readText(configPath);
   if (!configRead.ok) {
-    return err({ kind: 'config-not-found', searchedDir: projectDir });
+    const altPath = join(projectDir, 'mkdocs.yaml');
+    const altRead = await fs.readText(altPath);
+    if (altRead.ok) {
+      configPath = altPath;
+      configRead = altRead;
+    } else {
+      return err({ kind: 'config-not-found', searchedDir: projectDir });
+    }
   }
 
   const inherited = await resolveInherits(configRead.value, configPath, fs);
-  const pythonStripped = preprocessMkdocsPythonTags(
-    preprocessMkdocsEnvTags(inherited.source),
-  );
+  const pythonStripped = preprocessMkdocsPythonTags(preprocessMkdocsEnvTags(inherited.source));
   const decoded = yamlDecoder.decode(pythonStripped.source);
   if (!decoded.ok) {
     return err({ kind: 'yaml-decode-failed', message: decoded.error.message });

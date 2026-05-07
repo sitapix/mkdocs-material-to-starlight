@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { runWholeSourceScanners, type WholeSourceScanner } from './whole-source-scanner.js';
 import { createDiagnostic, type Diagnostic } from '../diagnostics/diagnostic.js';
+import { runWholeSourceScanners, type WholeSourceScanner } from './whole-source-scanner.js';
 
 function diag(ruleId: string, message = 'm'): Diagnostic {
   return createDiagnostic({ severity: 'info', ruleId, source: 'test', message });
@@ -26,9 +26,7 @@ describe('runWholeSourceScanners', () => {
   });
 
   it('accepts a single-Diagnostic return shape', () => {
-    const scanners: WholeSourceScanner[] = [
-      { name: 'single', scan: () => diag('lone') },
-    ];
+    const scanners: WholeSourceScanner[] = [{ name: 'single', scan: () => diag('lone') }];
     const out = runWholeSourceScanners('s', 'page.md', scanners);
     expect(out).toHaveLength(1);
     expect(out[0]?.diagnostic.ruleId).toBe('lone');
@@ -53,8 +51,20 @@ describe('runWholeSourceScanners', () => {
   it('passes the same source verbatim to every scanner', () => {
     const seen: string[] = [];
     const scanners: WholeSourceScanner[] = [
-      { name: 'a', scan: (s) => { seen.push(s); return null; } },
-      { name: 'b', scan: (s) => { seen.push(s); return null; } },
+      {
+        name: 'a',
+        scan: (s) => {
+          seen.push(s);
+          return null;
+        },
+      },
+      {
+        name: 'b',
+        scan: (s) => {
+          seen.push(s);
+          return null;
+        },
+      },
     ];
     runWholeSourceScanners('hello world', 'p.md', scanners);
     expect(seen).toEqual(['hello world', 'hello world']);

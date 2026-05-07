@@ -18,9 +18,9 @@
  *   - Pure given the AST: no I/O.
  */
 
-import { visit } from 'unist-util-visit';
-import type { Plugin } from 'unified';
 import type { Root } from 'mdast';
+import type { Plugin } from 'unified';
+import { visit } from 'unist-util-visit';
 import { extractLabelIcon } from '../extract-label-icon.js';
 
 interface ContainerDirectiveLike {
@@ -53,9 +53,7 @@ export interface TabTransformOptions {
   readonly iconOverrides?: Readonly<Record<string, string>>;
 }
 
-export const transformTabDirectives: Plugin<[TabTransformOptions?], Root> = (
-  options = {},
-) => {
+export const transformTabDirectives: Plugin<[TabTransformOptions?], Root> = (options = {}) => {
   const emitMdx = options.emitMdxTabs !== false;
   const tabsLinked = options.tabsLinked === true;
   const iconOverrides = options.iconOverrides;
@@ -129,9 +127,7 @@ function buildTabItemAttributes(
     return [{ type: 'mdxJsxAttribute', name: 'label', value: 'Tab' }];
   }
   const { iconName, label } = extractLabelIcon(
-    iconOverrides === undefined
-      ? { rawLabel }
-      : { rawLabel, overrides: iconOverrides },
+    iconOverrides === undefined ? { rawLabel } : { rawLabel, overrides: iconOverrides },
   );
   const safeLabel = label.length > 0 ? label : 'Tab';
   const attributes: unknown[] = [];
@@ -178,8 +174,7 @@ function deriveSyncKey(labels: ReadonlyArray<string>): string | null {
 
 function renderTabsContainer(directive: ContainerDirectiveLike): ReadonlyArray<unknown> {
   const exclusive =
-    directive.attributes?.['exclusive'] !== undefined &&
-    directive.attributes['exclusive'] !== null;
+    directive.attributes?.exclusive !== undefined && directive.attributes.exclusive !== null;
   const openTag = exclusive
     ? '<div class="sl-tabs" data-exclusive="true">'
     : '<div class="sl-tabs">';
@@ -193,11 +188,12 @@ function renderTab(
   const rawLabel = readDirectiveLabel(directive);
   // Plain HTML tabs have no `icon` attribute slot, but we still strip the
   // shortcode so the visible data-label doesn't carry literal `:foo:` text.
-  const cleaned = rawLabel === null ? null : extractLabelIcon(
-    iconOverrides === undefined
-      ? { rawLabel }
-      : { rawLabel, overrides: iconOverrides },
-  ).label;
+  const cleaned =
+    rawLabel === null
+      ? null
+      : extractLabelIcon(
+          iconOverrides === undefined ? { rawLabel } : { rawLabel, overrides: iconOverrides },
+        ).label;
   const openTag =
     cleaned === null || cleaned.length === 0
       ? '<div class="sl-tab">'
@@ -205,10 +201,7 @@ function renderTab(
   return wrapWithDiv(directive, openTag);
 }
 
-function wrapWithDiv(
-  directive: ContainerDirectiveLike,
-  openTag: string,
-): ReadonlyArray<unknown> {
+function wrapWithDiv(directive: ContainerDirectiveLike, openTag: string): ReadonlyArray<unknown> {
   const out: unknown[] = [{ type: 'html', value: openTag }];
   for (const child of directive.children) {
     if (isDirectiveLabel(child)) {

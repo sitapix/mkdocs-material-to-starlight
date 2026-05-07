@@ -17,20 +17,14 @@ describe('extractExtraAssets', () => {
     const out = extractExtraAssets({
       extra_javascript: ['js/custom.js'],
     });
-    expect(out.js).toEqual([
-      { src: 'js/custom.js' },
-    ]);
+    expect(out.js).toEqual([{ src: 'js/custom.js' }]);
   });
 
   it('extracts extra_javascript object form with type, async, defer', () => {
     const out = extractExtraAssets({
-      extra_javascript: [
-        { path: 'js/module.js', type: 'module', async: true, defer: false },
-      ],
+      extra_javascript: [{ path: 'js/module.js', type: 'module', async: true, defer: false }],
     });
-    expect(out.js).toEqual([
-      { src: 'js/module.js', type: 'module', async: true },
-    ]);
+    expect(out.js).toEqual([{ src: 'js/module.js', type: 'module', async: true }]);
   });
 
   it('omits unset attrs from JS entries', () => {

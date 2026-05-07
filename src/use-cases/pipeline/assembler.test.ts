@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { assemblePipeline } from './assembler.js';
 import type { PluginDescriptor } from '../../domain/transform/plugin-contract.js';
+import { assemblePipeline } from './assembler.js';
 
 const plugin = (overrides: Partial<PluginDescriptor>): PluginDescriptor => {
   const id = overrides.id ?? 'p';
@@ -32,12 +32,7 @@ describe('assemblePipeline', () => {
 
     expect(result.ok).toBe(true);
     if (result.ok) {
-      expect(result.value.map((p) => p.id)).toEqual([
-        'normalize',
-        'b',
-        'a',
-        'stringify',
-      ]);
+      expect(result.value.map((p) => p.id)).toEqual(['normalize', 'b', 'a', 'stringify']);
     }
   });
 

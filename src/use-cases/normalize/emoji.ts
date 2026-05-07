@@ -27,7 +27,7 @@ const INLINE_CODE_PATTERN = /(`[^`\n]*`)/g;
 // underscores are CommonMark-significant. Without this tolerance, shortcodes
 // that survived remark-stringify with escapes (`:red\_circle:`) would fail
 // to match here and render as literal text in the final output.
-const SHORTCODE_PATTERN = /:((?:[a-z0-9+\-]|_|\\_)+):/g;
+const SHORTCODE_PATTERN = /:((?:[a-z0-9+-]|_|\\_)+):/g;
 const ICON_PREFIX_PATTERN = /^(material|fontawesome|octicons|simple|lucide|fa)-/;
 
 // Manual overrides for shortcodes that `gemoji` doesn't ship under the

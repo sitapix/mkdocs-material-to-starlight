@@ -12,12 +12,7 @@ describe('planAssetCopies', () => {
 
   it('returns a copy entry for every non-markdown file', () => {
     const plan = planAssetCopies({
-      allFiles: [
-        'index.md',
-        'images/diagram.png',
-        'assets/logo.svg',
-        'docs.md',
-      ],
+      allFiles: ['index.md', 'images/diagram.png', 'assets/logo.svg', 'docs.md'],
       markdownExtensions: ['.md', '.mdx'],
     });
     expect(plan).toEqual([

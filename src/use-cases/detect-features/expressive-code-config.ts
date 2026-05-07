@@ -18,8 +18,8 @@
 
 import type { MkdocsMarkdownExtension } from '../../domain/config/mkdocs-config.js';
 import {
-  mapPygmentsHighlightToExpressiveCode,
   type ExpressiveCodeMapping,
+  mapPygmentsHighlightToExpressiveCode,
 } from '../../domain/starlight/expressive-code-mapping.js';
 
 export function extractExpressiveCodeConfig(

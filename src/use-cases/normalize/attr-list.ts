@@ -14,9 +14,9 @@
  */
 
 import {
+  type SanitizeReport,
   stripBareAttrListLines,
   stripInlineAttrLists,
-  type SanitizeReport,
 } from '../mdx-detection/sanitize-mdx-syntax.js';
 
 const MATH_PLACEHOLDER_PREFIX = '\u0000MATH';
@@ -24,10 +24,7 @@ const MATH_PLACEHOLDER_SUFFIX = '\u0000';
 
 export function normalizeAttrList(source: string, report?: SanitizeReport): string {
   const { masked, blocks } = maskMath(source);
-  const stripped = stripInlineAttrLists(
-    stripBareAttrListLines(masked, report),
-    report,
-  );
+  const stripped = stripInlineAttrLists(stripBareAttrListLines(masked, report), report);
   return unmaskMath(stripped, blocks);
 }
 

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { detectFeaturesFromPlugins } from './from-plugins.js';
 import type { MkdocsPlugin } from '../../domain/config/mkdocs-config.js';
+import { detectFeaturesFromPlugins } from './from-plugins.js';
 
 function plugins(...names: string[]): ReadonlyArray<MkdocsPlugin> {
   return names.map((name) => ({ name, options: {} }));
@@ -8,9 +8,7 @@ function plugins(...names: string[]): ReadonlyArray<MkdocsPlugin> {
 
 describe('detectFeaturesFromPlugins', () => {
   it('returns an empty set when no recognized plugins are configured', () => {
-    expect(detectFeaturesFromPlugins(plugins('search', 'unknown-plugin'))).toEqual(
-      new Set(),
-    );
+    expect(detectFeaturesFromPlugins(plugins('search', 'unknown-plugin'))).toEqual(new Set());
   });
 
   it('maps the Material blog plugin to the blog feature', () => {
@@ -27,16 +25,12 @@ describe('detectFeaturesFromPlugins', () => {
 
   it('maps git-revision-date-localized to the last-updated feature', () => {
     expect(
-      detectFeaturesFromPlugins(plugins('git-revision-date-localized')).has(
-        'last-updated',
-      ),
+      detectFeaturesFromPlugins(plugins('git-revision-date-localized')).has('last-updated'),
     ).toBe(true);
   });
 
   it('maps mkdocs-glightbox to the image-zoom feature', () => {
-    expect(detectFeaturesFromPlugins(plugins('glightbox')).has('image-zoom')).toBe(
-      true,
-    );
+    expect(detectFeaturesFromPlugins(plugins('glightbox')).has('image-zoom')).toBe(true);
   });
 
   it('maps mike to the versions feature', () => {
@@ -44,15 +38,11 @@ describe('detectFeaturesFromPlugins', () => {
   });
 
   it('maps git-authors to the contributor-list feature', () => {
-    expect(
-      detectFeaturesFromPlugins(plugins('git-authors')).has('contributor-list'),
-    ).toBe(true);
+    expect(detectFeaturesFromPlugins(plugins('git-authors')).has('contributor-list')).toBe(true);
   });
 
   it('maps git-committers to the contributor-list feature', () => {
-    expect(
-      detectFeaturesFromPlugins(plugins('git-committers')).has('contributor-list'),
-    ).toBe(true);
+    expect(detectFeaturesFromPlugins(plugins('git-committers')).has('contributor-list')).toBe(true);
   });
 
   it('git-authors and git-committers share the same target — both produce a single contributor-list feature', () => {
@@ -69,9 +59,7 @@ describe('detectFeaturesFromPlugins', () => {
   });
 
   it('ignores unrecognized plugins (no false positives)', () => {
-    expect(detectFeaturesFromPlugins(plugins('some-unknown-plugin'))).toEqual(
-      new Set(),
-    );
+    expect(detectFeaturesFromPlugins(plugins('some-unknown-plugin'))).toEqual(new Set());
   });
 
   describe('extension-driven features (Tier 4 #14)', () => {
@@ -90,10 +78,7 @@ describe('detectFeaturesFromPlugins', () => {
     });
 
     it('combines plugin-driven and extension-driven features in one pass', () => {
-      const features = detectFeaturesFromPlugins(
-        plugins('mike'),
-        exts('pymdownx.keys'),
-      );
+      const features = detectFeaturesFromPlugins(plugins('mike'), exts('pymdownx.keys'));
       expect(features.has('versions')).toBe(true);
       expect(features.has('kbd')).toBe(true);
     });

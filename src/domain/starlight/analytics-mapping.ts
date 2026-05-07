@@ -40,22 +40,22 @@ export function mapAnalyticsToHeadEntries(
   // mkdocs.yml `extra:` block lands under `extras.extra`; fall back to the
   // flat shape so callers can pass either form without thinking about it.
   const inner =
-    typeof extras['extra'] === 'object' && extras['extra'] !== null
-      ? (extras['extra'] as Record<string, unknown>)
+    typeof extras.extra === 'object' && extras.extra !== null
+      ? (extras.extra as Record<string, unknown>)
       : extras;
-  const analytics = inner['analytics'];
+  const analytics = inner.analytics;
   if (analytics === null || analytics === undefined) return null;
   if (typeof analytics !== 'object') return null;
 
   const obj = analytics as Record<string, unknown>;
-  const provider = obj['provider'];
+  const provider = obj.provider;
   if (provider !== 'google') return null;
 
-  const property = obj['property'];
+  const property = obj.property;
   if (typeof property !== 'string' || property.length === 0) return null;
 
   const unsupported: string[] = [];
-  if (obj['feedback'] !== undefined && obj['feedback'] !== null) {
+  if (obj.feedback !== undefined && obj.feedback !== null) {
     unsupported.push('feedback');
   }
 

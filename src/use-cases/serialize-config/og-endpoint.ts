@@ -34,9 +34,10 @@ export function serializeOgEndpoint(input: OgEndpointInput): string {
   const layoutLiteral = serializeLayoutLiteral(input.cardsLayoutOptions);
   // When layout options exist, splice them into `getImageOptions`'s return
   // record. Otherwise emit the bare title/description form.
-  const getImageOptionsBody = layoutLiteral === ''
-    ? '    title: page.title,\n    description: page.description,'
-    : `    title: page.title,\n    description: page.description,\n${spreadLayout(layoutLiteral)}`;
+  const getImageOptionsBody =
+    layoutLiteral === ''
+      ? '    title: page.title,\n    description: page.description,'
+      : `    title: page.title,\n    description: page.description,\n${spreadLayout(layoutLiteral)}`;
   return [
     "import { OGImageRoute } from 'astro-og-canvas';",
     "import { getCollection } from 'astro:content';",
@@ -56,7 +57,7 @@ export function serializeOgEndpoint(input: OgEndpointInput): string {
     ');',
     '',
     '// astro-og-canvas 0.11+ returns a Promise; await is required so the',
-    '// resolved `getStaticPaths` is exported (Astro\'s static-route validator',
+    "// resolved `getStaticPaths` is exported (Astro's static-route validator",
     '// rejects modules that re-export an unresolved Promise from a `[...slug]`',
     '// dynamic route).',
     'export const { getStaticPaths, GET } = await OGImageRoute({',
@@ -81,10 +82,10 @@ function spreadLayout(literal: string): string {
   // the resulting object literal stays clean and Prettier-stable.
   const inner = literal.slice(1, -1).trim();
   if (inner === '') return '';
-  return inner
+  return `${inner
     .split(',')
     .map((p) => `    ${p.trim()}`)
-    .join(',\n') + ',';
+    .join(',\n')},`;
 }
 
 function quote(value: string): string {

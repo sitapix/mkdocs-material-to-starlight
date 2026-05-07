@@ -21,11 +21,11 @@
  *   - Unknown icon-set prefixes emit `icon-unmapped`.
  */
 
-import { visit, SKIP } from 'unist-util-visit';
-import type { Plugin } from 'unified';
 import type { PhrasingContent, Root, Text } from 'mdast';
-import { resolveIcon, type IconDescriptor } from '../resolve-icon.js';
+import type { Plugin } from 'unified';
+import { SKIP, visit } from 'unist-util-visit';
 import { createDiagnostic, type Diagnostic } from '../../../domain/diagnostics/diagnostic.js';
+import { type IconDescriptor, resolveIcon } from '../resolve-icon.js';
 
 export interface IconTransformOptions {
   readonly diagnostics: Diagnostic[];
@@ -66,10 +66,7 @@ export const transformIcons: Plugin<[IconTransformOptions], Root> = (options) =>
 
 type SplitNode = Text | MdxJsxTextElementNode;
 
-function splitTextNode(
-  node: Text,
-  options: IconTransformOptions,
-): ReadonlyArray<SplitNode> | null {
+function splitTextNode(node: Text, options: IconTransformOptions): ReadonlyArray<SplitNode> | null {
   const value = node.value;
   const matches = [...value.matchAll(SHORTCODE_RE)];
   if (matches.length === 0) {
@@ -110,9 +107,9 @@ function splitTextNode(
   return out;
 }
 
-function maybeOverrides(
-  options: IconTransformOptions,
-): { overrides?: Readonly<Record<string, string>> } {
+function maybeOverrides(options: IconTransformOptions): {
+  overrides?: Readonly<Record<string, string>>;
+} {
   return options.overrides === undefined ? {} : { overrides: options.overrides };
 }
 
@@ -128,10 +125,7 @@ function toIconHtml(descriptor: IconDescriptor, label: string | null): MdxJsxTex
     return makeIconHtml(descriptor.name, label);
   }
   if (descriptor.kind === 'local-svg') {
-    return makeIconHtml(
-      `local:${descriptor.iconSet}:${descriptor.iconName}`,
-      label,
-    );
+    return makeIconHtml(`local:${descriptor.iconSet}:${descriptor.iconName}`, label);
   }
   // placeholder is handled in the caller; this branch is unreachable.
   return makeIconHtml(descriptor.original, label);
@@ -213,8 +207,7 @@ function consumeTrailingAttrs(value: string, afterShortcode: number): TrailingAt
   return { label: null, consumedTo: afterShortcode };
 }
 
-const ATTR_TOKEN_RE =
-  /^(?:\.[\w-]+|#[\w-]+|[\w-]+\s*=\s*(?:"[^"]*"|'[^']*'|[\w-]+))$/;
+const ATTR_TOKEN_RE = /^(?:\.[\w-]+|#[\w-]+|[\w-]+\s*=\s*(?:"[^"]*"|'[^']*'|[\w-]+))$/;
 
 function isPureAttrList(blob: string): boolean {
   const trimmed = blob.trim();

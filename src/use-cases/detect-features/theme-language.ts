@@ -83,7 +83,7 @@ const VALID_LANG_TAG_RE = /^[A-Za-z][A-Za-z0-9-]*$/;
 export function extractThemeLanguage(
   themeOptions: Readonly<Record<string, unknown>>,
 ): ThemeLanguageConfig | undefined {
-  const raw = themeOptions['language'];
+  const raw = themeOptions.language;
   if (typeof raw !== 'string') return undefined;
   if (!VALID_LANG_TAG_RE.test(raw)) return undefined;
   if (raw === 'en') return undefined;

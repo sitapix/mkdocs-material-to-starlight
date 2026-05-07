@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest';
+import type { YamlDecoder } from '../../domain/ports/yaml-decoder.js';
+import { err, ok } from '../../domain/result.js';
 import {
   effectiveMetaDefaults,
+  type MetaEntry,
   mergeFrontmatter,
   parseMetaFiles,
-  type MetaEntry,
 } from './meta-cascade.js';
-import type { YamlDecoder } from '../../domain/ports/yaml-decoder.js';
-import { ok, err } from '../../domain/result.js';
 
 const yaml: YamlDecoder = {
   decode: (source) => {
@@ -47,9 +47,7 @@ describe('parseMetaFiles', () => {
       ],
       yaml,
     );
-    expect(out).toEqual([
-      { relPath: 'api/.meta.yml', defaults: { authors: 'alice' } },
-    ]);
+    expect(out).toEqual([{ relPath: 'api/.meta.yml', defaults: { authors: 'alice' } }]);
   });
 
   it('skips files whose YAML root is not an object', () => {
@@ -145,10 +143,7 @@ describe('mergeFrontmatter', () => {
   });
 
   it('does shallow merge — page array values fully replace cascaded ones', () => {
-    const out = mergeFrontmatter(
-      { authors: ['alice'] },
-      { authors: ['team-a', 'team-b'] },
-    );
+    const out = mergeFrontmatter({ authors: ['alice'] }, { authors: ['team-a', 'team-b'] });
     expect(out.authors).toEqual(['alice']);
   });
 
@@ -220,9 +215,7 @@ describe('effectiveMetaDefaults — additional edge cases', () => {
   });
 
   it('meta.yml at a sibling directory does NOT apply', () => {
-    const e: ReadonlyArray<MetaEntry> = [
-      { relPath: 'a/b/.meta.yml', defaults: { x: 1 } },
-    ];
+    const e: ReadonlyArray<MetaEntry> = [{ relPath: 'a/b/.meta.yml', defaults: { x: 1 } }];
     expect(effectiveMetaDefaults('a/c/page.md', e)).toEqual({});
   });
 
@@ -231,7 +224,7 @@ describe('effectiveMetaDefaults — additional edge cases', () => {
       { relPath: '.meta.yml', defaults: { template: 'splash' } },
     ];
     const r1 = effectiveMetaDefaults('p.md', e);
-    (r1 as Record<string, unknown>)['template'] = 'mutated';
+    (r1 as Record<string, unknown>).template = 'mutated';
     const r2 = effectiveMetaDefaults('p.md', e);
     expect(r2.template).toBe('splash');
   });

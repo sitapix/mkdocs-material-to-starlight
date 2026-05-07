@@ -47,12 +47,7 @@ describe('normalizeImages', () => {
   });
 
   it('does not touch lines inside fenced code blocks', () => {
-    const src = [
-      '```',
-      '![x](y.png){ align=left }',
-      '```',
-      '',
-    ].join('\n');
+    const src = ['```', '![x](y.png){ align=left }', '```', ''].join('\n');
     expect(normalizeImages(src)).toBe(src);
   });
 
@@ -65,9 +60,7 @@ describe('normalizeImages', () => {
 
   it('promotes #only-light hash images to <img class="only-light">', () => {
     const src = '![Diagram](diagram.png#only-light)\n';
-    expect(normalizeImages(src)).toBe(
-      '<img src="diagram.png" alt="Diagram" class="only-light">\n',
-    );
+    expect(normalizeImages(src)).toBe('<img src="diagram.png" alt="Diagram" class="only-light">\n');
   });
 
   it('promotes #only-dark hash images to <img class="only-dark">', () => {

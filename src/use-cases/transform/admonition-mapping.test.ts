@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { mapAdmonitionToAside } from './admonition-mapping.js';
 import type { AdmonitionType } from '../../domain/syntax/admonition-type.js';
+import { mapAdmonitionToAside } from './admonition-mapping.js';
 
 describe('mapAdmonitionToAside', () => {
   it('maps each Material type to a Starlight aside descriptor', () => {

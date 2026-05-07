@@ -49,15 +49,13 @@ function matchesShortcode(src: string): boolean {
 function matchesI18nFallback(src: string): boolean {
   return (
     /class\s+\w+File\s*\(\s*File\s*\)/.test(src) ||
-    /def\s+on_files\b/.test(src) &&
-      /(src_uri\.startswith|languages|locale|fallback)/.test(src)
+    (/def\s+on_files\b/.test(src) && /(src_uri\.startswith|languages|locale|fallback)/.test(src))
   );
 }
 
 function matchesTitleExtraction(src: string): boolean {
   return (
-    /page\.meta\[\s*['"]title['"]\s*\]\s*=/.test(src) ||
-    /cards_layout_options.+title/.test(src)
+    /page\.meta\[\s*['"]title['"]\s*\]\s*=/.test(src) || /cards_layout_options.+title/.test(src)
   );
 }
 
@@ -76,7 +74,6 @@ function matchesPostBuildEmission(src: string): boolean {
 
 function matchesDynamicContent(src: string): boolean {
   return (
-    /yaml\.safe_load|yaml\.load/.test(src) &&
-    /(render_template|jinja2|page\.url\s*==)/.test(src)
+    /yaml\.safe_load|yaml\.load/.test(src) && /(render_template|jinja2|page\.url\s*==)/.test(src)
   );
 }

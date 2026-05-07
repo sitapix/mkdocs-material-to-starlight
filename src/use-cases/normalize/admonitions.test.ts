@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { normalizeAdmonitions, ADMONITION_FENCE_DEPTH } from './admonitions.js';
+import { ADMONITION_FENCE_DEPTH, normalizeAdmonitions } from './admonitions.js';
 
 const FENCE = ':'.repeat(ADMONITION_FENCE_DEPTH);
 
@@ -17,9 +17,7 @@ describe('normalizeAdmonitions', () => {
 
   it('preserves a quoted title with bracketed-attribute syntax', () => {
     const src = '!!! warning "Heads up"\n    Read this.\n';
-    expect(normalizeAdmonitions(src)).toBe(
-      `${FENCE}warning[Heads up]\nRead this.\n${FENCE}\n`,
-    );
+    expect(normalizeAdmonitions(src)).toBe(`${FENCE}warning[Heads up]\nRead this.\n${FENCE}\n`);
   });
 
   it('translates ??? as a collapsible directive (data-collapsible attribute)', () => {
@@ -44,8 +42,7 @@ describe('normalizeAdmonitions', () => {
   });
 
   it('rewrites multiple admonitions in one document independently', () => {
-    const src =
-      '!!! note\n    First.\n\n!!! warning\n    Second.\n';
+    const src = '!!! note\n    First.\n\n!!! warning\n    Second.\n';
     expect(normalizeAdmonitions(src)).toBe(
       `${FENCE}note\nFirst.\n${FENCE}\n\n${FENCE}warning\nSecond.\n${FENCE}\n`,
     );
@@ -53,19 +50,11 @@ describe('normalizeAdmonitions', () => {
 
   it('leaves an admonition with empty body as a marker-only directive', () => {
     const src = '!!! note\n\nNext paragraph.\n';
-    expect(normalizeAdmonitions(src)).toBe(
-      `${FENCE}note\n${FENCE}\n\nNext paragraph.\n`,
-    );
+    expect(normalizeAdmonitions(src)).toBe(`${FENCE}note\n${FENCE}\n\nNext paragraph.\n`);
   });
 
   it('does not touch lines that look like admonitions but are inside fenced code', () => {
-    const src = [
-      '```',
-      '!!! note',
-      '    body',
-      '```',
-      '',
-    ].join('\n');
+    const src = ['```', '!!! note', '    body', '```', ''].join('\n');
     expect(normalizeAdmonitions(src)).toBe(src);
   });
 
@@ -134,12 +123,7 @@ describe('normalizeAdmonitions', () => {
   });
 
   it('is idempotent across nesting — running twice equals running once', () => {
-    const src = [
-      '??? info "Outer"',
-      '    !!! note',
-      '        Inner.',
-      '',
-    ].join('\n');
+    const src = ['??? info "Outer"', '    !!! note', '        Inner.', ''].join('\n');
     const once = normalizeAdmonitions(src);
     const twice = normalizeAdmonitions(once);
     expect(twice).toBe(once);

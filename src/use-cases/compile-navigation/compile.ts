@@ -19,12 +19,9 @@
  */
 
 import type { MkdocsNavEntry } from '../../domain/config/mkdocs-config.js';
+import { createDiagnostic, type Diagnostic } from '../../domain/diagnostics/diagnostic.js';
 import type { SidebarEntry } from '../../domain/starlight/sidebar.js';
 import type { SlugMap } from '../../domain/starlight/slug-map.js';
-import {
-  createDiagnostic,
-  type Diagnostic,
-} from '../../domain/diagnostics/diagnostic.js';
 
 const SOURCE = 'mkdocs-material-to-starlight';
 

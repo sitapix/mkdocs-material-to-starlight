@@ -44,7 +44,9 @@ describe('translateBlogOptions', () => {
       },
     });
     expect(out).toContain('authors:');
-    expect(out).toContain("alice: { name: 'Alice', url: 'https://example.com', picture: '/img/a.png' }");
+    expect(out).toContain(
+      "alice: { name: 'Alice', url: 'https://example.com', picture: '/img/a.png' }",
+    );
   });
 
   it('translates categories_allowed to a category whitelist comment', () => {

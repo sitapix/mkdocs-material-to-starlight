@@ -37,14 +37,10 @@ export interface RunAstroCheckOptions {
 export async function runAstroCheck(
   options: RunAstroCheckOptions,
 ): Promise<ReadonlyArray<Diagnostic>> {
-  const result = await options.runner.run(
-    'npx',
-    ['--no-install', 'astro', 'check'],
-    {
-      cwd: options.outputDir,
-      timeoutMs: options.timeoutMs ?? DEFAULT_TIMEOUT_MS,
-    },
-  );
+  const result = await options.runner.run('npx', ['--no-install', 'astro', 'check'], {
+    cwd: options.outputDir,
+    timeoutMs: options.timeoutMs ?? DEFAULT_TIMEOUT_MS,
+  });
 
   if (!result.ok) {
     return [

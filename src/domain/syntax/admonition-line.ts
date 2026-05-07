@@ -42,8 +42,7 @@ const PATTERN =
 // regression: `users/install/ddev-installation.md` uses `??? "..."` without
 // any type, expecting Material's default. We fall back to type "note" so the
 // admonition still converts to a Starlight aside.
-const TYPELESS_COLLAPSIBLE =
-  /^(?<indent> *)(?<marker>\?\?\?\+|\?\?\?) +"(?<title>[^"]*)" *$/;
+const TYPELESS_COLLAPSIBLE = /^(?<indent> *)(?<marker>\?\?\?\+|\?\?\?) +"(?<title>[^"]*)" *$/;
 
 // Lenient fallback used after the strict pattern fails. Captures the trailing
 // text after the type (and optional `inline [end]` modifiers) as a literal
@@ -57,14 +56,14 @@ export function parseAdmonitionLine(line: string): AdmonitionOpening | null {
   const strict = line.match(PATTERN);
   if (strict !== null && strict.groups !== undefined) {
     const groups = strict.groups;
-    const rawTitle = groups['title'];
+    const rawTitle = groups.title;
     return {
-      marker: groups['marker'] as AdmonitionMarker,
-      type: groups['type'] ?? '',
+      marker: groups.marker as AdmonitionMarker,
+      type: groups.type ?? '',
       title: rawTitle === undefined || rawTitle === '' ? null : rawTitle,
       hasEmptyTitle: rawTitle === '',
-      inline: parseInline(groups['modifiers'] ?? ''),
-      indent: (groups['indent'] ?? '').length,
+      inline: parseInline(groups.modifiers ?? ''),
+      indent: (groups.indent ?? '').length,
     };
   }
 
@@ -72,26 +71,26 @@ export function parseAdmonitionLine(line: string): AdmonitionOpening | null {
   if (typeless !== null && typeless.groups !== undefined) {
     const groups = typeless.groups;
     return {
-      marker: groups['marker'] as AdmonitionMarker,
+      marker: groups.marker as AdmonitionMarker,
       type: 'note',
-      title: groups['title'] ?? null,
-      hasEmptyTitle: groups['title'] === '',
+      title: groups.title ?? null,
+      hasEmptyTitle: groups.title === '',
       inline: null,
-      indent: (groups['indent'] ?? '').length,
+      indent: (groups.indent ?? '').length,
     };
   }
 
   const lenient = line.match(LENIENT_PATTERN);
   if (lenient === null || lenient.groups === undefined) return null;
   const groups = lenient.groups;
-  const rest = (groups['rest'] ?? '').trim();
+  const rest = (groups.rest ?? '').trim();
   return {
-    marker: groups['marker'] as AdmonitionMarker,
-    type: groups['type'] ?? '',
+    marker: groups.marker as AdmonitionMarker,
+    type: groups.type ?? '',
     title: cleanLenientTitle(rest),
     hasEmptyTitle: false,
-    inline: parseInline(groups['modifiers'] ?? ''),
-    indent: (groups['indent'] ?? '').length,
+    inline: parseInline(groups.modifiers ?? ''),
+    indent: (groups.indent ?? '').length,
   };
 }
 

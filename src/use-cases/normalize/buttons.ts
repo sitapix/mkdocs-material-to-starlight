@@ -19,8 +19,9 @@
  * Idempotent (output has no `.md-button` markers) and fence-shielded.
  */
 
-import { extractLabelIcon } from '../transform/extract-label-icon.js';
 import { isFenceLine } from '../../domain/syntax/fence.js';
+import { extractLabelIcon } from '../transform/extract-label-icon.js';
+
 const BUTTON_RE =
   /\[(?<label>[^\]\n]+)\]\((?<url>[^)\n]+)\)\{ *(?<classes>\.md-button(?: +\.md-button--[a-z0-9-]+)*) *\}/g;
 
@@ -46,9 +47,7 @@ function rewriteLine(line: string): string {
       url: string;
       classes: string;
     };
-    const variant = groups.classes.includes('.md-button--primary')
-      ? 'primary'
-      : 'secondary';
+    const variant = groups.classes.includes('.md-button--primary') ? 'primary' : 'secondary';
     const { iconName, label } = extractLabelIcon({ rawLabel: groups.label });
     const iconAttr = iconName === null ? '' : ` icon="${escapeAttr(iconName)}"`;
     return `<LinkButton href="${escapeAttr(groups.url)}" variant="${variant}"${iconAttr}>${label}</LinkButton>`;

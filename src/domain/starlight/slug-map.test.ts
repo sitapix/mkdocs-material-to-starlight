@@ -57,19 +57,14 @@ describe('buildSlugMap', () => {
     const result = buildSlugMap(['index.md', 'api.md', 'guide/intro.md']);
     expect(result.ok).toBe(true);
     if (result.ok) {
-      expect(result.value.entries().map((e) => e.slug)).toEqual([
-        '',
-        'api',
-        'guide/intro',
-      ]);
+      expect(result.value.entries().map((e) => e.slug)).toEqual(['', 'api', 'guide/intro']);
     }
   });
 
   it('applies i18n rename to slug derivation when locales are provided', () => {
-    const result = buildSlugMap(
-      ['page.md', 'page.fr.md', 'guides/intro.de.md'],
-      { i18nLocales: ['fr', 'de'] },
-    );
+    const result = buildSlugMap(['page.md', 'page.fr.md', 'guides/intro.de.md'], {
+      i18nLocales: ['fr', 'de'],
+    });
     expect(result.ok).toBe(true);
     if (result.ok) {
       // Default-locale file: slug unchanged.
@@ -78,17 +73,12 @@ describe('buildSlugMap', () => {
       // resolves to `/fr/page`.
       expect(result.value.getBySourcePath('page.fr.md')?.slug).toBe('fr/page');
       // German nested file.
-      expect(result.value.getBySourcePath('guides/intro.de.md')?.slug).toBe(
-        'de/guides/intro',
-      );
+      expect(result.value.getBySourcePath('guides/intro.de.md')?.slug).toBe('de/guides/intro');
     }
   });
 
   it('passes through paths whose locale suffix is not in the i18n list', () => {
-    const result = buildSlugMap(
-      ['page.es.md'],
-      { i18nLocales: ['fr', 'de'] },
-    );
+    const result = buildSlugMap(['page.es.md'], { i18nLocales: ['fr', 'de'] });
     expect(result.ok).toBe(true);
     if (result.ok) {
       // Spanish locale wasn't configured — treat as a regular filename.

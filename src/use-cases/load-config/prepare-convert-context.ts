@@ -12,30 +12,41 @@
 
 import { readdir } from 'node:fs/promises';
 import { join } from 'node:path';
+import type { MkdocsConfig, MkdocsPlugin } from '../../domain/config/mkdocs-config.js';
+import { parseRepoUrl, type RepoContext } from '../../domain/config/repo-context.js';
 import type { FileSystem } from '../../domain/ports/file-system.js';
+import type { OutputValidator } from '../../domain/ports/output-validator.js';
 import { err, ok, type Result } from '../../domain/result.js';
 import { createNodeConfigDiscoverer } from '../../infrastructure/fs/node-config-discoverer.js';
 import { createNodeDirectoryReader } from '../../infrastructure/fs/node-directory-reader.js';
 import { createNodeFileSystem } from '../../infrastructure/fs/node-file-system.js';
 import { createMdxOutputValidator } from '../../infrastructure/mdx/at-mdx-js-validator.js';
 import { createJsYamlDecoder } from '../../infrastructure/yaml/js-yaml-decoder.js';
-import { parseRepoUrl, type RepoContext } from '../../domain/config/repo-context.js';
-import type { MkdocsConfig, MkdocsPlugin } from '../../domain/config/mkdocs-config.js';
-import {
-  applyExcludePatterns,
-  extractExcludePatterns,
-} from '../detect-features/exclude-config.js';
-import { extractAutoAppend } from '../detect-features/auto-append.js';
-import { extractI18nLocales } from '../detect-features/i18n-config.js';
-import { type AssetCopy, planAssetCopies } from '../copy-assets/plan.js';
-import { loadMkdocsConfig } from './load-mkdocs-config.js';
 import { enrichMissingDocsDirMessage } from '../convert-site/diagnostic-enrichment.js';
-import type { OutputValidator } from '../../domain/ports/output-validator.js';
+import { type AssetCopy, planAssetCopies } from '../copy-assets/plan.js';
+import { extractAutoAppend } from '../detect-features/auto-append.js';
+import { applyExcludePatterns, extractExcludePatterns } from '../detect-features/exclude-config.js';
+import { extractI18nLocales } from '../detect-features/i18n-config.js';
+import { loadMkdocsConfig } from './load-mkdocs-config.js';
 
 const ASSET_EXTENSIONS: ReadonlyArray<string> = [
-  '.css', '.js', '.json', '.yaml', '.yml', '.md', '.mdx',
-  '.png', '.jpg', '.jpeg', '.gif', '.svg', '.webp', '.avif',
-  '.pdf', '.mp4', '.webm',
+  '.css',
+  '.js',
+  '.json',
+  '.yaml',
+  '.yml',
+  '.md',
+  '.mdx',
+  '.png',
+  '.jpg',
+  '.jpeg',
+  '.gif',
+  '.svg',
+  '.webp',
+  '.avif',
+  '.pdf',
+  '.mp4',
+  '.webm',
 ];
 
 export interface PrepareConvertContextInput {
@@ -124,9 +135,27 @@ export async function prepareConvertContext(
   const docsDir = join(projectDir, config.docsDir);
   const sourceListingRaw = await dirReader.list(docsDir, ['.md', '.mdx']);
   if (!sourceListingRaw.ok) {
+    // Look for markdown sitting next to mkdocs.yml so the enriched error
+    // can suggest `docs_dir: .` for legacy layouts (real-world: jondot/
+    // awesome-react-native, yetone/olo, smarie/python-parsyfiles,
+    // Riverside-Software/pct-mkdocs).
+    const configDirListing = await dirReader.list(projectDir, ['.md', '.mdx']);
+    const configDirHasMarkdown = configDirListing.ok && configDirListing.value.length > 0;
     return err({
       code: 'directory-read-failed',
-      message: enrichMissingDocsDirMessage(sourceListingRaw.error.message, config.plugins),
+      message: enrichMissingDocsDirMessage(
+        sourceListingRaw.error.message,
+        config.plugins,
+        configDirHasMarkdown
+          ? {
+              configDirHasMarkdown: true,
+              configDirRelative: autoDiscovery?.discoveredRelPath
+                ? autoDiscovery.discoveredRelPath.replace(/\/?mkdocs\.ya?ml$/, '') || '.'
+                : '.',
+              configuredDocsDir: config.docsDir,
+            }
+          : undefined,
+      ),
     });
   }
   // Apply mkdocs-exclude patterns BEFORE every downstream step that walks
@@ -197,9 +226,7 @@ export async function prepareConvertContext(
     // Default-wire the production validator. Callers can pass an explicit
     // validator (test seam) or `null` to skip validation entirely.
     outputValidator:
-      input.outputValidator === undefined
-        ? createMdxOutputValidator()
-        : input.outputValidator,
+      input.outputValidator === undefined ? createMdxOutputValidator() : input.outputValidator,
   });
 }
 
@@ -210,7 +237,11 @@ function extractThemeFeatures(config: MkdocsConfig): ReadonlyArray<string> {
 
 function translateLoadError(
   e:
-    | { readonly kind: 'config-ambiguous'; readonly searchedDir: string; readonly candidates: ReadonlyArray<string> }
+    | {
+        readonly kind: 'config-ambiguous';
+        readonly searchedDir: string;
+        readonly candidates: ReadonlyArray<string>;
+      }
     | { readonly kind: 'config-not-found'; readonly searchedDir: string }
     | { readonly kind: 'yaml-decode-failed'; readonly message: string }
     | { readonly kind: 'config-invalid'; readonly message: string },
@@ -240,7 +271,6 @@ function translateLoadError(
       };
     case 'yaml-decode-failed':
       return { code: 'yaml-decode-failed', message: e.message };
-    case 'config-invalid':
     default:
       return { code: 'config-invalid', message: e.message };
   }

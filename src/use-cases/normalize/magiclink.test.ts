@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { normalizeMagicLinks } from './magiclink.js';
 import type { RepoContext } from '../../domain/config/repo-context.js';
+import { normalizeMagicLinks } from './magiclink.js';
 
 const GITHUB_CONTEXT: RepoContext = {
   provider: 'github',
@@ -63,10 +63,7 @@ describe('normalizeMagicLinks', () => {
   });
 
   it('handles multiple matches on one line independently', () => {
-    const out = normalizeMagicLinks(
-      'See #1 and #2 and @alice and foo/bar#3.\n',
-      GITHUB_CONTEXT,
-    );
+    const out = normalizeMagicLinks('See #1 and #2 and @alice and foo/bar#3.\n', GITHUB_CONTEXT);
     expect(out).toContain('[#1]');
     expect(out).toContain('[#2]');
     expect(out).toContain('[@alice]');

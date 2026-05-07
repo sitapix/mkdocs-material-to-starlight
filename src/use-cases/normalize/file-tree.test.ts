@@ -45,14 +45,7 @@ describe('normalizeFileTrees', () => {
     });
 
     it('works with a text-language fence', () => {
-      const src = [
-        '```text',
-        'project/',
-        '├── a.ts',
-        '└── b.ts',
-        '```',
-        '',
-      ].join('\n');
+      const src = ['```text', 'project/', '├── a.ts', '└── b.ts', '```', ''].join('\n');
       const result = normalizeFileTrees(src);
       expect(result.promoted).toBe(true);
       expect(result.text).toContain('<FileTree>');
@@ -85,39 +78,19 @@ describe('normalizeFileTrees', () => {
     });
 
     it('does NOT promote a code block with a programming language', () => {
-      const src = [
-        '```bash',
-        'project/',
-        '├── src/',
-        '└── README.md',
-        '```',
-        '',
-      ].join('\n');
+      const src = ['```bash', 'project/', '├── src/', '└── README.md', '```', ''].join('\n');
       const result = normalizeFileTrees(src);
       expect(result.promoted).toBe(false);
     });
 
     it('does NOT promote when fewer than 2 lines have box-drawing chars', () => {
-      const src = [
-        '```',
-        'my-project/',
-        '├── src/',
-        'README.md',
-        '```',
-        '',
-      ].join('\n');
+      const src = ['```', 'my-project/', '├── src/', 'README.md', '```', ''].join('\n');
       const result = normalizeFileTrees(src);
       expect(result.promoted).toBe(false);
     });
 
     it('does NOT promote a fence with fewer than 3 content lines', () => {
-      const src = [
-        '```',
-        'project/',
-        '└── file.ts',
-        '```',
-        '',
-      ].join('\n');
+      const src = ['```', 'project/', '└── file.ts', '```', ''].join('\n');
       const result = normalizeFileTrees(src);
       expect(result.promoted).toBe(false);
     });
@@ -141,9 +114,9 @@ describe('normalizeFileTrees', () => {
       const src = [
         '```Python',
         'from foo import bar',
-        '```',                       // close of Python fence
+        '```', // close of Python fence
         '',
-        '**Note**:',                 // first non-blank after close
+        '**Note**:', // first non-blank after close
         '',
         'Some prose with no tree structure.',
         '',
@@ -165,14 +138,7 @@ describe('normalizeFileTrees', () => {
       // The first-line heuristic must reject obvious-prose tokens like bold
       // (`**X**`), punctuated text (`Note:`), or anything with formatting —
       // not just things containing slashes or spaces.
-      const src = [
-        '```',
-        '**Note**:',
-        '├── stuff',
-        '└── more',
-        '```',
-        '',
-      ].join('\n');
+      const src = ['```', '**Note**:', '├── stuff', '└── more', '```', ''].join('\n');
       const result = normalizeFileTrees(src);
       expect(result.promoted).toBe(false);
     });

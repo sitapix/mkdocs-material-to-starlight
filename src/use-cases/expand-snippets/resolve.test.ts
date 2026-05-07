@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { resolveSnippet } from './resolve.js';
 import type { FileSystem } from '../../domain/ports/file-system.js';
-import { ok, err } from '../../domain/result.js';
+import { err, ok } from '../../domain/result.js';
+import { resolveSnippet } from './resolve.js';
 
 function makeFileSystem(files: Record<string, string>): FileSystem {
   return {
@@ -13,7 +13,7 @@ function makeFileSystem(files: Record<string, string>): FileSystem {
       return ok(content);
     },
     async exists(path) {
-      return Object.prototype.hasOwnProperty.call(files, path);
+      return Object.hasOwn(files, path);
     },
     async realpath(path) {
       return ok(path);
@@ -66,10 +66,7 @@ describe('resolveSnippet', () => {
     if (!result.ok) {
       expect(result.error.code).toBe('snippet-not-found');
       expect(result.error.relativePath).toBe('missing.md');
-      expect(result.error.searched).toEqual([
-        'docs/missing.md',
-        'overrides/missing.md',
-      ]);
+      expect(result.error.searched).toEqual(['docs/missing.md', 'overrides/missing.md']);
     }
   });
 

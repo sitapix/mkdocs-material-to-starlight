@@ -1,28 +1,21 @@
 /**
- * End-to-end conversion of 5 representative real-world MkDocs Material
- * projects. Each test builds a minimal `docs/` tree alongside the saved
- * `mkdocs.yml` from the corpus, runs `convertSiteFromDisk`, and asserts:
+ * End-to-end conversion against 5 representative real-world MkDocs Material
+ * configs from the corpus. Each test builds a minimal `docs/` tree
+ * alongside the saved `mkdocs.yml`, runs `convertSiteFromDisk`, and asserts:
  *   1. The conversion returns Result.ok.
  *   2. The output contains a buildable Astro project skeleton.
  *   3. MIGRATION_NOTES.md mentions every detected plugin.
  *   4. astro.config.mjs has matching braces / a single export default.
  *
- * The synthetic docs/ tree exercises the syntactic features the project
+ * The synthetic docs/ tree exercises the syntactic features each config
  * uses in production — admonitions, snippets, content tabs, code blocks,
  * etc. — without trying to reproduce the entire site.
  */
 
-import { describe, expect, it, beforeEach, afterEach } from 'vitest';
-import {
-  mkdtempSync,
-  mkdirSync,
-  rmSync,
-  writeFileSync,
-  readFileSync,
-  copyFileSync,
-} from 'node:fs';
-import { join } from 'node:path';
+import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { convertSiteFromDisk } from '../../src/interface/api/convert-site.js';
 
 const FIXTURES = join(__dirname, '..', 'fixtures', 'real-configs');
@@ -78,36 +71,36 @@ const CASES: ReadonlyArray<E2ECase> = [
     expectInConfig: ['title:'],
   },
   {
-    name: 'fastapi (Tiangolo template)',
-    configFile: 'fastapi.yml',
+    name: 'macros + only-mkdocs config',
+    configFile: 'corpus-06.yml',
     docs: [
       {
         path: 'index.md',
         content:
-          '# FastAPI\n\n<!-- only-mkdocs -->\nDocs-only block.\n<!-- /only-mkdocs -->\n\n!!! note\n    Body.\n',
+          '# Site\n\n<!-- only-mkdocs -->\nDocs-only block.\n<!-- /only-mkdocs -->\n\n!!! note\n    Body.\n',
       },
     ],
     expectInNotes: ['plugin-macros'],
     expectInConfig: ['title:'],
   },
   {
-    name: 'pydantic (kitchen sink)',
-    configFile: 'pydantic.yml',
-    docs: [{ path: 'index.md', content: '# Pydantic\n\n!!! note\n    Body.\n' }],
+    name: 'kitchen-sink config',
+    configFile: 'corpus-16.yml',
+    docs: [{ path: 'index.md', content: '# Site\n\n!!! note\n    Body.\n' }],
     expectInNotes: ['plugin-mkdocstrings'],
     expectInConfig: ['title:'],
   },
   {
-    name: 'hatch (mike + glightbox + click)',
-    configFile: 'hatch.yml',
-    docs: [{ path: 'index.md', content: '# Hatch\n\nText.\n' }],
+    name: 'mike + glightbox + click config',
+    configFile: 'corpus-08.yml',
+    docs: [{ path: 'index.md', content: '# Site\n\nText.\n' }],
     expectInNotes: ['plugin-click'],
     expectInConfig: ['title:'],
   },
   {
-    name: 'mkdocstrings-python (Pawamoy template)',
-    configFile: 'mkdocstrings-python.yml',
-    docs: [{ path: 'index.md', content: '# mkdocstrings-python\n\nText.\n' }],
+    name: 'mkdocstrings-python config',
+    configFile: 'corpus-14.yml',
+    docs: [{ path: 'index.md', content: '# Site\n\nText.\n' }],
     expectInNotes: ['plugin-mkdocstrings'],
     expectInConfig: ['title:'],
   },
@@ -142,7 +135,7 @@ describe('all-real-configs end-to-end', () => {
   // bases) with a minimal index.md. Every conversion must produce Result.ok.
   // This catches conversion-time regressions that the parse-only smoke test
   // doesn't cover.
-  const INHERIT_BASES = new Set(['hatch-insiders.yml', 'typer-env.yml']);
+  const INHERIT_BASES = new Set(['corpus-07-base.yml', 'corpus-19-base.yml']);
   const allYml = (() => {
     const { readdirSync } = require('node:fs') as typeof import('node:fs');
     return readdirSync(FIXTURES)
@@ -171,18 +164,13 @@ describe('all-real-configs end-to-end', () => {
       const docsDirMatch = cfgRaw.match(/^docs_dir:\s*['"]?([^'"\n#]+?)['"]?\s*(?:#.*)?$/m);
       const docsRel = (docsDirMatch?.[1] ?? 'docs').replace(/\/+$/, '');
       mkdirSync(join(projDir, docsRel), { recursive: true });
-      writeFileSync(
-        join(projDir, docsRel, 'index.md'),
-        `# ${filename}\n\nSmoke test page.\n`,
-      );
+      writeFileSync(join(projDir, docsRel, 'index.md'), `# ${filename}\n\nSmoke test page.\n`);
       const result = await convertSiteFromDisk({
         projectDir: projDir,
         outputDir: outDir,
       });
       if (!result.ok) {
-        throw new Error(
-          `${filename}: ${result.error.code}: ${result.error.message}`,
-        );
+        throw new Error(`${filename}: ${result.error.code}: ${result.error.message}`);
       }
       expect(result.ok).toBe(true);
       // Output skeleton always present.
@@ -211,9 +199,7 @@ describe('real-world end-to-end', () => {
       copyFileSync(join(FIXTURES, c.configFile), join(projectDir, 'mkdocs.yml'));
       mkdirSync(join(projectDir, 'docs'), { recursive: true });
       for (const doc of c.docs) {
-        const dir = doc.path.includes('/')
-          ? doc.path.slice(0, doc.path.lastIndexOf('/'))
-          : '';
+        const dir = doc.path.includes('/') ? doc.path.slice(0, doc.path.lastIndexOf('/')) : '';
         if (dir.length > 0) {
           mkdirSync(join(projectDir, 'docs', dir), { recursive: true });
         }

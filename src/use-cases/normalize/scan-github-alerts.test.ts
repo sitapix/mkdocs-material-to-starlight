@@ -36,7 +36,17 @@ describe('scanGithubAlerts', () => {
   });
 
   it('emits per-occurrence with correct line numbers', () => {
-    const source = ['Para 1.', '', '> [!NOTE]', '> Body', '', 'Para 2.', '', '> [!WARNING]', '> Body 2'].join('\n');
+    const source = [
+      'Para 1.',
+      '',
+      '> [!NOTE]',
+      '> Body',
+      '',
+      'Para 2.',
+      '',
+      '> [!WARNING]',
+      '> Body 2',
+    ].join('\n');
     const diagnostics = scanGithubAlerts(source);
     expect(diagnostics).toHaveLength(2);
     expect(diagnostics[0]?.place?.line).toBe(3);

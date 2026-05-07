@@ -16,15 +16,9 @@ describe('normalizeMkautodocBlocks', () => {
     // `:docstring:` tokens (they round-trip as `\:::` and `\:`), producing
     // unreadable output. Wrapping in a fenced code block preserves the
     // original syntax verbatim AND round-trips cleanly.
-    const input = [
-      '# API',
-      '',
-      '::: httpx.request',
-      '    :docstring:',
-      '',
-      'After.',
-      '',
-    ].join('\n');
+    const input = ['# API', '', '::: httpx.request', '    :docstring:', '', 'After.', ''].join(
+      '\n',
+    );
     const output = normalizeMkautodocBlocks(input);
     expect(output).toContain('```text');
     expect(output).toContain('::: httpx.request');
@@ -55,34 +49,19 @@ describe('normalizeMkautodocBlocks', () => {
     // Standard remark-directive container syntax uses non-indented body and a
     // closing `:::`. Those must NOT be wrapped — they are real directives the
     // downstream AST transforms should handle.
-    const input = [
-      ':::note',
-      'This is an aside body.',
-      ':::',
-      '',
-    ].join('\n');
+    const input = [':::note', 'This is an aside body.', ':::', ''].join('\n');
     const output = normalizeMkautodocBlocks(input);
     expect(output).toBe(input);
   });
 
   it('does not wrap a bare `:::` line with no identifier (closing marker)', () => {
-    const input = [
-      ':::',
-      'plain text',
-      '',
-    ].join('\n');
+    const input = [':::', 'plain text', ''].join('\n');
     expect(normalizeMkautodocBlocks(input)).toBe(input);
   });
 
   it('leaves `:::` lines inside a fenced code block untouched', () => {
     // A code example showing mkautodoc syntax must stay inside its fence.
-    const input = [
-      '```text',
-      '::: httpx.request',
-      '    :docstring:',
-      '```',
-      '',
-    ].join('\n');
+    const input = ['```text', '::: httpx.request', '    :docstring:', '```', ''].join('\n');
     expect(normalizeMkautodocBlocks(input)).toBe(input);
   });
 
@@ -105,13 +84,7 @@ describe('normalizeMkautodocBlocks', () => {
   });
 
   it('is idempotent — running it twice produces the same output as running it once', () => {
-    const input = [
-      '::: httpx.request',
-      '    :docstring:',
-      '',
-      'After.',
-      '',
-    ].join('\n');
+    const input = ['::: httpx.request', '    :docstring:', '', 'After.', ''].join('\n');
     const once = normalizeMkautodocBlocks(input);
     const twice = normalizeMkautodocBlocks(once);
     expect(twice).toBe(once);
@@ -122,11 +95,7 @@ describe('normalizeMkautodocBlocks', () => {
     // were NOT being wrapped, causing remark-stringify to escape them to \:::
     // in the output. Any `::: identifier` line (with a space before the identifier)
     // must be wrapped, regardless of whether it has an options block.
-    const input = [
-      '::: httpx.request',
-      'Not indented.',
-      '',
-    ].join('\n');
+    const input = ['::: httpx.request', 'Not indented.', ''].join('\n');
     const output = normalizeMkautodocBlocks(input);
     expect(output).toContain('```text');
     expect(output).toContain('::: httpx.request');

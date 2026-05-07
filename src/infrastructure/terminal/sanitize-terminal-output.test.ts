@@ -1,8 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import {
-  sanitizeForSingleLine,
-  stripTerminalEscapes,
-} from './sanitize-terminal-output.js';
+import { sanitizeForSingleLine, stripTerminalEscapes } from './sanitize-terminal-output.js';
 
 describe('stripTerminalEscapes', () => {
   it('passes through plain ASCII text unchanged', () => {

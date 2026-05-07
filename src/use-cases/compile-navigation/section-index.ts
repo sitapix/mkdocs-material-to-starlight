@@ -18,15 +18,8 @@
  * `nav:`, so an implicit index isn't surfaced. The diagnostic explains this.
  */
 
-import type {
-  MkdocsNavEntry,
-  SectionEntry,
-  FileEntry,
-} from '../../domain/config/mkdocs-config.js';
-import {
-  createDiagnostic,
-  type Diagnostic,
-} from '../../domain/diagnostics/diagnostic.js';
+import type { FileEntry, MkdocsNavEntry, SectionEntry } from '../../domain/config/mkdocs-config.js';
+import { createDiagnostic, type Diagnostic } from '../../domain/diagnostics/diagnostic.js';
 
 const SOURCE = 'compile-navigation/section-index';
 const INDEX_PATH_RE = /\/(index|README)\.md$/i;
@@ -36,24 +29,17 @@ export interface ApplySectionIndexResult {
   readonly diagnostics: ReadonlyArray<Diagnostic>;
 }
 
-export function applySectionIndex(
-  nav: ReadonlyArray<MkdocsNavEntry>,
-): ApplySectionIndexResult {
+export function applySectionIndex(nav: ReadonlyArray<MkdocsNavEntry>): ApplySectionIndexResult {
   const diagnostics: Diagnostic[] = [];
   const transformed = nav.map((entry) => transformEntry(entry, diagnostics));
   return { nav: transformed, diagnostics };
 }
 
-function transformEntry(
-  entry: MkdocsNavEntry,
-  diagnostics: Diagnostic[],
-): MkdocsNavEntry {
+function transformEntry(entry: MkdocsNavEntry, diagnostics: Diagnostic[]): MkdocsNavEntry {
   if (entry.kind !== 'section') {
     return entry;
   }
-  const recursedChildren = entry.children.map((child) =>
-    transformEntry(child, diagnostics),
-  );
+  const recursedChildren = entry.children.map((child) => transformEntry(child, diagnostics));
   const indexPosition = findIndexChildPosition(recursedChildren);
   if (indexPosition <= 0) {
     return { ...entry, children: recursedChildren };
@@ -63,9 +49,7 @@ function transformEntry(
   return { ...entry, children: reordered };
 }
 
-function findIndexChildPosition(
-  children: ReadonlyArray<MkdocsNavEntry>,
-): number {
+function findIndexChildPosition(children: ReadonlyArray<MkdocsNavEntry>): number {
   for (let i = 0; i < children.length; i += 1) {
     const child = children[i];
     if (child !== undefined && child.kind === 'file' && INDEX_PATH_RE.test(child.path)) {
@@ -82,10 +66,7 @@ function hoistToFront<T>(items: ReadonlyArray<T>, position: number): T[] {
   return [target, ...rest];
 }
 
-function reorderingDiagnostic(
-  section: SectionEntry,
-  index: FileEntry,
-): Diagnostic {
+function reorderingDiagnostic(section: SectionEntry, index: FileEntry): Diagnostic {
   return createDiagnostic({
     severity: 'info',
     ruleId: 'plugin-section-index-applied',

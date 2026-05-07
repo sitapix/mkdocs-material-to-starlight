@@ -10,10 +10,7 @@
  * comparable runs produce comparable diffs in CI.
  */
 
-import type {
-  PageDiffResult,
-  VisualDiffReport,
-} from '../../domain/visual-diff/page-diff.js';
+import type { PageDiffResult, VisualDiffReport } from '../../domain/visual-diff/page-diff.js';
 
 export function serializeVisualDiffReport(report: VisualDiffReport): string {
   const lines: string[] = [];

@@ -23,14 +23,12 @@ interface LanguageEntry {
   readonly default?: unknown;
 }
 
-export function extractI18nLocales(
-  plugins: ReadonlyArray<MkdocsPlugin>,
-): ReadonlyArray<string> {
+export function extractI18nLocales(plugins: ReadonlyArray<MkdocsPlugin>): ReadonlyArray<string> {
   for (const plugin of plugins) {
     if (plugin.name !== 'i18n') {
       continue;
     }
-    const languages = plugin.options['languages'];
+    const languages = plugin.options.languages;
     if (!Array.isArray(languages)) {
       continue;
     }
@@ -86,14 +84,12 @@ interface RichLanguageEntry {
   readonly name?: unknown;
 }
 
-export function extractI18nConfig(
-  plugins: ReadonlyArray<MkdocsPlugin>,
-): I18nConfig | null {
+export function extractI18nConfig(plugins: ReadonlyArray<MkdocsPlugin>): I18nConfig | null {
   for (const plugin of plugins) {
     if (plugin.name !== 'i18n') {
       continue;
     }
-    const languages = plugin.options['languages'];
+    const languages = plugin.options.languages;
     if (!Array.isArray(languages)) {
       continue;
     }

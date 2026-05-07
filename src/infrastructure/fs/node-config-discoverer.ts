@@ -15,9 +15,9 @@
 
 import { readdir } from 'node:fs/promises';
 import { join } from 'node:path';
-import { ok, err } from '../../domain/result.js';
 import type { ConfigDiscoverer } from '../../domain/ports/config-discoverer.js';
 import type { DirectoryReadError } from '../../domain/ports/directory-reader.js';
+import { err, ok } from '../../domain/result.js';
 
 const DEFAULT_MAX_DEPTH = 4;
 

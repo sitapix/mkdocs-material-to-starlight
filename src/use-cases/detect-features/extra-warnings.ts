@@ -12,10 +12,7 @@
  * Pure. Idempotent.
  */
 
-import {
-  createDiagnostic,
-  type Diagnostic,
-} from '../../domain/diagnostics/diagnostic.js';
+import { createDiagnostic, type Diagnostic } from '../../domain/diagnostics/diagnostic.js';
 
 const SOURCE = 'detect-features/extra-warnings';
 
@@ -57,8 +54,7 @@ export function detectExtraWarnings(
         severity: 'info',
         ruleId: 'extra-annotate-no-equivalent',
         source: SOURCE,
-        message:
-          `mkdocs.yml \`extra.annotate\` (custom annotation selectors for languages: ${langs}) detected. Starlight code blocks (ExpressiveCode) do not render Material-style popover annotations — the converter already downgrades \`(N)!\` markers to plain \`(N)\` and leaves the trailing list as a numbered legend. Custom selectors have no effect because there are no popovers to attach to. No action required unless you want to reimplement the popover UX as a custom MDX component.`,
+        message: `mkdocs.yml \`extra.annotate\` (custom annotation selectors for languages: ${langs}) detected. Starlight code blocks (ExpressiveCode) do not render Material-style popover annotations — the converter already downgrades \`(N)!\` markers to plain \`(N)\` and leaves the trailing list as a numbered legend. Custom selectors have no effect because there are no popovers to attach to. No action required unless you want to reimplement the popover UX as a custom MDX component.`,
       }),
     );
   }
@@ -73,7 +69,7 @@ export function detectExtraWarnings(
         ruleId: 'extra-tags-alias-map',
         source: SOURCE,
         message:
-          'mkdocs.yml `extra.tags` (Material\'s tag-name → identifier alias map, paired with `theme.icon.tag.<identifier>` to attach an icon to each tag) detected. The `starlight-tags` plugin (frostybee/starlight-tags) consumes plain-string tags from page frontmatter; it has no equivalent dictionary for assigning per-tag icons. Tags pass through as plain strings; if per-tag icons matter, render them manually inside a custom Tag.astro component using your own slug→icon map.',
+          "mkdocs.yml `extra.tags` (Material's tag-name → identifier alias map, paired with `theme.icon.tag.<identifier>` to attach an icon to each tag) detected. The `starlight-tags` plugin (frostybee/starlight-tags) consumes plain-string tags from page frontmatter; it has no equivalent dictionary for assigning per-tag icons. Tags pass through as plain strings; if per-tag icons matter, render them manually inside a custom Tag.astro component using your own slug→icon map.",
       }),
     );
   }
@@ -85,8 +81,8 @@ export function detectExtraWarnings(
   // upstream build treats nav/link errors. The converter has its own
   // diagnostic-level taxonomy and is stricter by default; surface this
   // mismatch so the user knows their custom validation policy is dropped.
-  if (isPlainObject(extras['validation'])) {
-    const v = extras['validation'] as Record<string, unknown>;
+  if (isPlainObject(extras.validation)) {
+    const v = extras.validation as Record<string, unknown>;
     const setKnobs: string[] = [];
     if (isPlainObject(v.nav)) setKnobs.push('nav.*');
     if (isPlainObject(v.links)) setKnobs.push('links.*');
@@ -95,19 +91,18 @@ export function detectExtraWarnings(
         severity: 'info',
         ruleId: 'mkdocs-validation-config-dropped',
         source: SOURCE,
-        message:
-          `mkdocs.yml \`validation:\` block (${setKnobs.length === 0 ? 'top-level' : setKnobs.join(', ')}) detected. The converter has its own diagnostic taxonomy (\`broken-link\`, \`nav-missing-target\`, etc.) and emits at \`warning\` severity by default — stricter than MkDocs' defaults. The custom levels (\`info\`/\`warn\`/\`ignore\`) you set in mkdocs.yml are not translated; review MIGRATION_NOTES.md after conversion to triage findings.`,
+        message: `mkdocs.yml \`validation:\` block (${setKnobs.length === 0 ? 'top-level' : setKnobs.join(', ')}) detected. The converter has its own diagnostic taxonomy (\`broken-link\`, \`nav-missing-target\`, etc.) and emits at \`warning\` severity by default — stricter than MkDocs' defaults. The custom levels (\`info\`/\`warn\`/\`ignore\`) you set in mkdocs.yml are not translated; review MIGRATION_NOTES.md after conversion to triage findings.`,
       }),
     );
   }
-  if (extras['strict'] === true) {
+  if (extras.strict === true) {
     out.push(
       createDiagnostic({
         severity: 'info',
         ruleId: 'mkdocs-strict-mode-info',
         source: SOURCE,
         message:
-          'mkdocs.yml `strict: true` detected. The converter does not have a strict mode that fails the run on any warning. To approximate the same behavior post-migration, treat the conversion run as failing if any `warning`-level diagnostic appears in MIGRATION_NOTES.md, and run `astro check` (the converter\'s `--check` flag) to surface build-blocking issues.',
+          "mkdocs.yml `strict: true` detected. The converter does not have a strict mode that fails the run on any warning. To approximate the same behavior post-migration, treat the conversion run as failing if any `warning`-level diagnostic appears in MIGRATION_NOTES.md, and run `astro check` (the converter's `--check` flag) to surface build-blocking issues.",
       }),
     );
   }
@@ -117,7 +112,7 @@ export function detectExtraWarnings(
   // fact that the script reference will be dropped (extra_javascript paths
   // are honoured, but the implicit `document$.subscribe(…)` Material runs
   // is MkDocs-specific and won't fire under Astro).
-  const extraJs = extras['extra_javascript'];
+  const extraJs = extras.extra_javascript;
   const tsDiag = detectTablesort(extraJs);
   if (tsDiag !== null) out.push(tsDiag);
 
@@ -135,8 +130,8 @@ export function detectExtraWarnings(
  */
 function detectVersionMetadata(version: unknown): Diagnostic | null {
   if (!isPlainObject(version)) return null;
-  const def = typeof version['default'] === 'string' ? (version['default'] as string) : null;
-  const alias = version['alias'] === true;
+  const def = typeof version.default === 'string' ? (version.default as string) : null;
+  const alias = version.alias === true;
   if (def === null && !alias) return null;
   const parts: string[] = [];
   if (def !== null) parts.push(`default: "${def}"`);
@@ -175,7 +170,7 @@ function detectTablesort(extraJs: unknown): Diagnostic | null {
     ruleId: 'tablesort-detected',
     source: SOURCE,
     message:
-      'mkdocs.yml `extra_javascript` references `tablesort` — Material\'s recommended approach for sortable tables. The script reference is preserved in your Astro site, but Material wires `tablesort` via a `document$.subscribe(...)` block that does not fire under Astro/Starlight. To restore sortable tables: add an Astro client script (e.g. `<script>` tag in a custom Layout override) that runs `new Tablesort(table)` on every `<table>` after page load. Alternatively, accept the loss — most documentation tables do not need sorting.',
+      "mkdocs.yml `extra_javascript` references `tablesort` — Material's recommended approach for sortable tables. The script reference is preserved in your Astro site, but Material wires `tablesort` via a `document$.subscribe(...)` block that does not fire under Astro/Starlight. To restore sortable tables: add an Astro client script (e.g. `<script>` tag in a custom Layout override) that runs `new Tablesort(table)` on every `<table>` after page load. Alternatively, accept the loss — most documentation tables do not need sorting.",
   });
 }
 
@@ -187,9 +182,7 @@ function detectTablesort(extraJs: unknown): Diagnostic | null {
  * user has a clear migration target. Returns null when no usable provider
  * key is set or the provider is `google` (already handled).
  */
-function detectAnalyticsProviderFallback(
-  analytics: unknown,
-): Diagnostic | null {
+function detectAnalyticsProviderFallback(analytics: unknown): Diagnostic | null {
   if (!isPlainObject(analytics)) return null;
   const provider = analytics.provider;
   if (typeof provider !== 'string') return null;
@@ -202,7 +195,7 @@ function detectAnalyticsProviderFallback(
       ruleId: 'extra-analytics-provider-recommended',
       source: SOURCE,
       message:
-        'mkdocs.yml `extra.analytics.provider: plausible` detected — Starlight has no built-in Plausible integration but the community plugin `starlight-plausible` (jakebellacera/starlight-plausible) configures it in one line. Install it, drop the script tag, and pass your domain via the plugin\'s options.',
+        "mkdocs.yml `extra.analytics.provider: plausible` detected — Starlight has no built-in Plausible integration but the community plugin `starlight-plausible` (jakebellacera/starlight-plausible) configures it in one line. Install it, drop the script tag, and pass your domain via the plugin's options.",
     });
   }
   if (lower === 'gtm' || lower === 'tag-manager' || lower === 'google-tag-manager') {
@@ -210,23 +203,17 @@ function detectAnalyticsProviderFallback(
       severity: 'info',
       ruleId: 'extra-analytics-provider-recommended',
       source: SOURCE,
-      message:
-        'mkdocs.yml `extra.analytics.provider: ' + provider + '` detected — for Google Tag Manager use the community plugin `starlight-gtm` (jbend/starlight-gtm). Install it and pass your container ID via the plugin\'s options.',
+      message: `mkdocs.yml \`extra.analytics.provider: ${provider}\` detected — for Google Tag Manager use the community plugin \`starlight-gtm\` (jbend/starlight-gtm). Install it and pass your container ID via the plugin's options.`,
     });
   }
   return createDiagnostic({
     severity: 'warning',
     ruleId: 'extra-analytics-provider-unsupported',
     source: SOURCE,
-    message:
-      'mkdocs.yml `extra.analytics.provider: ' + provider + '` detected — Starlight has no plugin for this provider and the converter only auto-wires Google Analytics. Add the provider\'s tracking script manually to your Starlight `head[]` config.',
+    message: `mkdocs.yml \`extra.analytics.provider: ${provider}\` detected — Starlight has no plugin for this provider and the converter only auto-wires Google Analytics. Add the provider's tracking script manually to your Starlight \`head[]\` config.`,
   });
 }
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
-  return (
-    typeof value === 'object' &&
-    value !== null &&
-    !Array.isArray(value)
-  );
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }

@@ -22,12 +22,12 @@ describe('serializePackageJson', () => {
   });
 
   it('slugifies the site name into a package name (lowercase, kebab-case)', () => {
-    expect(JSON.parse(serializePackageJson({ siteName: 'Hello World!', siteDescription: null })).name).toBe(
-      'hello-world',
-    );
-    expect(JSON.parse(serializePackageJson({ siteName: '  My Docs  ', siteDescription: null })).name).toBe(
-      'my-docs',
-    );
+    expect(
+      JSON.parse(serializePackageJson({ siteName: 'Hello World!', siteDescription: null })).name,
+    ).toBe('hello-world');
+    expect(
+      JSON.parse(serializePackageJson({ siteName: '  My Docs  ', siteDescription: null })).name,
+    ).toBe('my-docs');
   });
 
   it('preserves the description when present', () => {

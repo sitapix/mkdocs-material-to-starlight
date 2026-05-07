@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { parseNavTree } from './nav-tree.js';
 import type { MkdocsNavEntry } from '../../domain/config/mkdocs-config.js';
+import { parseNavTree } from './nav-tree.js';
 
 describe('parseNavTree', () => {
   it('parses a bare filename string as a FileEntry without title', () => {
@@ -104,9 +104,7 @@ describe('parseNavTree', () => {
     // expected MkDocs to treat the trailing fragment as HTML attributes.
     // The result is a "URL" containing `"` which is invalid per RFC 3986
     // and would otherwise pollute the rendered sidebar.
-    const result = parseNavTree([
-      { Workshop: 'https://example.com/path" target="_blank' },
-    ]);
+    const result = parseNavTree([{ Workshop: 'https://example.com/path" target="_blank' }]);
     expect(result.ok).toBe(true);
     if (result.ok && result.value[0]?.kind === 'external') {
       expect(result.value[0].href).toBe('https://example.com/path');

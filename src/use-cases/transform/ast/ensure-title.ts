@@ -16,8 +16,8 @@
  * `sourcePath`.
  */
 
-import type { Plugin } from 'unified';
 import type { Heading, Root, Yaml } from 'mdast';
+import type { Plugin } from 'unified';
 import type { Diagnostic } from '../../../domain/diagnostics/diagnostic.js';
 import { createDiagnostic } from '../../../domain/diagnostics/diagnostic.js';
 
@@ -32,7 +32,7 @@ export interface EnsureTitleOptions {
   readonly diagnostics?: Diagnostic[];
 }
 
-const NEEDS_QUOTING = /[:#&*!|>'"%@`{}\[\]]/;
+const NEEDS_QUOTING = /[:#&*!|>'"%@`{}[\]]/;
 // YAML 1.1/1.2 coerces these unquoted scalars to non-string types. Real-
 // world break (governance/.../2025-10-15.md): the source has no
 // frontmatter; we synthesize one with `title: <basename>` = `2025-10-15`.
@@ -46,7 +46,7 @@ const COERCED_SCALAR = new RegExp(
     String.raw`|[+-]?(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?` +
     // Bool / null markers (any case)
     '|true|false|yes|no|on|off|null|~|True|False|Yes|No|On|Off|Null|TRUE|FALSE|YES|NO|ON|OFF|NULL' +
-  ')$',
+    ')$',
 );
 
 export const ensureTitle: Plugin<[EnsureTitleOptions], Root> = (options) => {
@@ -98,11 +98,7 @@ function extractFrontmatterTitle(yamlSource: string): string | null {
   return raw.replace(/^['"]|['"]$/g, '').trim();
 }
 
-function stripDuplicateH1(
-  tree: Root,
-  title: string,
-  options: EnsureTitleOptions,
-): void {
+function stripDuplicateH1(tree: Root, title: string, options: EnsureTitleOptions): void {
   const titleNorm = normalizeForCompare(title);
   for (let i = 0; i < tree.children.length; i += 1) {
     const child = tree.children[i];

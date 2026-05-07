@@ -63,7 +63,7 @@ function translateRest(rest: string): string {
     // Already translated or already an EC marker — preserve.
     if (!LINENUMS_RE.test(rest) && !HL_LINES_RE.test(rest)) return rest;
   }
-  let parts: string[] = [];
+  const parts: string[] = [];
   let working = rest.trimStart();
 
   // Capture language id (first whitespace-delimited token), but only when the
@@ -73,9 +73,7 @@ function translateRest(rest: string): string {
   // A token that includes `=` or starts with a known option prefix is not a
   // language id — treat it as part of the options that follow.
   const isOption =
-    langCandidate.length === 0 ||
-    langCandidate.includes('=') ||
-    OPTION_PREFIX_RE.test(working);
+    langCandidate.length === 0 || langCandidate.includes('=') || OPTION_PREFIX_RE.test(working);
   const lang = isOption ? '' : langCandidate;
   if (lang.length > 0) {
     parts.push(lang);
@@ -148,8 +146,7 @@ function rewriteMaterialBraceBlock(rest: string): string | null {
   // but the PyMdown attr_list block is the wrong place to embed that
   // markup. Strip the fence-killing backticks (they would render as
   // literal text in Expressive Code's title regardless).
-  const titleValue =
-    rawTitle === null ? null : rawTitle.replace(/`/g, '');
+  const titleValue = rawTitle === null ? null : rawTitle.replace(/`/g, '');
   // Strip the entire brace block — its non-title contents are Material-only
   // attributes (test=, lint=, upgrade=, etc.) that Expressive Code does not
   // recognize. The title, if any, is reattached outside the braces.

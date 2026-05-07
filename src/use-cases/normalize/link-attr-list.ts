@@ -15,11 +15,9 @@
  * attribute lists live in their own normalizers. Idempotent.
  */
 
-import {
-  createDiagnostic,
-  type Diagnostic,
-} from '../../domain/diagnostics/diagnostic.js';
+import { createDiagnostic, type Diagnostic } from '../../domain/diagnostics/diagnostic.js';
 import { isFenceLine } from '../../domain/syntax/fence.js';
+
 // Matches a link followed by an optional space and a {attrs} block. The link
 // itself is matched broadly (up to the closing `)` or `]`). Group 1 = the
 // full link, group 2 = the attr list body (inside the braces).
@@ -34,9 +32,7 @@ export interface NormalizeLinkAttrResult {
   readonly diagnostics: ReadonlyArray<Diagnostic>;
 }
 
-export function normalizeLinkAttrLists(
-  source: string,
-): NormalizeLinkAttrResult {
+export function normalizeLinkAttrLists(source: string): NormalizeLinkAttrResult {
   const lines = source.split('\n');
   const out: string[] = [];
   const diagnostics: Diagnostic[] = [];

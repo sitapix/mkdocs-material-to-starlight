@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { convertFile } from '../../src/use-cases/convert-file/convert.js';
 import { buildSlugMap } from '../../src/domain/starlight/slug-map.js';
+import { convertFile } from '../../src/use-cases/convert-file/convert.js';
 
 /**
  * Pipeline-level idempotency property — converting the converted output is a
@@ -78,16 +78,7 @@ const CORPUS: ReadonlyArray<Fixture> = [
   },
   {
     name: 'blocks-syntax tabs',
-    source: [
-      '/// tab | C',
-      'c-body',
-      '///',
-      '',
-      '/// tab | C++',
-      'cpp-body',
-      '///',
-      '',
-    ].join('\n'),
+    source: ['/// tab | C', 'c-body', '///', '', '/// tab | C++', 'cpp-body', '///', ''].join('\n'),
   },
   {
     name: 'admonition with inline marks',
@@ -103,8 +94,7 @@ const CORPUS: ReadonlyArray<Fixture> = [
   },
   {
     name: 'footnotes',
-    source:
-      'A reference.[^1]\n\n[^1]: The footnote body.\n',
+    source: 'A reference.[^1]\n\n[^1]: The footnote body.\n',
   },
   {
     name: 'inline math',
@@ -152,8 +142,7 @@ const CORPUS: ReadonlyArray<Fixture> = [
   },
   {
     name: 'figure caption block',
-    source:
-      '![Diagram](diagram.png)\n\n/// caption\nFig 1: System overview.\n///\n',
+    source: '![Diagram](diagram.png)\n\n/// caption\nFig 1: System overview.\n///\n',
   },
   {
     name: 'definition block',
@@ -161,8 +150,7 @@ const CORPUS: ReadonlyArray<Fixture> = [
   },
   {
     name: 'html block',
-    source:
-      '/// html | div[class=highlight]\nWrapped content.\n///\n',
+    source: '/// html | div[class=highlight]\nWrapped content.\n///\n',
   },
   {
     name: 'snippet marker (unexpanded)',
@@ -170,8 +158,7 @@ const CORPUS: ReadonlyArray<Fixture> = [
   },
   {
     name: 'mixed: admonition with internal link',
-    source:
-      '!!! note "API"\n    See [auth](api/auth.md) for details.\n',
+    source: '!!! note "API"\n    See [auth](api/auth.md) for details.\n',
   },
   {
     name: 'already-converted aside directive',
@@ -200,7 +187,7 @@ describe('convertFile pipeline-level idempotency', () => {
     });
   }
 
-  it('exercises every CORPUS fixture (sanity check that the array isn\'t empty)', () => {
+  it("exercises every CORPUS fixture (sanity check that the array isn't empty)", () => {
     expect(CORPUS.length).toBeGreaterThan(20);
   });
 });

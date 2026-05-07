@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { applySectionIndex } from './section-index.js';
 import type { MkdocsNavEntry } from '../../domain/config/mkdocs-config.js';
+import { applySectionIndex } from './section-index.js';
 
 describe('applySectionIndex', () => {
   it('returns the input unchanged when no section contains an index page', () => {
@@ -99,9 +99,7 @@ describe('applySectionIndex', () => {
     ];
     const { diagnostics } = applySectionIndex(nav);
     expect(diagnostics).toHaveLength(2);
-    expect(diagnostics.every((d) => d.ruleId === 'plugin-section-index-applied')).toBe(
-      true,
-    );
+    expect(diagnostics.every((d) => d.ruleId === 'plugin-section-index-applied')).toBe(true);
     expect(diagnostics[0]?.message).toMatch(/API/);
     expect(diagnostics[1]?.message).toMatch(/Guide/);
   });
@@ -128,9 +126,7 @@ describe('applySectionIndex', () => {
     if (outer?.kind !== 'section') return;
     const inner = outer.children[0];
     if (inner?.kind !== 'section') return;
-    expect(inner.children[0]?.kind === 'file' && inner.children[0].path).toBe(
-      'api/v1/index.md',
-    );
+    expect(inner.children[0]?.kind === 'file' && inner.children[0].path).toBe('api/v1/index.md');
     expect(diagnostics).toHaveLength(1);
   });
 

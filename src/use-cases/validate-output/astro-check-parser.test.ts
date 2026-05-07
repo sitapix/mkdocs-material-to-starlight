@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { parseAstroCheckOutput } from './astro-check-parser.js';
 import type { ProcessOutput } from '../../domain/ports/process-runner.js';
+import { parseAstroCheckOutput } from './astro-check-parser.js';
 
 function output(partial: Partial<ProcessOutput>): ProcessOutput {
   return {
@@ -23,8 +23,7 @@ describe('parseAstroCheckOutput', () => {
   it('parses a single Error line with file:line:column - Error: message form', () => {
     const out = output({
       exitCode: 1,
-      stdout:
-        'src/content/docs/index.md:3:1 - Error: Missing field "title".\n',
+      stdout: 'src/content/docs/index.md:3:1 - Error: Missing field "title".\n',
     });
     const diags = parseAstroCheckOutput(out);
     expect(diags).toHaveLength(1);
@@ -39,8 +38,7 @@ describe('parseAstroCheckOutput', () => {
   it('parses warnings as astro-check-warning with severity warning', () => {
     const out = output({
       exitCode: 0,
-      stdout:
-        "src/pages/about.astro:5:10 - Warning: 'foo' is declared but never used.\n",
+      stdout: "src/pages/about.astro:5:10 - Warning: 'foo' is declared but never used.\n",
     });
     const diags = parseAstroCheckOutput(out);
     expect(diags).toHaveLength(1);
@@ -80,11 +78,7 @@ describe('parseAstroCheckOutput', () => {
   it('parses two-line modern form (path:line:col then indented Error: message)', () => {
     const out = output({
       exitCode: 1,
-      stdout: [
-        'src/content/docs/api.mdx:7:3',
-        '  Error: Cannot find name `Tabs`.',
-        '',
-      ].join('\n'),
+      stdout: ['src/content/docs/api.mdx:7:3', '  Error: Cannot find name `Tabs`.', ''].join('\n'),
     });
     const diags = parseAstroCheckOutput(out);
     expect(diags).toHaveLength(1);
@@ -162,11 +156,7 @@ describe('parseAstroCheckOutput', () => {
   it('idempotency: parsing the same output twice returns identical diagnostics', () => {
     const out = output({
       exitCode: 1,
-      stdout: [
-        'src/a.md:1:1 - Error: a',
-        'src/b.md:2:2 - Warning: b',
-        '',
-      ].join('\n'),
+      stdout: ['src/a.md:1:1 - Error: a', 'src/b.md:2:2 - Warning: b', ''].join('\n'),
     });
     expect(parseAstroCheckOutput(out)).toEqual(parseAstroCheckOutput(out));
   });

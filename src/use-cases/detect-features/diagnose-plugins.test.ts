@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { diagnosePlugins } from './diagnose-plugins.js';
 import type { MkdocsPlugin } from '../../domain/config/mkdocs-config.js';
+import { diagnosePlugins } from './diagnose-plugins.js';
 
 function plugins(...names: string[]): ReadonlyArray<MkdocsPlugin> {
   return names.map((name) => ({ name, options: {} }));

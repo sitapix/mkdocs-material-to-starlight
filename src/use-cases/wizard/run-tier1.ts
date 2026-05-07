@@ -1,14 +1,14 @@
-import type { Prompter } from '../../domain/wizard/ports/prompter.js';
-import type { ConversionPlan } from '../../domain/wizard/plan.js';
+import { err, ok, type Result } from '../../domain/result.js';
 import {
   type DefaultAnswers,
+  WIZARD_CANCELLED,
   type WizardAnswers,
   type WizardCancelled,
-  WIZARD_CANCELLED,
 } from '../../domain/wizard/answers.js';
-import { type Result, err, ok } from '../../domain/result.js';
-import { type Tier1Trigger, triggerSet } from './tier1-trigger.js';
+import type { ConversionPlan } from '../../domain/wizard/plan.js';
+import type { Prompter } from '../../domain/wizard/ports/prompter.js';
 import { tier1DocsUrl } from './docs-links.js';
+import { type Tier1Trigger, triggerSet } from './tier1-trigger.js';
 
 /**
  * Tier 1: prompts that fire only when a related feature is detected in the

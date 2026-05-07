@@ -17,12 +17,12 @@
  * once, and the adapter starts working.
  */
 
-import { ok, err, type Result } from '../../domain/result.js';
 import type {
   BrowserAutomator,
   BrowserAutomatorError,
   CaptureOptions,
 } from '../../domain/ports/browser-automator.js';
+import { err, ok, type Result } from '../../domain/result.js';
 
 interface PlaywrightChromiumModule {
   readonly chromium: {
@@ -31,9 +31,7 @@ interface PlaywrightChromiumModule {
 }
 
 interface PlaywrightBrowser {
-  newContext(options: {
-    viewport: { width: number; height: number };
-  }): Promise<PlaywrightContext>;
+  newContext(options: { viewport: { width: number; height: number } }): Promise<PlaywrightContext>;
   close(): Promise<void>;
 }
 

@@ -46,10 +46,7 @@ export function preprocessMkdocsPythonTags(source: string): PreprocessResult {
   return { source: result, stripped };
 }
 
-function stripContinuations(
-  source: string,
-  stripped: ReadonlyArray<string>,
-): string {
+function stripContinuations(source: string, stripped: ReadonlyArray<string>): string {
   if (stripped.length === 0) return source;
   const lines = source.split('\n');
   const out: string[] = [];

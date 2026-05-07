@@ -16,9 +16,7 @@ describe('mapAnalyticsToHeadEntries', () => {
   });
 
   it('returns null when provider is google but property is missing', () => {
-    expect(
-      mapAnalyticsToHeadEntries({ analytics: { provider: 'google' } }),
-    ).toBeNull();
+    expect(mapAnalyticsToHeadEntries({ analytics: { provider: 'google' } })).toBeNull();
   });
 
   it('emits two <script> head entries for Google Analytics', () => {
@@ -26,8 +24,9 @@ describe('mapAnalyticsToHeadEntries', () => {
       analytics: { provider: 'google', property: 'G-ABC123' },
     });
     expect(result).not.toBeNull();
-    expect(result?.headEntries).toHaveLength(2);
-    const [loader, init] = result!.headEntries;
+    if (result === null) return;
+    expect(result.headEntries).toHaveLength(2);
+    const [loader, init] = result.headEntries;
     expect(loader?.tag).toBe('script');
     expect(loader?.attrs?.async).toBe(true);
     expect(loader?.attrs?.src).toContain('G-ABC123');

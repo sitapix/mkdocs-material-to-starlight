@@ -22,13 +22,13 @@ describe('translateOgCanvasOptions', () => {
   it('translates font_family to font.title.family', () => {
     const out = translateOgCanvasOptions({ font_family: 'Roboto' });
     expect(out).toContain('font:');
-    expect(out).toContain("title:");
+    expect(out).toContain('title:');
     expect(out).toContain("families: ['Roboto']");
   });
 
   it('translates background_image to bgImage', () => {
     const out = translateOgCanvasOptions({ background_image: 'assets/bg.png' });
-    expect(out).toContain("bgImage:");
+    expect(out).toContain('bgImage:');
     expect(out).toContain("'assets/bg.png'");
   });
 

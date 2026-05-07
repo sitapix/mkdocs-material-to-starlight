@@ -1,7 +1,7 @@
-import { describe, expect, it } from 'vitest';
-import { mkdtempSync, mkdirSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { describe, expect, it } from 'vitest';
 import { convertSiteFromDisk } from '../../src/interface/api/convert-site.js';
 
 describe('per-occurrence macros expression diagnostics', () => {
@@ -9,12 +9,10 @@ describe('per-occurrence macros expression diagnostics', () => {
     const project = mkdtempSync(join(tmpdir(), 'mk2sl-macro-'));
     mkdirSync(join(project, 'docs'), { recursive: true });
     writeFileSync(join(project, 'mkdocs.yml'), 'site_name: T\ntheme: { name: material }\n');
-    writeFileSync(join(project, 'docs', 'index.md'), [
-      '# Test',
-      '',
-      'Value: {{ foo }}',
-      '',
-    ].join('\n'));
+    writeFileSync(
+      join(project, 'docs', 'index.md'),
+      ['# Test', '', 'Value: {{ foo }}', ''].join('\n'),
+    );
 
     const out = mkdtempSync(join(tmpdir(), 'mk2sl-macro-out-'));
     const result = await convertSiteFromDisk({ projectDir: project, outputDir: out });
@@ -32,14 +30,10 @@ describe('per-occurrence macros expression diagnostics', () => {
     const project = mkdtempSync(join(tmpdir(), 'mk2sl-macro-fence-'));
     mkdirSync(join(project, 'docs'), { recursive: true });
     writeFileSync(join(project, 'mkdocs.yml'), 'site_name: T\ntheme: { name: material }\n');
-    writeFileSync(join(project, 'docs', 'index.md'), [
-      '# Test',
-      '',
-      '```python',
-      'x = {{ foo }}',
-      '```',
-      '',
-    ].join('\n'));
+    writeFileSync(
+      join(project, 'docs', 'index.md'),
+      ['# Test', '', '```python', 'x = {{ foo }}', '```', ''].join('\n'),
+    );
 
     const out = mkdtempSync(join(tmpdir(), 'mk2sl-macro-fence-out-'));
     const result = await convertSiteFromDisk({ projectDir: project, outputDir: out });

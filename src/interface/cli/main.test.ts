@@ -1,7 +1,7 @@
-import { describe, expect, it, beforeEach, afterEach } from 'vitest';
-import { mkdtempSync, mkdirSync, rmSync, writeFileSync, existsSync } from 'node:fs';
-import { join } from 'node:path';
+import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { runCli } from './main.js';
 
 describe('runCli', () => {
@@ -72,10 +72,7 @@ describe('runCli', () => {
   });
 
   it('reports diagnostics to stdout on success even when there are warnings', async () => {
-    writeFileSync(
-      join(projectDir, 'docs', 'index.md'),
-      'See [missing](missing.md).\n',
-    );
+    writeFileSync(join(projectDir, 'docs', 'index.md'), 'See [missing](missing.md).\n');
     const code = await runCli([projectDir, outputDir], makeIo());
     expect(code).toBe(0);
     expect(stdout.join('\n')).toMatch(/broken-link/);
@@ -140,8 +137,7 @@ describe('runCli', () => {
             ok: true,
             value: {
               exitCode: 1,
-              stdout:
-                'src/content/docs/index.md:1:1 - Error: bogus content schema field.\n',
+              stdout: 'src/content/docs/index.md:1:1 - Error: bogus content schema field.\n',
               stderr: '',
               timedOut: false,
             },
@@ -241,14 +237,8 @@ describe('runCli', () => {
   it('expands snippets when --snippet-base-path is supplied', async () => {
     mkdirSync(join(projectDir, 'docs', 'snippets'), { recursive: true });
     writeFileSync(join(projectDir, 'docs', 'snippets', 'foo.md'), 'inlined body');
-    writeFileSync(
-      join(projectDir, 'docs', 'index.md'),
-      '--8<-- "snippets/foo.md"\n',
-    );
-    const code = await runCli(
-      [projectDir, outputDir, '--snippet-base-path', 'docs'],
-      makeIo(),
-    );
+    writeFileSync(join(projectDir, 'docs', 'index.md'), '--8<-- "snippets/foo.md"\n');
+    const code = await runCli([projectDir, outputDir, '--snippet-base-path', 'docs'], makeIo());
     expect(code).toBe(0);
     const indexOut = require('node:fs').readFileSync(
       join(outputDir, 'src', 'content', 'docs', 'index.md'),

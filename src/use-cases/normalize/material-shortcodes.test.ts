@@ -78,7 +78,7 @@ describe('normalizeMaterialShortcodes', () => {
   });
 
   it('escapes HTML special chars in args so the JSX attribute is safe', () => {
-    const out = normalizeMaterialShortcodes('<!-- md:default \'a"b\' -->');
+    const out = normalizeMaterialShortcodes("<!-- md:default 'a\"b' -->");
     // Double-quote inside the text= attribute must be escaped
     expect(out).not.toMatch(/text="[^"]*"[^"]/);
   });

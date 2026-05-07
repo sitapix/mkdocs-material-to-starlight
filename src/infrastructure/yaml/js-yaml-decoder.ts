@@ -14,12 +14,9 @@
  * Imperative shell — js-yaml is the only direct dependency for this port.
  */
 
-import { load, DEFAULT_SCHEMA, Type, YAMLException } from 'js-yaml';
-import { ok, err, type Result } from '../../domain/result.js';
-import type {
-  YamlDecodeError,
-  YamlDecoder,
-} from '../../domain/ports/yaml-decoder.js';
+import { DEFAULT_SCHEMA, load, Type, YAMLException } from 'js-yaml';
+import type { YamlDecodeError, YamlDecoder } from '../../domain/ports/yaml-decoder.js';
+import { err, ok, type Result } from '../../domain/result.js';
 
 const PYTHON_NAME_PREFIX = 'tag:yaml.org,2002:python/name:';
 const PYTHON_OBJECT_PREFIX = 'tag:yaml.org,2002:python/object';
@@ -109,10 +106,7 @@ export function createJsYamlDecoder(): YamlDecoder {
 }
 
 function isDuplicateKeyError(cause: unknown): boolean {
-  return (
-    cause instanceof YAMLException &&
-    cause.reason.includes('duplicated mapping key')
-  );
+  return cause instanceof YAMLException && cause.reason.includes('duplicated mapping key');
 }
 
 function translateError(cause: unknown): YamlDecodeError {

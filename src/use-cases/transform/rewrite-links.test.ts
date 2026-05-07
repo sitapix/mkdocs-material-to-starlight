@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { rewriteInternalLink } from './rewrite-links.js';
 import { buildSlugMap, type SlugMap } from '../../domain/starlight/slug-map.js';
+import { rewriteInternalLink } from './rewrite-links.js';
 
 function fixture(paths: ReadonlyArray<string>): SlugMap {
   const result = buildSlugMap(paths);

@@ -15,8 +15,8 @@
  * No I/O. Empty / no-frontmatter files yield no diagnostics.
  */
 
-import { STARLIGHT_FRONTMATTER_FIELDS } from '../../domain/starlight/frontmatter-schema.js';
 import type { Diagnostic } from '../../domain/diagnostics/diagnostic.js';
+import { STARLIGHT_FRONTMATTER_FIELDS } from '../../domain/starlight/frontmatter-schema.js';
 
 const FRONTMATTER_RE = /^---\n([\s\S]*?)\n---/;
 const KEY_RE = /^([A-Za-z_][A-Za-z0-9_-]*)\s*:/;

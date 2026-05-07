@@ -14,8 +14,13 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { getMappingRow, getAllMappingRows, getTranslationDepth, type TranslationDepth } from './table.js';
 import { getRegisteredRuleId } from '../diagnostics/registry.js';
+import {
+  getAllMappingRows,
+  getMappingRow,
+  getTranslationDepth,
+  type TranslationDepth,
+} from './table.js';
 
 const SETUP_PAIRS: ReadonlyArray<{ featureId: string; ruleId: string }> = [
   { featureId: 'theme-palette', ruleId: 'palette-translated' },

@@ -19,9 +19,7 @@ describe('scanMaterialMarkers', () => {
     it('emits a warning when a parameterized tags marker is present', () => {
       const src = '<!-- material/tags { scope: true, include: [Foo] } -->\n';
       const diags = scanMaterialMarkers(src);
-      expect(
-        diags.find((d) => d.ruleId === 'material-tags-marker-detected'),
-      ).toBeDefined();
+      expect(diags.find((d) => d.ruleId === 'material-tags-marker-detected')).toBeDefined();
     });
 
     it('does not match the marker inside fenced code', () => {
@@ -45,25 +43,19 @@ describe('scanMaterialMarkers', () => {
     it('does not emit when comments is false or absent', () => {
       const src = ['---', 'title: Hello', '---', '', 'body'].join('\n');
       const diags = scanMaterialMarkers(src);
-      expect(
-        diags.find((d) => d.ruleId === 'comments-frontmatter-detected'),
-      ).toBeUndefined();
+      expect(diags.find((d) => d.ruleId === 'comments-frontmatter-detected')).toBeUndefined();
     });
 
     it('only matches when the value is exactly true (not a substring)', () => {
       const src = ['---', 'description: comments true here', '---', '', 'body'].join('\n');
       const diags = scanMaterialMarkers(src);
-      expect(
-        diags.find((d) => d.ruleId === 'comments-frontmatter-detected'),
-      ).toBeUndefined();
+      expect(diags.find((d) => d.ruleId === 'comments-frontmatter-detected')).toBeUndefined();
     });
   });
 
   describe('<!-- more --> excerpt separator', () => {
     it('emits an info diagnostic when the more marker is present', () => {
-      const src = ['Intro paragraph.', '', '<!-- more -->', '', 'Rest of post.', ''].join(
-        '\n',
-      );
+      const src = ['Intro paragraph.', '', '<!-- more -->', '', 'Rest of post.', ''].join('\n');
       const diags = scanMaterialMarkers(src);
       const d = diags.find((x) => x.ruleId === 'blog-more-marker-detected');
       expect(d).toBeDefined();
@@ -100,9 +92,6 @@ describe('scanMaterialMarkers', () => {
     ].join('\n');
     const diags = scanMaterialMarkers(src);
     const ids = diags.map((d) => d.ruleId).sort();
-    expect(ids).toEqual([
-      'comments-frontmatter-detected',
-      'material-tags-marker-detected',
-    ]);
+    expect(ids).toEqual(['comments-frontmatter-detected', 'material-tags-marker-detected']);
   });
 });

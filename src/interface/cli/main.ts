@@ -135,7 +135,9 @@ export async function runCli(
     });
     if (!decision.interactive) {
       io.stderr(
-        'error: no arguments and not a TTY. Pass --yes to accept defaults, or run from a terminal to use the wizard.',
+        'error: not a TTY and no arguments given. Run from a terminal for the interactive wizard, ' +
+          'or pass `<project-dir> <output-dir> [--yes]` for non-interactive mode (e.g. ' +
+          '`mkdocs-material-to-starlight ./docs ./out --yes`). Run with --help for full usage.',
       );
       return 2;
     }
@@ -212,22 +214,29 @@ async function runExplain(projectDir: string, io: CliIo): Promise<number> {
       `note: auto-discovered ${resolved.value.autoDiscovery.discoveredRelPath} (no mkdocs.yml at ${projectDir}).`,
     );
   }
+  const configPath = join(effectiveDir, 'mkdocs.yml');
   let configText: string;
   try {
-    configText = await readFile(join(effectiveDir, 'mkdocs.yml'), 'utf8');
+    configText = await readFile(configPath, 'utf8');
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    io.stderr(`error: could not read mkdocs.yml: ${message}`);
+    io.stderr(`error: could not read ${configPath}: ${message}`);
     return 1;
   }
   const decoded = yaml.decode(configText);
   if (!decoded.ok) {
-    io.stderr(`error: yaml-decode-failed: ${decoded.error.message}`);
+    io.stderr(
+      `error: ${configPath} is not valid YAML: ${decoded.error.message}. ` +
+        'See https://www.mkdocs.org/user-guide/configuration/ for the expected format.',
+    );
     return 1;
   }
   const config = parseMkdocsConfig(decoded.value);
   if (!config.ok) {
-    io.stderr(`error: config-invalid: ${config.error.message}`);
+    io.stderr(
+      `error: ${configPath} is missing or has malformed required fields: ${config.error.message}. ` +
+        'See https://www.mkdocs.org/user-guide/configuration/#site_name (site_name is the only required key).',
+    );
     return 1;
   }
   const rows = explainConversion(config.value);
@@ -363,7 +372,7 @@ async function runConvert(
   const conversionDiagnostics = result.value.diagnostics;
   const checkDiagnostics = command.check ? await runCheckPass(command, overrides) : [];
   const allDiagnostics = [...conversionDiagnostics, ...checkDiagnostics];
-  io.stdout(formatReport(allDiagnostics));
+  io.stdout(formatReport(allDiagnostics, command.outputDir));
   // CI-meaningful exit code: any error-severity diagnostic — whether emitted
   // by the converter (e.g. output-syntax-error after MDX validation) or by
   // astro check — means the generated project will not build. A clean exit 0

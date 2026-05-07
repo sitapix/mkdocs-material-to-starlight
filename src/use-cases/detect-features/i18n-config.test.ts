@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { extractI18nLocales, extractI18nConfig } from './i18n-config.js';
 import type { MkdocsPlugin } from '../../domain/config/mkdocs-config.js';
+import { extractI18nConfig, extractI18nLocales } from './i18n-config.js';
 
 describe('extractI18nLocales', () => {
   it('returns an empty list when no i18n plugin is configured', () => {
@@ -26,10 +26,7 @@ describe('extractI18nLocales', () => {
     const plugin: MkdocsPlugin = {
       name: 'i18n',
       options: {
-        languages: [
-          { locale: 'en' },
-          { locale: 'fr' },
-        ],
+        languages: [{ locale: 'en' }, { locale: 'fr' }],
       },
     };
     expect(extractI18nLocales([plugin])).toEqual(['fr']);
@@ -39,11 +36,7 @@ describe('extractI18nLocales', () => {
     const plugin: MkdocsPlugin = {
       name: 'i18n',
       options: {
-        languages: [
-          { locale: 'en', default: true },
-          { locale: 'zh-CN' },
-          { locale: 'pt-BR' },
-        ],
+        languages: [{ locale: 'en', default: true }, { locale: 'zh-CN' }, { locale: 'pt-BR' }],
       },
     };
     expect(extractI18nLocales([plugin])).toEqual(['zh-CN', 'pt-BR']);
@@ -58,9 +51,7 @@ describe('extractI18nLocales', () => {
   });
 
   it('returns empty when languages is missing entirely', () => {
-    expect(
-      extractI18nLocales([{ name: 'i18n', options: {} }]),
-    ).toEqual([]);
+    expect(extractI18nLocales([{ name: 'i18n', options: {} }])).toEqual([]);
   });
 });
 
@@ -102,10 +93,7 @@ describe('extractI18nConfig', () => {
       {
         name: 'i18n',
         options: {
-          languages: [
-            { locale: 'en', default: true },
-            { locale: 'fr' },
-          ],
+          languages: [{ locale: 'en', default: true }, { locale: 'fr' }],
         },
       },
     ]);

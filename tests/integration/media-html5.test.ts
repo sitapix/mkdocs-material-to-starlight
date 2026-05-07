@@ -1,7 +1,7 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { convertSiteFromDisk } from '../../src/interface/api/convert-site.js';
 
 let project: string;
@@ -33,10 +33,7 @@ function writeProject(body: string, plugins: string = '  - search'): void {
 }
 
 function readTutorial(ext: 'md' | 'mdx' = 'md'): string {
-  return readFileSync(
-    join(out, 'src', 'content', 'docs', `tutorial.${ext}`),
-    'utf8',
-  );
+  return readFileSync(join(out, 'src', 'content', 'docs', `tutorial.${ext}`), 'utf8');
 }
 
 describe('mkdocs-video / mkdocs-audio integration — full pipeline', () => {
@@ -108,10 +105,7 @@ describe('mkdocs-video / mkdocs-audio integration — full pipeline', () => {
   });
 
   it('the plugin-level "auto-converted" diagnostic surfaces in the migration notes', async () => {
-    writeProject(
-      '# Demo\n\nBody.\n\n![type:video](v.mp4)\n',
-      '  - search\n  - mkdocs-video',
-    );
+    writeProject('# Demo\n\nBody.\n\n![type:video](v.mp4)\n', '  - search\n  - mkdocs-video');
 
     const result = await convertSiteFromDisk({ projectDir: project, outputDir: out });
     expect(result.ok).toBe(true);
@@ -138,10 +132,7 @@ describe('mkdocs-video / mkdocs-audio integration — full pipeline', () => {
         outputDir: out2,
       });
       expect(second.ok).toBe(true);
-      const secondBody = readFileSync(
-        join(out2, 'src', 'content', 'docs', 'tutorial.md'),
-        'utf8',
-      );
+      const secondBody = readFileSync(join(out2, 'src', 'content', 'docs', 'tutorial.md'), 'utf8');
       expect(secondBody).toBe(firstBody);
     } finally {
       rmSync(out2, { recursive: true, force: true });

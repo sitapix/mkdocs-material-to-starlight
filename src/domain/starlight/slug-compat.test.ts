@@ -1,8 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import {
-  expectedAstroSlug,
-  findSlugIncompatibleSegments,
-} from './slug-compat.js';
+import { expectedAstroSlug, findSlugIncompatibleSegments } from './slug-compat.js';
 
 describe('findSlugIncompatibleSegments', () => {
   it('returns an empty array for ASCII slug-safe paths', () => {
@@ -17,23 +14,19 @@ describe('findSlugIncompatibleSegments', () => {
     // Astro's `github-slugger` strips the dot, so the actual slug
     // becomes `10/configuration` — sidebar refs to `1.0/configuration`
     // 404 at build.
-    expect(findSlugIncompatibleSegments('1.0/configuration.md'))
-      .toEqual(['1.0']);
-    expect(findSlugIncompatibleSegments('docs/v1.2/page.md'))
-      .toEqual(['v1.2']);
+    expect(findSlugIncompatibleSegments('1.0/configuration.md')).toEqual(['1.0']);
+    expect(findSlugIncompatibleSegments('docs/v1.2/page.md')).toEqual(['v1.2']);
   });
 
   it('flags filenames containing `+`', () => {
     // Real-world: jujimeizuo/note has `cs/sys/cmu-15-445/c++-primer.md`.
     // github-slugger drops the `+` chars and collapses dashes — the
     // actual slug is `c-primer`, not `c++-primer`.
-    expect(findSlugIncompatibleSegments('cs/sys/cmu-15-445/c++-primer.md'))
-      .toEqual(['c++-primer']);
+    expect(findSlugIncompatibleSegments('cs/sys/cmu-15-445/c++-primer.md')).toEqual(['c++-primer']);
   });
 
   it('flags multiple incompatible segments in a single path', () => {
-    expect(findSlugIncompatibleSegments('docs/1.0/c++-primer.md'))
-      .toEqual(['1.0', 'c++-primer']);
+    expect(findSlugIncompatibleSegments('docs/1.0/c++-primer.md')).toEqual(['1.0', 'c++-primer']);
   });
 
   it('flags spaces, ampersands, parentheses, and other punctuation', () => {
@@ -65,8 +58,7 @@ describe('findSlugIncompatibleSegments', () => {
 describe('expectedAstroSlug', () => {
   it('matches `github-slugger`-style normalization per segment', () => {
     expect(expectedAstroSlug('1.0/configuration.md')).toBe('10/configuration');
-    expect(expectedAstroSlug('cs/sys/cmu-15-445/c++-primer.md'))
-      .toBe('cs/sys/cmu-15-445/c-primer');
+    expect(expectedAstroSlug('cs/sys/cmu-15-445/c++-primer.md')).toBe('cs/sys/cmu-15-445/c-primer');
     expect(expectedAstroSlug('Q&A/page.md')).toBe('qa/page');
     expect(expectedAstroSlug('foo (draft).md')).toBe('foo-draft');
   });

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { normalizeAttrList } from './attr-list.js';
 
 describe('normalizeAttrList', () => {
-  it('strips `{ scope=\'col\' }` from a markdown table header (Ruff rules.md)', () => {
+  it("strips `{ scope='col' }` from a markdown table header (Ruff rules.md)", () => {
     // Real-world: Ruff `rules.md` writes
     //   `| Code { scope='col' } | Name { scope='col' } | … |`
     // PyMdown's attr_list extension would attach the `scope` attribute to

@@ -1,9 +1,9 @@
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { readProjectDirInteractively } from './wizard-project-dir.js';
 import { createFakePrompter } from '../../use-cases/wizard/fake-prompter.js';
+import { readProjectDirInteractively } from './wizard-project-dir.js';
 
 let workspace: string;
 
@@ -68,7 +68,8 @@ describe('readProjectDirInteractively — cancellation paths', () => {
 
       expect(result).toBe('cancelled');
       const errorLog = prompter.logs.find(
-        (l) => l.level === 'error' && /gave up after 3 attempts/i.test(l.message),
+        (l) =>
+          l.level === 'error' && /could not locate mkdocs\.yml after 3 attempts/i.test(l.message),
       );
       expect(errorLog).toBeDefined();
     } finally {
@@ -93,9 +94,7 @@ describe('readProjectDirInteractively — recovery paths', () => {
       if (result === 'cancelled') return;
       expect(result.projectDir).toBe(workspace);
 
-      const yamlError = prompter.spinners.find((s) =>
-        /not valid yaml/i.test(s.erroredWith ?? ''),
-      );
+      const yamlError = prompter.spinners.find((s) => /not valid yaml/i.test(s.erroredWith ?? ''));
       expect(yamlError).toBeDefined();
     } finally {
       rmSync(bad, { recursive: true, force: true });
@@ -159,9 +158,7 @@ describe('readProjectDirInteractively — discovery in nested dirs', () => {
     expect(result).not.toBe('cancelled');
     if (result === 'cancelled') return;
     expect(result.projectDir).toBe(nested);
-    expect(prompter.calls.some((c) => c.kind === 'confirm' && /^use /i.test(c.message))).toBe(
-      true,
-    );
+    expect(prompter.calls.some((c) => c.kind === 'confirm' && /^use /i.test(c.message))).toBe(true);
   });
 
   it('treats decline of the single candidate as not-found and re-prompts', async () => {

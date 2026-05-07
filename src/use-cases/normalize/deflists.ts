@@ -70,10 +70,7 @@ interface DeflistEntry {
   readonly definitions: ReadonlyArray<string>;
 }
 
-function tryReadDeflistBlock(
-  lines: ReadonlyArray<string>,
-  start: number,
-): DeflistBlock | null {
+function tryReadDeflistBlock(lines: ReadonlyArray<string>, start: number): DeflistBlock | null {
   const firstEntry = readEntry(lines, start);
   if (firstEntry === null) {
     return null;

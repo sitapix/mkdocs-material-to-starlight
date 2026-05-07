@@ -15,7 +15,7 @@
  * with the trailing shortcode visible.
  */
 
-import { resolveIcon, type IconDescriptor } from './resolve-icon.js';
+import { type IconDescriptor, resolveIcon } from './resolve-icon.js';
 
 const SHORTCODE_RE = /:[a-z][a-z0-9-]*[a-z0-9]:/;
 const SHORTCODE_RE_GLOBAL = /:[a-z][a-z0-9-]*[a-z0-9]:/g;
@@ -64,7 +64,10 @@ export function extractLabelIcon(input: ExtractLabelIconInput): LabelIcon {
 }
 
 function stripRemainingShortcodes(label: string): string {
-  return label.replace(SHORTCODE_RE_GLOBAL, '').replace(/\s{2,}/g, ' ').trim();
+  return label
+    .replace(SHORTCODE_RE_GLOBAL, '')
+    .replace(/\s{2,}/g, ' ')
+    .trim();
 }
 
 function resolveIconForLabel(

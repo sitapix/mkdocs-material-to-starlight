@@ -34,12 +34,7 @@ describe('normalizeButtons', () => {
   });
 
   it('does not rewrite button markers inside fenced code', () => {
-    const src = [
-      '```',
-      '[Click](url){ .md-button }',
-      '```',
-      '',
-    ].join('\n');
+    const src = ['```', '[Click](url){ .md-button }', '```', ''].join('\n');
     expect(normalizeButtons(src)).toBe(src);
   });
 
@@ -107,7 +102,9 @@ describe('normalizeButtons', () => {
       // to Starlight\'s `forward-slash` icon — the paper-airplane glyph.
       const src = '[Send :fontawesome-solid-paper-plane:](#){ .md-button }\n';
       const out = normalizeButtons(src);
-      expect(out).toContain('<LinkButton href="#" variant="secondary" icon="forward-slash">Send</LinkButton>');
+      expect(out).toContain(
+        '<LinkButton href="#" variant="secondary" icon="forward-slash">Send</LinkButton>',
+      );
       expect(out).not.toContain(':fontawesome-solid-paper-plane:');
     });
 
@@ -115,7 +112,9 @@ describe('normalizeButtons', () => {
       // :material-arrow-right: maps to a Starlight built-in via icon-mappings.
       const src = '[Continue :material-arrow-right:](#){ .md-button .md-button--primary }\n';
       const out = normalizeButtons(src);
-      expect(out).toMatch(/<LinkButton[^>]*variant="primary"[^>]*icon="[^"]+"[^>]*>Continue<\/LinkButton>/);
+      expect(out).toMatch(
+        /<LinkButton[^>]*variant="primary"[^>]*icon="[^"]+"[^>]*>Continue<\/LinkButton>/,
+      );
     });
   });
 });

@@ -31,8 +31,7 @@ export function scanCodeFenceFlags(source: string): ReadonlyArray<Diagnostic> {
         severity: 'info',
         ruleId: 'code-fence-copy-flag-stripped',
         source: 'normalize/scan-code-fence-flags',
-        message:
-          'Code fence carries the Material `' + flag + '` flag. Expressive Code has no per-block copy-button toggle — the flag was stripped during normalization. To suppress the copy button globally, set `expressiveCode.frames.showCopyToClipboardButton: false` in `astro.config.mjs`. To suppress per-block, use `frame="none"` (which removes the entire chrome).',
+        message: `Code fence carries the Material \`${flag}\` flag. Expressive Code has no per-block copy-button toggle — the flag was stripped during normalization. To suppress the copy button globally, set \`expressiveCode.frames.showCopyToClipboardButton: false\` in \`astro.config.mjs\`. To suppress per-block, use \`frame="none"\` (which removes the entire chrome).`,
         place: { line: lineNumber, column: 1 },
       }),
     );

@@ -71,9 +71,7 @@ const HUE_TABLE: ReadonlyMap<string, { hue: number; chroma: number }> = new Map(
   }),
 );
 
-export function mapMaterialPaletteToStarlight(
-  raw: unknown,
-): StarlightPalette | null {
+export function mapMaterialPaletteToStarlight(raw: unknown): StarlightPalette | null {
   const primary = extractPrimary(raw);
   if (primary === null) return null;
   if (primary === 'custom') {

@@ -9,15 +9,22 @@ on:
 permissions:
   contents: read
 
+# Cancel superseded runs on the same ref so a fast push sequence does not
+# spawn N parallel matrices.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   test:
     name: Test (Node ${{ matrix.node }} / ${{ matrix.os }})
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
     strategy:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-latest]
-        node: ['20', '22']
+        node: ['20', '22', '24']
 
     steps:
       - name: Checkout
@@ -32,11 +39,20 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Lint (biome)
+        run: npm run check:ci
+
       - name: Typecheck
         run: npm run typecheck
+
+      - name: Knip (dead code)
+        run: npm run knip
 
       - name: Run tests
         run: npm test
 
       - name: Build
         run: npm run build
+
+      - name: Audit (production deps, moderate+)
+        run: npm run audit:release

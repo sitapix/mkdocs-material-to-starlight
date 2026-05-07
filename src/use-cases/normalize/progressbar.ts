@@ -49,10 +49,7 @@ export function normalizeProgressBar(source: string): string {
     output.push(
       line.replace(PROGRESS_RE, (_match, num, op, den, label) => {
         const numeric = Number(num);
-        const value =
-          op === '%'
-            ? clampPct(numeric)
-            : clampPct((numeric / Number(den)) * 100);
+        const value = op === '%' ? clampPct(numeric) : clampPct((numeric / Number(den)) * 100);
         const labelText = typeof label === 'string' ? label : '';
         return `<progress value="${value}" max="100">${labelText}</progress>`;
       }),

@@ -20,12 +20,7 @@
 const FRONTMATTER_RE = /^---\n([\s\S]*?)\n---/;
 // Fields we ALWAYS want as strings (Starlight's schema requires it). Wrap
 // regardless of value shape.
-const STRING_FIELDS: ReadonlyArray<string> = [
-  'title',
-  'description',
-  'tagline',
-  'sidebar_label',
-];
+const STRING_FIELDS: ReadonlyArray<string> = ['title', 'description', 'tagline', 'sidebar_label'];
 
 // Fields whose name is conventionally date-typed in Material/MkDocs
 // frontmatter but whose value users routinely write unquoted. Without
@@ -45,23 +40,19 @@ const DATE_LIKE_FIELDS: ReadonlyArray<string> = [
   'published',
 ];
 
-const COERCE_FIELDS: ReadonlyArray<string> = [
-  ...STRING_FIELDS,
-  ...DATE_LIKE_FIELDS,
-];
+const COERCE_FIELDS: ReadonlyArray<string> = [...STRING_FIELDS, ...DATE_LIKE_FIELDS];
 // Recognise YAML scalars that DON'T render as a string when left bare.
-const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}(?:[Tt ]\d{2}:\d{2}(?::\d{2})?(?:\.\d+)?(?:[Zz]|[+-]\d{2}:?\d{2})?)?$/;
+const ISO_DATE_RE =
+  /^\d{4}-\d{2}-\d{2}(?:[Tt ]\d{2}:\d{2}(?::\d{2})?(?:\.\d+)?(?:[Zz]|[+-]\d{2}:?\d{2})?)?$/;
 const NUMBER_RE = /^[+-]?(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?$/;
-const BOOL_NULL_RE = /^(?:true|false|yes|no|on|off|null|~|True|False|Yes|No|On|Off|Null|TRUE|FALSE|YES|NO|ON|OFF|NULL)$/;
+const BOOL_NULL_RE =
+  /^(?:true|false|yes|no|on|off|null|~|True|False|Yes|No|On|Off|Null|TRUE|FALSE|YES|NO|ON|OFF|NULL)$/;
 
 export function normalizeFrontmatterTitleCoercion(source: string): string {
   const match = source.match(FRONTMATTER_RE);
   if (match === null) return source;
   const fmOriginal = match[1] ?? '';
-  const fmRewritten = fmOriginal
-    .split('\n')
-    .map(rewriteLine)
-    .join('\n');
+  const fmRewritten = fmOriginal.split('\n').map(rewriteLine).join('\n');
   if (fmRewritten === fmOriginal) return source;
   return `---\n${fmRewritten}\n---${source.slice(match[0].length)}`;
 }

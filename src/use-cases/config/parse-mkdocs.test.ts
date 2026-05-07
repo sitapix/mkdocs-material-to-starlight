@@ -92,10 +92,7 @@ describe('parseMkdocsConfig', () => {
   it('parses markdown_extensions list', () => {
     const result = parseMkdocsConfig({
       site_name: 'X',
-      markdown_extensions: [
-        'admonition',
-        { 'pymdownx.tabbed': { alternate_style: true } },
-      ],
+      markdown_extensions: ['admonition', { 'pymdownx.tabbed': { alternate_style: true } }],
     });
     expect(result.ok).toBe(true);
     if (result.ok) {

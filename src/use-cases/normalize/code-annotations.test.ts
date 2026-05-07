@@ -13,12 +13,7 @@ describe('normalizeCodeAnnotations', () => {
   });
 
   it('strips .annotate from a { .lang .annotate } info string', () => {
-    const src = [
-      '``` { .python .annotate }',
-      'print("hi")',
-      '```',
-      '',
-    ].join('\n');
+    const src = ['``` { .python .annotate }', 'print("hi")', '```', ''].join('\n');
     const out = normalizeCodeAnnotations(src);
     expect(out).not.toContain('.annotate');
     expect(out).toContain('python');
@@ -80,12 +75,7 @@ describe('normalizeCodeAnnotations', () => {
   });
 
   it('is idempotent — running twice equals running once', () => {
-    const src = [
-      '``` { .python .annotate }',
-      'print("hi")  # (1)!',
-      '```',
-      '',
-    ].join('\n');
+    const src = ['``` { .python .annotate }', 'print("hi")  # (1)!', '```', ''].join('\n');
     const once = normalizeCodeAnnotations(src);
     expect(normalizeCodeAnnotations(once)).toBe(once);
   });

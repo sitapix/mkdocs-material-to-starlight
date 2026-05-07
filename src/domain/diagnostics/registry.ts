@@ -63,7 +63,7 @@ const REGISTRY_ENTRIES: ReadonlyArray<DiagnosticEntry> = [
     id: 'unknown-frontmatter-field',
     severity: 'warning',
     description: "Frontmatter contains a top-level field that is not in Starlight's docsSchema.",
-    fix: 'The generated `src/content.config.ts` auto-extends `docsSchema({ extend: z.object({ ... }) })` with every detected field. Types are inferred from observed values — review and tighten as needed.',
+    fix: 'Open `src/content.config.ts` and tighten the inferred Zod types in the generated `docsSchema({ extend: z.object({ ... }) })` snippet (e.g. swap `z.unknown().optional()` for `z.string()` or `z.enum([...])`), or remove fields you do not need. See https://starlight.astro.build/reference/frontmatter/#customize-frontmatter-schema for the full schema reference.',
   },
   {
     id: 'unknown-jsx-component',
@@ -211,7 +211,7 @@ const REGISTRY_ENTRIES: ReadonlyArray<DiagnosticEntry> = [
     severity: 'error',
     description:
       '`astro check` reported a build-blocking error in the converted project (TypeScript, content-collection schema, or MDX compilation).',
-    fix: 'Open the cited file at the cited location, fix the underlying issue, and re-run the converter. If the error originates from converter output, file a bug.',
+    fix: 'Open the cited file at the cited location. Common causes: (1) frontmatter does not match `docsSchema`. Adjust the frontmatter or extend the schema in `src/content.config.ts` (https://starlight.astro.build/reference/frontmatter/). (2) MDX syntax error (https://mdxjs.com/docs/troubleshooting-mdx/). (3) TypeScript error in a `.astro` page. Re-run the converter after fixing the source. If the error originates in converter output, file a bug.',
   },
   {
     id: 'astro-check-warning',
@@ -363,7 +363,7 @@ const REGISTRY_ENTRIES: ReadonlyArray<DiagnosticEntry> = [
     id: 'extension-only-mkdocs-stripped',
     severity: 'info',
     description:
-      'A `<!-- only-mkdocs -->` … `<!-- /only-mkdocs -->` content block was found and stripped from output (FastAPI convention for content that should appear on the docs site but not in PyPI README).',
+      'A `<!-- only-mkdocs -->` … `<!-- /only-mkdocs -->` content block was found and stripped from output (a convention used by some projects to mark content that should appear on the docs site but not in the PyPI README).',
     fix: 'No action required if the content was only meant for the rendered site. Inspect the diff if you wanted to keep the content.',
   },
   {
@@ -462,7 +462,7 @@ const REGISTRY_ENTRIES: ReadonlyArray<DiagnosticEntry> = [
     severity: 'info',
     description:
       'Material `theme.palette.primary` color was translated into Starlight accent CSS variables in the generated stylesheet shim.',
-    fix: 'No action required. The closest Starlight accent hue is approximate; tune `--sl-color-accent-*` in `src/styles/mkdocs-migration.css` if needed.',
+    fix: 'No action required. The closest Starlight accent hue is approximate; tune `--sl-color-accent-*` in `src/styles/mkdocs-migration.css` if needed. See https://starlight.astro.build/guides/css-and-tailwind/#theming for the full accent-ramp reference.',
     relatedFeatureId: 'theme-palette',
   },
   {
@@ -470,7 +470,7 @@ const REGISTRY_ENTRIES: ReadonlyArray<DiagnosticEntry> = [
     severity: 'warning',
     description:
       'Material `theme.palette.primary: custom` was detected. The custom palette relies on user-defined `--md-primary-fg-color` overrides which the converter cannot read.',
-    fix: "Inspect your existing `extra_css` files for `--md-primary-fg-color` declarations and translate them to Starlight's `--sl-color-accent-*` ramp in `src/styles/mkdocs-migration.css`.",
+    fix: "Inspect your existing `extra_css` files for `--md-primary-fg-color` declarations and translate them to Starlight's `--sl-color-accent-*` ramp in `src/styles/mkdocs-migration.css`. See https://starlight.astro.build/guides/css-and-tailwind/#theming for the canonical CSS variable list.",
     relatedFeatureId: 'theme-palette',
   },
   {
@@ -571,7 +571,7 @@ const REGISTRY_ENTRIES: ReadonlyArray<DiagnosticEntry> = [
     severity: 'info',
     description:
       'mkdocs.yml lists the `i18n` plugin (mkdocs-static-i18n); per-locale files have been renamed automatically.',
-    fix: 'Add a `locales: { … }` block to `astro.config.mjs` to register each locale with Starlight (the converter renames source files but does not write the locale config).',
+    fix: 'Add a `locales: { … }` block to `astro.config.mjs` to register each locale with Starlight (the converter renames source files but does not write the locale config). See https://starlight.astro.build/guides/i18n/ for the `locales` config schema and translation patterns.',
     relatedFeatureId: 'plugin-i18n-rename',
   },
   {
@@ -587,7 +587,7 @@ const REGISTRY_ENTRIES: ReadonlyArray<DiagnosticEntry> = [
     severity: 'info',
     description:
       '`theme.language` detected — Starlight `defaultLocale` and `locales: { root: { label, lang } }` set in astro.config.mjs.',
-    fix: 'No action required for locales Starlight ships translations for (the same set Material supports). For an unsupported locale, provide UI strings via the starlight `i18n` config or a custom locale loader.',
+    fix: "No action required for locales Starlight ships translations for (the same set Material supports). For an unsupported locale, add UI strings via Starlight's `i18n` config: https://starlight.astro.build/guides/i18n/#translate-starlights-ui.",
     relatedFeatureId: 'theme-language',
   },
   {
@@ -675,7 +675,7 @@ const REGISTRY_ENTRIES: ReadonlyArray<DiagnosticEntry> = [
     severity: 'info',
     description:
       'A comment-system override was detected in overrides/ (Giscus, Disqus, or Utterances snippet). The Material partial-override HTML is not auto-converted — Starlight uses a different override surface.',
-    fix: 'Install a community Starlight plugin (`starlight-giscus` for GitHub Discussions, or write a `Comments.astro` component override registered via the starlight `components` config). Port the snippet from your overrides/ HTML by hand — repo IDs and theme settings carry over unchanged.',
+    fix: 'Install a community Starlight plugin ([starlight-giscus](https://github.com/dragomano/starlight-giscus) for GitHub Discussions, or write a `Comments.astro` component override registered via the starlight `components` config). Port the snippet from your overrides/ HTML by hand — repo IDs and theme settings carry over unchanged.',
     relatedFeatureId: 'comment-system',
   },
   {
@@ -723,10 +723,10 @@ const REGISTRY_ENTRIES: ReadonlyArray<DiagnosticEntry> = [
     fix: 'Re-run the wizard, or invoke with explicit flags + `--yes` to skip prompts.',
   },
   {
-    id: 'typer-snippet-directive-detected',
+    id: 'source-include-directive-detected',
     severity: 'info',
     description:
-      'A typer-style `{* path *}` source-include directive was found. The converter cannot run the MkDocs macros plugin to inline the file; a TODO comment with the path is emitted instead.',
+      'A `{* path *}` source-include directive was found. The converter cannot run the MkDocs macros plugin to inline the file; a TODO comment with the path is emitted instead.',
     fix: "Manually inline the referenced file's contents at the marked location, or write an Astro component / remark plugin that reads the file at build time.",
   },
   {
@@ -823,7 +823,7 @@ const REGISTRY_ENTRIES: ReadonlyArray<DiagnosticEntry> = [
     severity: 'info',
     description:
       "The root `index.md` was detected as a landing-style page (hero image + CTA buttons or feature grid) and its frontmatter was rewritten to use Starlight's `template: splash` with a `hero:` block.",
-    fix: 'No action required. Review the generated `hero:` frontmatter in the output `index.md` and adjust `title`, `tagline`, `image`, and `actions` to match your design intent. The original body content (including any feature grid) is preserved below the hero block.',
+    fix: 'No action required. Review the generated `hero:` frontmatter in the output `index.md` and adjust `title`, `tagline`, `image`, and `actions` to match your design intent. See https://starlight.astro.build/reference/frontmatter/#hero for the full hero schema. The original body content (including any feature grid) is preserved below the hero block.',
     relatedFeatureId: 'landing-page-splash',
   },
   {
@@ -863,14 +863,14 @@ const REGISTRY_ENTRIES: ReadonlyArray<DiagnosticEntry> = [
     severity: 'warning',
     description:
       '`pymdownx.arithmatex` was configured. The converter passes `$inline$` and `$$block$$` math through to remark-math, but Astro needs a rehype renderer to actually display the formulas.',
-    fix: 'Install `rehype-katex` (preferred for static rendering) or `rehype-mathjax`, then add it to the markdown integrations in `astro.config.mjs`: `markdown: { remarkPlugins: [remarkMath], rehypePlugins: [rehypeKatex] }`. Also add `import "katex/dist/katex.min.css"` to your global CSS.',
+    fix: 'Install `rehype-katex` (preferred for static rendering) or `rehype-mathjax`, then add it to the markdown integrations in `astro.config.mjs`: `markdown: { remarkPlugins: [remarkMath], rehypePlugins: [rehypeKatex] }`. Also add `import "katex/dist/katex.min.css"` to your global CSS. Full setup: https://docs.astro.build/en/guides/markdown-content/#markdown-plugins and https://github.com/remarkjs/remark-math.',
   },
   {
     id: 'latex-delimiter-unsupported',
     severity: 'warning',
     description:
       "Source uses Material's alternate LaTeX delimiters `\\(...\\)` (inline) or `\\[...\\]` (block), which Material recommends as a MathJax-friendly alternative to `$`/`$$`. remark-math (the math pipeline auto-wired into emitted Starlight projects) does not recognize backslash-paren delimiters by default, so they will pass through verbatim and render as literal backslashes.",
-    fix: 'Easiest path: rewrite to dollar delimiters in source — `\\(x\\)` → `$x$`, `\\[y\\]` → `$$y$$`. Alternative: configure a custom remark plugin in `astro.config.mjs` that recognizes backslash delimiters (e.g., a Pandoc-flavored math plugin), or write a small regex-based remark plugin to translate the delimiters before remark-math runs.',
+    fix: 'Easiest path: rewrite to dollar delimiters in source. `\\(x\\)` becomes `$x$`; `\\[y\\]` becomes `$$y$$`. Alternative: configure a custom remark plugin in `astro.config.mjs` that recognizes backslash delimiters (e.g., a Pandoc-flavored math plugin), or write a small regex-based remark plugin to translate the delimiters before remark-math runs. See https://github.com/remarkjs/remark-math/tree/main/packages/remark-math for the package README and API reference.',
   },
   {
     id: 'math-runtime-script-superseded',
@@ -989,7 +989,7 @@ const REGISTRY_ENTRIES: ReadonlyArray<DiagnosticEntry> = [
     severity: 'warning',
     description:
       'A Material `<!-- material/tags -->` index marker (with or without `{ scope, include, exclude, toc }` parameters) was detected in source. Material renders this marker as a list of all tagged pages; Starlight has no equivalent and the marker becomes an inert HTML comment in the converted output.',
-    fix: "Install the `starlight-tags` community plugin (frostybee/starlight-tags) and replace this marker with its `<TagsList />` JSX component (the file becomes `.mdx`). Per-tag scoping/inclusion/exclusion that Material supports must be reproduced via the plugin's component props.",
+    fix: "Install the [starlight-tags](https://github.com/frostybee/starlight-tags) community plugin and replace this marker with its `<TagsList />` JSX component (the file becomes `.mdx`). Per-tag scoping/inclusion/exclusion that Material supports must be reproduced via the plugin's component props.",
   },
   {
     id: 'frontmatter-search-boost',
@@ -1010,21 +1010,21 @@ const REGISTRY_ENTRIES: ReadonlyArray<DiagnosticEntry> = [
     severity: 'info',
     description:
       "Page frontmatter `categories:` was detected — Material blog plugin's thematic grouping field. `starlight-blog` does not have a separate categories taxonomy.",
-    fix: 'Either move category names into the `tags:` array (the converter does not auto-merge to avoid silent data shifts), or accept that `categories:` passes through as opaque YAML. `starlight-blog` only renders `tags:`.',
+    fix: 'Either move category names into the `tags:` array (the converter does not auto-merge to avoid silent data shifts), or accept that `categories:` passes through as opaque YAML. `starlight-blog` only renders `tags:`. See https://github.com/HiDeoo/starlight-blog for the supported frontmatter fields.',
   },
   {
     id: 'frontmatter-blog-pin',
     severity: 'info',
     description:
       "Page frontmatter `pin: true|false` was detected — Material blog plugin's pin-to-top index feature. `starlight-blog` does not honor this field.",
-    fix: 'Reproduce by setting `featured: true` on the post (a `starlight-blog` convention surfaced in the sidebar) or by adjusting the post `date` field to control ordering.',
+    fix: 'Reproduce by setting `featured: true` on the post (a `starlight-blog` convention surfaced in the sidebar) or by adjusting the post `date` field to control ordering. See https://github.com/HiDeoo/starlight-blog for the supported frontmatter fields.',
   },
   {
     id: 'frontmatter-blog-links',
     severity: 'info',
     description:
       "Page frontmatter `links:` was detected — Material blog plugin's related-reading list rendered in the post sidebar. `starlight-blog` has no equivalent.",
-    fix: 'Reproduce by inlining the links inside an "## Related" heading at the foot of the post body, or build a small Astro component that reads a `related:` frontmatter field via `getEntry()`.',
+    fix: 'Reproduce by inlining the links inside an "## Related" heading at the foot of the post body, or build a small Astro component that reads a `related:` frontmatter field via `getEntry()`. See https://github.com/HiDeoo/starlight-blog for the supported frontmatter fields.',
   },
   {
     id: 'frontmatter-social-cards',
@@ -1089,14 +1089,14 @@ const REGISTRY_ENTRIES: ReadonlyArray<DiagnosticEntry> = [
     severity: 'info',
     description:
       'mkdocs.yml `repo_url` was set. The converter wires the URL into Starlight `editLink.baseUrl`, but does not auto-synthesise a header repo-button — Starlight surfaces repo links via the `social: [...]` config.',
-    fix: 'Add a `social` entry to your `astro.config` for the repo platform: `{ icon: "github" | "gitlab" | "bitbucket", label: <repo_name>, href: <repo_url> }`. Skip if you already had the same entry in mkdocs.yml `extra.social[]` (the converter has wired that path through).',
+    fix: 'Add a `social` entry to your `astro.config` for the repo platform: `{ icon: "github" | "gitlab" | "bitbucket", label: <repo_name>, href: <repo_url> }`. Skip if you already had the same entry in mkdocs.yml `extra.social[]` (the converter has wired that path through). See https://starlight.astro.build/reference/configuration/#social for the full schema.',
   },
   {
     id: 'theme-icon-overrides-detected',
     severity: 'info',
     description:
       'mkdocs.yml `theme.icon` overrides were detected. Starlight has its own icon catalog and slot system; most UI-chrome icons (menu, search, repo, edit, view, previous, next, top, close) cannot be remapped via config.',
-    fix: 'For UI-chrome overrides, reproduce via custom component overrides under `src/components/overrides/`. For `theme.icon.admonition.<type>`, set `<Aside icon="…">` per occurrence. For `theme.icon.tag.<id>`, build a custom Tag.astro component using your slug → icon map. For `theme.icon.logo`, pass `logo: { src }` in starlight() pointing at an SVG asset under `src/assets/`.',
+    fix: 'For UI-chrome overrides, reproduce via custom component overrides under `src/components/overrides/`. For `theme.icon.admonition.<type>`, set `<Aside icon="…">` per occurrence. For `theme.icon.tag.<id>`, build a custom Tag.astro component using your slug → icon map. For `theme.icon.logo`, pass `logo: { src }` in starlight() pointing at an SVG asset under `src/assets/`. See https://starlight.astro.build/reference/overrides/ for the override surface and slot names.',
   },
   {
     id: 'theme-direction-rtl',
@@ -1117,7 +1117,7 @@ const REGISTRY_ENTRIES: ReadonlyArray<DiagnosticEntry> = [
     severity: 'info',
     description:
       'mkdocs.yml `extra.analytics.provider` is set to a known non-Google provider (`plausible`, `tag-manager`, etc.). A community Starlight plugin exists for these — installing it is a clean migration path.',
-    fix: 'For Plausible: install `starlight-plausible` and pass your domain via plugin options. For GTM: install `starlight-gtm` and pass your container ID.',
+    fix: 'No analytics plugin ships in the canonical Starlight plugin list (https://starlight.astro.build/resources/plugins/). Search npm for a community Starlight analytics plugin matching your provider, or wire your tracking snippet through the Starlight `head` option (https://starlight.astro.build/reference/configuration/#head).',
   },
   {
     id: 'extra-annotate-no-equivalent',
@@ -1172,7 +1172,8 @@ const REGISTRY_ENTRIES: ReadonlyArray<DiagnosticEntry> = [
       '  2. **Bare `{` interpreted as JSX expression**. MDX treats `{` as the start of a JS expression. The converter escapes Jinja `{{...}}` / `{%...%}` / `{#...#}` and PyMdown attr_list `{:...}` automatically, but a `{` in arbitrary prose (e.g. pseudo-code `outputMode: OutputMode) extends Sink {` mid-paragraph) still trips the parser. Wrap the offending content in a fenced code block.\n' +
       '  3. **Autolink `<https://…>` or `<email>`** — MDX wants explicit Markdown links `[https://...](https://...)`.\n' +
       '  4. **HTML element needing self-close in MDX** (`<br>` → `<br/>`, `<img ...>` → `<img ... />`).\n' +
-      '  5. **Genuine converter bug** — if the file source looks clean and none of the above apply, file an issue with the line/column and the surrounding 3 lines of source.',
+      '  5. **Genuine converter bug** — if the file source looks clean and none of the above apply, file an issue with the line/column and the surrounding 3 lines of source.\n\n' +
+      'MDX troubleshooting reference: https://mdxjs.com/docs/troubleshooting-mdx/',
   },
   {
     id: 'output-validator-unavailable',

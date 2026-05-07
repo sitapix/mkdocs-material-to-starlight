@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { validateOutput } from './validate.js';
 import type {
-  OutputValidator,
   OutputValidationResult,
+  OutputValidator,
 } from '../../domain/ports/output-validator.js';
+import { validateOutput } from './validate.js';
 
 function fakeValidator(result: OutputValidationResult): OutputValidator {
   return {

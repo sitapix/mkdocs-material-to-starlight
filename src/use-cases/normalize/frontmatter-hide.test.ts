@@ -12,32 +12,24 @@ describe('normalizeFrontmatterHide', () => {
   });
 
   it('translates hide: [toc] → tableOfContents: false', () => {
-    const out = normalizeFrontmatterHide(
-      '---\ntitle: X\nhide:\n  - toc\n---\n',
-    );
+    const out = normalizeFrontmatterHide('---\ntitle: X\nhide:\n  - toc\n---\n');
     expect(out).toContain('tableOfContents: false');
     expect(out).not.toContain('hide:');
   });
 
   it('translates hide: [navigation] → template: splash', () => {
-    const out = normalizeFrontmatterHide(
-      '---\ntitle: X\nhide:\n  - navigation\n---\n',
-    );
+    const out = normalizeFrontmatterHide('---\ntitle: X\nhide:\n  - navigation\n---\n');
     expect(out).toContain('template: splash');
   });
 
   it('translates hide: [toc, navigation] → both', () => {
-    const out = normalizeFrontmatterHide(
-      '---\ntitle: X\nhide:\n  - toc\n  - navigation\n---\n',
-    );
+    const out = normalizeFrontmatterHide('---\ntitle: X\nhide:\n  - toc\n  - navigation\n---\n');
     expect(out).toContain('tableOfContents: false');
     expect(out).toContain('template: splash');
   });
 
   it('drops unknown hide values silently (footer has no Starlight equivalent)', () => {
-    const out = normalizeFrontmatterHide(
-      '---\ntitle: X\nhide:\n  - footer\n---\n',
-    );
+    const out = normalizeFrontmatterHide('---\ntitle: X\nhide:\n  - footer\n---\n');
     expect(out).not.toContain('hide:');
     // No tableOfContents/template added either.
     expect(out).not.toContain('tableOfContents');
@@ -57,9 +49,7 @@ describe('normalizeFrontmatterHide', () => {
   });
 
   it('does not touch hide: that appears in body text', () => {
-    const out = normalizeFrontmatterHide(
-      '---\ntitle: X\n---\n\nThe `hide:` field has uses.\n',
-    );
+    const out = normalizeFrontmatterHide('---\ntitle: X\n---\n\nThe `hide:` field has uses.\n');
     expect(out).toContain('`hide:`');
   });
 });

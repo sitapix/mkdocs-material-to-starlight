@@ -136,10 +136,9 @@ export function scanLatexDelimiters(
     const hasParen = BACKSLASH_PAREN_RE.test(content);
     const hasBracket = BACKSLASH_BRACKET_RE.test(content);
     if (!hasParen && !hasBracket) continue;
-    const markers = [
-      ...(hasParen ? ['\\(...\\)'] : []),
-      ...(hasBracket ? ['\\[...\\]'] : []),
-    ].join(' / ');
+    const markers = [...(hasParen ? ['\\(...\\)'] : []), ...(hasBracket ? ['\\[...\\]'] : [])].join(
+      ' / ',
+    );
     out.push({
       sourcePath,
       diagnostic: createDiagnostic({

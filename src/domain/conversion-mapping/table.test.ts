@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { getMappingRow, getAllMappingRows } from './table.js';
+import { getAllMappingRows, getMappingRow } from './table.js';
 
 describe('conversion mapping table', () => {
   it('returns null for an unknown feature id', () => {

@@ -28,9 +28,7 @@ describe('inferFrontmatterTypes', () => {
   it('infers z.number() from integers and floats', () => {
     const out = inferFrontmatterTypes(
       ['weight', 'rating'],
-      [
-        { source: '---\ntitle: X\nweight: 100\nrating: 4.5\n---\n' },
-      ],
+      [{ source: '---\ntitle: X\nweight: 100\nrating: 4.5\n---\n' }],
     );
     expect(out.weight).toBe('z.number().optional()');
     expect(out.rating).toBe('z.number().optional()');
@@ -117,9 +115,7 @@ describe('inferFrontmatterTypes', () => {
     // content-load time.
     const out = inferFrontmatterTypes(
       ['flag', 'other'],
-      [
-        { source: '---\ntitle: A\nflag: True\nother: FALSE\n---\n' },
-      ],
+      [{ source: '---\ntitle: A\nflag: True\nother: FALSE\n---\n' }],
     );
     expect(out.flag).toBe('z.boolean().optional()');
     expect(out.other).toBe('z.boolean().optional()');

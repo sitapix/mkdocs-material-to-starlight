@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { formatRecap, type RecapInput } from './format-recap.js';
 
 const baseTier0 = {
@@ -26,19 +26,21 @@ describe('formatRecap — header', () => {
 
 describe('formatRecap — Tier 0 mandatory choices', () => {
   it('shows the package manager', () => {
-    expect(formatRecap(recapWith({ tier0: { ...baseTier0, packageManager: 'pnpm' } }))).toMatch(/pnpm/);
+    expect(formatRecap(recapWith({ tier0: { ...baseTier0, packageManager: 'pnpm' } }))).toMatch(
+      /pnpm/,
+    );
   });
 
   it('mentions astro check when enabled', () => {
-    expect(
-      formatRecap(recapWith({ tier0: { ...baseTier0, check: true } })),
-    ).toMatch(/astro check/i);
+    expect(formatRecap(recapWith({ tier0: { ...baseTier0, check: true } }))).toMatch(
+      /astro check/i,
+    );
   });
 
   it('does not mention astro check when disabled', () => {
-    expect(
-      formatRecap(recapWith({ tier0: { ...baseTier0, check: false } })),
-    ).not.toMatch(/astro check/i);
+    expect(formatRecap(recapWith({ tier0: { ...baseTier0, check: false } }))).not.toMatch(
+      /astro check/i,
+    );
   });
 });
 
@@ -59,18 +61,14 @@ describe('formatRecap — Tier 1 conditional decisions', () => {
   });
 
   it('summarizes locale count when tier1.locales is non-empty (avoid wall-of-text)', () => {
-    const text = formatRecap(
-      recapWith({ tier1: { locales: ['en', 'de', 'fr', 'ja', 'zh'] } }),
-    );
+    const text = formatRecap(recapWith({ tier1: { locales: ['en', 'de', 'fr', 'ja', 'zh'] } }));
     expect(text).toMatch(/5 locales/);
     // The full list isn't dumped — just the count + first few.
     expect(text).not.toContain('en, de, fr, ja, zh');
   });
 
   it('summarizes extra-asset count when tier1.extraAssets is non-empty', () => {
-    const text = formatRecap(
-      recapWith({ tier1: { extraAssets: ['extra.css', 'tweaks.js'] } }),
-    );
+    const text = formatRecap(recapWith({ tier1: { extraAssets: ['extra.css', 'tweaks.js'] } }));
     expect(text).toMatch(/2 extra (asset|asset)/i);
   });
 

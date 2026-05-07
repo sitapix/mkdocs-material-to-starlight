@@ -43,15 +43,9 @@ describe('normalizeCardGrids', () => {
   });
 
   it('rewrites a generic grid as :::grid container with original block contents', () => {
-    const src = [
-      '<div class="grid" markdown>',
-      '',
-      '!!! note',
-      '    body',
-      '',
-      '</div>',
-      '',
-    ].join('\n');
+    const src = ['<div class="grid" markdown>', '', '!!! note', '    body', '', '</div>', ''].join(
+      '\n',
+    );
     const out = normalizeCardGrids(src);
     expect(out).toContain(':::grid');
     expect(out).toContain('!!! note');
@@ -203,9 +197,7 @@ describe('normalizeCardGrids', () => {
       expect(out).toContain('<LinkCard');
       expect(out).toContain('title="Customizing Starlight"');
       expect(out).toContain('href="/guides/customization/"');
-      expect(out).toContain(
-        'description="Learn how to make your Starlight site your own."',
-      );
+      expect(out).toContain('description="Learn how to make your Starlight site your own."');
       expect(out).not.toMatch(/^:::card$/m);
     });
 
@@ -222,9 +214,7 @@ describe('normalizeCardGrids', () => {
         '',
       ].join('\n');
       const out = normalizeCardGrids(src);
-      expect(out).toContain(
-        'description="First line of description. Second line of description."',
-      );
+      expect(out).toContain('description="First line of description. Second line of description."');
     });
 
     it('escapes quote characters in the description', () => {
@@ -239,9 +229,7 @@ describe('normalizeCardGrids', () => {
         '',
       ].join('\n');
       const out = normalizeCardGrids(src);
-      expect(out).toContain(
-        'description="Reads &quot;config.yml&quot; on startup."',
-      );
+      expect(out).toContain('description="Reads &quot;config.yml&quot; on startup."');
     });
 
     it('does NOT promote when the description paragraph contains a markdown link', () => {
@@ -485,15 +473,9 @@ describe('normalizeCardGrids', () => {
   });
 
   it('is idempotent', () => {
-    const src = [
-      '<div class="grid cards" markdown>',
-      '',
-      '- a',
-      '- b',
-      '',
-      '</div>',
-      '',
-    ].join('\n');
+    const src = ['<div class="grid cards" markdown>', '', '- a', '- b', '', '</div>', ''].join(
+      '\n',
+    );
     const once = normalizeCardGrids(src);
     expect(normalizeCardGrids(once)).toBe(once);
   });
@@ -522,8 +504,14 @@ describe('normalizeCardGrids', () => {
     const inCard: string[] = [];
     let inside = false;
     for (const line of cardLines) {
-      if (line === ':::card') { inside = true; continue; }
-      if (line === ':::') { inside = false; continue; }
+      if (line === ':::card') {
+        inside = true;
+        continue;
+      }
+      if (line === ':::') {
+        inside = false;
+        continue;
+      }
       if (inside) inCard.push(line);
     }
     // None of the body lines should have 4+ spaces of leading indent
@@ -597,8 +585,14 @@ describe('normalizeCardGrids', () => {
     const inCard: string[] = [];
     let inside = false;
     for (const line of cardLines) {
-      if (line === ':::card') { inside = true; continue; }
-      if (line === ':::') { inside = false; continue; }
+      if (line === ':::card') {
+        inside = true;
+        continue;
+      }
+      if (line === ':::') {
+        inside = false;
+        continue;
+      }
       if (inside) inCard.push(line);
     }
     const codeLikeLines = inCard.filter((l) => /^ {4,}\S/.test(l));
@@ -703,8 +697,14 @@ function extractCardBodies(out: string): string[] {
   const inCard: string[] = [];
   let inside = false;
   for (const line of cardLines) {
-    if (line.trim() === ':::card') { inside = true; continue; }
-    if (inside && line.trim() === ':::') { inside = false; continue; }
+    if (line.trim() === ':::card') {
+      inside = true;
+      continue;
+    }
+    if (inside && line.trim() === ':::') {
+      inside = false;
+      continue;
+    }
     if (inside) inCard.push(line);
   }
   return inCard;

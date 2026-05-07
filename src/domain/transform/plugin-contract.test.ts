@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
   PIPELINE_STAGES,
-  validatePluginDescriptor,
-  type PluginDescriptor,
   type PipelineStage,
+  type PluginDescriptor,
+  validatePluginDescriptor,
 } from './plugin-contract.js';
 
 const minimal = (overrides: Partial<PluginDescriptor> = {}): PluginDescriptor => ({
@@ -29,9 +29,7 @@ describe('validatePluginDescriptor', () => {
   });
 
   it('rejects an unknown stage', () => {
-    const result = validatePluginDescriptor(
-      minimal({ stage: 'magic' as PipelineStage }),
-    );
+    const result = validatePluginDescriptor(minimal({ stage: 'magic' as PipelineStage }));
     expect(result.ok).toBe(false);
     if (!result.ok) {
       expect(result.error.message).toMatch(/stage/);

@@ -48,8 +48,7 @@ const CORPUS: ReadonlyArray<{ name: string; source: string }> = [
   },
   {
     name: 'mixed content with code and admonition',
-    source:
-      'Intro.\n\n```python\nprint("hi")\n```\n\n!!! tip "Use uv"\n    It is fast.\n',
+    source: 'Intro.\n\n```python\nprint("hi")\n```\n\n!!! tip "Use uv"\n    It is fast.\n',
   },
   {
     name: 'already normalized output passes through unchanged',

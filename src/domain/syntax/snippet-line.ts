@@ -48,19 +48,15 @@ export function parseSnippetLine(line: string): SnippetReference | null {
     return null;
   }
 
-  const indent = (match.groups['indent'] ?? '').length;
-  const spec = match.groups['spec'] ?? '';
+  const indent = (match.groups.indent ?? '').length;
+  const spec = match.groups.spec ?? '';
   const skipped = spec.startsWith(';');
   const cleaned = skipped ? spec.slice(1) : spec;
 
   return parsePathSpec(cleaned, indent, skipped);
 }
 
-function parsePathSpec(
-  spec: string,
-  indent: number,
-  skipped: boolean,
-): SnippetReference | null {
+function parsePathSpec(spec: string, indent: number, skipped: boolean): SnippetReference | null {
   // URL-form snippets (`--8<-- "https://…"`) — preserve the full URL as the
   // path so the expander can surface a security diagnostic. Without this
   // branch, the URL's leading `:` would be parsed as a section/range

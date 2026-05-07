@@ -28,7 +28,7 @@ const slugMap = (() => {
 })();
 
 // Build a single string from a list of "block" parts joined by blank lines.
-const blocks = (parts: ReadonlyArray<string>): string => parts.join('\n\n') + '\n';
+const blocks = (parts: ReadonlyArray<string>): string => `${parts.join('\n\n')}\n`;
 
 // Heading text — printable ASCII with no Markdown-special characters that
 // would derail emphasis/link parsing. Length-bounded so the corpus stays
@@ -42,7 +42,7 @@ const heading = fc
   .tuple(fc.integer({ min: 1, max: 4 }), headingText)
   .map(([level, text]) => `${'#'.repeat(level)} ${text}`);
 
-const paragraph = headingText.map((s) => s + '.');
+const paragraph = headingText.map((s) => `${s}.`);
 
 // Material legacy admonition: `!!! type "Title"\n    body\n`
 const admonition = fc
@@ -78,7 +78,7 @@ const codeBlock = fc
     fc.constantFrom('python', 'ts', 'js', 'bash', ''),
     fc.stringMatching(/^[A-Za-z0-9 _=\n]{1,80}$/),
   )
-  .map(([lang, body]) => '```' + lang + '\n' + body + '\n```');
+  .map(([lang, body]) => `\`\`\`${lang}\n${body}\n\`\`\``);
 
 // Inline mark — currently the converter rewrites ==text== to <mark>text</mark>;
 // idempotency is the key invariant here.

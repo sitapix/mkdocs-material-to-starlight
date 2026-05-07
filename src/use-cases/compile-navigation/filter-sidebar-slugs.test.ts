@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { filterSidebarSlugs } from './filter-sidebar-slugs.js';
 import type { SidebarEntry } from '../../domain/starlight/sidebar.js';
+import { filterSidebarSlugs } from './filter-sidebar-slugs.js';
 
 describe('filterSidebarSlugs', () => {
   it('returns the input unchanged when the drop set is empty', () => {
@@ -37,9 +37,11 @@ describe('filterSidebarSlugs', () => {
     expect(out).toHaveLength(1);
     const group = out[0]!;
     expect(group.kind).toBe('group');
-    expect((group as { items: ReadonlyArray<SidebarEntry> }).items.map((e) =>
-      e.kind === 'slug' ? e.slug : '',
-    )).toEqual(['blog/posts/hello']);
+    expect(
+      (group as { items: ReadonlyArray<SidebarEntry> }).items.map((e) =>
+        e.kind === 'slug' ? e.slug : '',
+      ),
+    ).toEqual(['blog/posts/hello']);
   });
 
   it('collapses a group that becomes empty after filtering', () => {

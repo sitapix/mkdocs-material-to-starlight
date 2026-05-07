@@ -24,9 +24,7 @@ export interface RssEndpointInput {
 export function serializeRssEndpoint(input: RssEndpointInput): string {
   const description = input.siteDescription ?? DEFAULT_DESCRIPTION;
   const siteExpr =
-    input.siteUrl === null
-      ? 'context.site'
-      : `context.site ?? ${quote(input.siteUrl)}`;
+    input.siteUrl === null ? 'context.site' : `context.site ?? ${quote(input.siteUrl)}`;
   return [
     "import rss from '@astrojs/rss';",
     "import { getCollection } from 'astro:content';",

@@ -14,15 +14,10 @@
  */
 
 import type { MkdocsConfig } from '../../domain/config/mkdocs-config.js';
-import {
-  getAllMappingRows,
-  type MappingRow,
-} from '../../domain/conversion-mapping/table.js';
+import { getAllMappingRows, type MappingRow } from '../../domain/conversion-mapping/table.js';
 import { expandMetaBundles } from '../config/expand-meta-bundles.js';
 
-export function explainConversion(
-  config: MkdocsConfig,
-): ReadonlyArray<MappingRow> {
+export function explainConversion(config: MkdocsConfig): ReadonlyArray<MappingRow> {
   // Expand meta-bundles (`pymdownx.extra`, `extra`) so a row gated on a
   // component extension (e.g. `attr_list`) fires when the user shortcut
   // via the bundle.

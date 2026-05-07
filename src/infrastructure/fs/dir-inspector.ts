@@ -13,11 +13,8 @@
  * wrong.
  */
 
-import { stat, readdir } from 'node:fs/promises';
-import type {
-  DirInspector,
-  DirState,
-} from '../../domain/wizard/ports/dir-inspector.js';
+import { readdir, stat } from 'node:fs/promises';
+import type { DirInspector, DirState } from '../../domain/wizard/ports/dir-inspector.js';
 
 export function createNodeDirInspector(): DirInspector {
   return {

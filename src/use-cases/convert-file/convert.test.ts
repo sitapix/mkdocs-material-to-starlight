@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { convertFile } from './convert.js';
 import { buildSlugMap, type SlugMap } from '../../domain/starlight/slug-map.js';
+import { convertFile } from './convert.js';
 
 function fixture(paths: ReadonlyArray<string>): SlugMap {
   const result = buildSlugMap(paths);
@@ -219,13 +219,9 @@ describe('convertFile', () => {
 
   it('honors /// admonition type: warning option end-to-end through the pipeline', () => {
     const map = fixture(['index.md']);
-    const source = [
-      '/// admonition | Heads up',
-      '    type: warning',
-      'body.',
-      '///',
-      '',
-    ].join('\n');
+    const source = ['/// admonition | Heads up', '    type: warning', 'body.', '///', ''].join(
+      '\n',
+    );
     const out = convertFile({ source, sourcePath: 'index.md', slugMap: map });
     // Material `warning` maps to Starlight `caution` per the conversion
     // mapping; the type:-overridden block must traverse the full pipeline.
@@ -238,12 +234,7 @@ describe('convertFile', () => {
 
   it('rewrites pymdownx.blocks.* /// note alongside legacy admonitions', () => {
     const map = fixture(['index.md']);
-    const source = [
-      '/// warning | Modern',
-      'Block syntax.',
-      '///',
-      '',
-    ].join('\n');
+    const source = ['/// warning | Modern', 'Block syntax.', '///', ''].join('\n');
     const out = convertFile({ source, sourcePath: 'index.md', slugMap: map });
     // Material warning maps to Starlight caution per the conversion mapping.
     expect(out.text).toMatch(/:::caution|<aside[^>]*caution/);

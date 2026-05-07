@@ -88,20 +88,14 @@ function tryRewriteAnnotatedBlock(
 ): AnnotatedRewrite | null {
   // Walk back from output to find the start of the preceding paragraph.
   let paragraphEnd = output.length - 1;
-  while (
-    paragraphEnd >= 0 &&
-    (output[paragraphEnd] ?? '').length === 0
-  ) {
+  while (paragraphEnd >= 0 && (output[paragraphEnd] ?? '').length === 0) {
     paragraphEnd -= 1;
   }
   if (paragraphEnd < 0) {
     return null;
   }
   let paragraphStart = paragraphEnd;
-  while (
-    paragraphStart > 0 &&
-    (output[paragraphStart - 1] ?? '').length > 0
-  ) {
+  while (paragraphStart > 0 && (output[paragraphStart - 1] ?? '').length > 0) {
     paragraphStart -= 1;
   }
   const paragraphLines = output.slice(paragraphStart, paragraphEnd + 1);

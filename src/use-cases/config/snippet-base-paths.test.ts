@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { extractSnippetBasePaths } from './snippet-base-paths.js';
 import type { MkdocsConfig } from '../../domain/config/mkdocs-config.js';
+import { extractSnippetBasePaths } from './snippet-base-paths.js';
 
 function configWith(extOptions: Readonly<Record<string, unknown>> | null): MkdocsConfig {
   return {
@@ -17,9 +17,7 @@ function configWith(extOptions: Readonly<Record<string, unknown>> | null): Mkdoc
     plugins: [],
     theme: null,
     markdownExtensions:
-      extOptions === null
-        ? []
-        : [{ name: 'pymdownx.snippets', options: extOptions }],
+      extOptions === null ? [] : [{ name: 'pymdownx.snippets', options: extOptions }],
     extras: {},
   };
 }

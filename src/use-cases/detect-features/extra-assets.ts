@@ -26,9 +26,7 @@ export interface ExtraAssets {
   readonly js: ReadonlyArray<ExtraJsEntry>;
 }
 
-export function extractExtraAssets(
-  extras: Readonly<Record<string, unknown>>,
-): ExtraAssets {
+export function extractExtraAssets(extras: Readonly<Record<string, unknown>>): ExtraAssets {
   return {
     css: parseStringList(extras.extra_css),
     js: parseJsList(extras.extra_javascript),
@@ -53,12 +51,9 @@ function parseJsList(raw: unknown): ReadonlyArray<ExtraJsEntry> {
     const path = typeof obj.path === 'string' ? obj.path : null;
     if (path === null) continue;
     const result: ExtraJsEntry = { src: path };
-    const withType: ExtraJsEntry =
-      obj.type === 'module' ? { ...result, type: 'module' } : result;
-    const withAsync: ExtraJsEntry =
-      obj.async === true ? { ...withType, async: true } : withType;
-    const final: ExtraJsEntry =
-      obj.defer === true ? { ...withAsync, defer: true } : withAsync;
+    const withType: ExtraJsEntry = obj.type === 'module' ? { ...result, type: 'module' } : result;
+    const withAsync: ExtraJsEntry = obj.async === true ? { ...withType, async: true } : withType;
+    const final: ExtraJsEntry = obj.defer === true ? { ...withAsync, defer: true } : withAsync;
     out.push(final);
   }
   return out;

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { applyPagesOverrides } from './apply-pages.js';
-import type { SidebarEntry } from '../../domain/starlight/sidebar.js';
 import type { AwesomePagesConfig } from '../../domain/config/awesome-pages.js';
+import type { SidebarEntry } from '../../domain/starlight/sidebar.js';
+import { applyPagesOverrides } from './apply-pages.js';
 
 const pages = (overrides: Partial<AwesomePagesConfig> = {}): AwesomePagesConfig => ({
   title: null,
@@ -128,11 +128,7 @@ describe('applyPagesOverrides', () => {
       const result = applyPagesOverrides(sidebar, map) as ReadonlyArray<{
         items: ReadonlyArray<{ slug: string }>;
       }>;
-      expect(result[0]?.items.map((i) => i.slug)).toEqual([
-        'api/index',
-        'api/users',
-        'api/auth',
-      ]);
+      expect(result[0]?.items.map((i) => i.slug)).toEqual(['api/index', 'api/users', 'api/auth']);
     });
 
     it('places explicitly-listed entries first and appends unlisted entries in their original order (no rest placeholder)', () => {
@@ -158,11 +154,7 @@ describe('applyPagesOverrides', () => {
       const result = applyPagesOverrides(sidebar, map) as ReadonlyArray<{
         items: ReadonlyArray<{ slug: string }>;
       }>;
-      expect(result[0]?.items.map((i) => i.slug)).toEqual([
-        'api/c',
-        'api/a',
-        'api/b',
-      ]);
+      expect(result[0]?.items.map((i) => i.slug)).toEqual(['api/c', 'api/a', 'api/b']);
     });
 
     it('honours the ... rest placeholder by inserting unlisted entries at that position', () => {
@@ -262,7 +254,7 @@ describe('applyPagesOverrides', () => {
       const result = applyPagesOverrides(sidebar, map) as ReadonlyArray<{
         items: ReadonlyArray<{ kind: string; label?: string; slug?: string }>;
       }>;
-      const labels = result[0]?.items.map((i) => i.kind === 'group' ? i.label : i.slug);
+      const labels = result[0]?.items.map((i) => (i.kind === 'group' ? i.label : i.slug));
       expect(labels).toEqual(['Inner', 'top/page']);
     });
 

@@ -15,9 +15,7 @@ describe('normalizeAbbreviations', () => {
       '',
     ].join('\n');
     const out = normalizeAbbreviations(src);
-    expect(out).toContain(
-      'The <abbr title="Hyper Text Markup Language">HTML</abbr> specification',
-    );
+    expect(out).toContain('The <abbr title="Hyper Text Markup Language">HTML</abbr> specification');
     expect(out).not.toContain('*[HTML]:');
   });
 
@@ -65,26 +63,41 @@ describe('normalizeAbbreviations', () => {
   });
 
   it('does not rewrite term inside fenced code', () => {
-    const src = [
-      '```',
-      'HTML',
-      '```',
-      '',
-      '*[HTML]: Hyper Text Markup Language',
-      '',
-    ].join('\n');
+    const src = ['```', 'HTML', '```', '', '*[HTML]: Hyper Text Markup Language', ''].join('\n');
     const out = normalizeAbbreviations(src);
     expect(out).toContain('```\nHTML\n```');
     expect(out).not.toContain('<abbr');
   });
 
-  it('is idempotent — running twice equals running once', () => {
+  it("does not wrap a short term that appears inside a longer term's title attribute", () => {
+    // Real-world (DaoCloud_DaoCloud-docs/dce/index.md): two abbreviations
+    // are defined where the SHORTER term's text appears inside the LONGER
+    // term's *definition*. With a per-term sequential regex pass, the
+    // longest-first replacement of `DCE` injects `<abbr title="… AI
+    // computing platform">DCE</abbr>`, and the next pass for `AI` then
+    // matches the `AI` *inside* that title attribute, producing nested
+    // `<abbr>` tags inside an attribute value — which MDX rejects with
+    // "Unexpected character `5` (U+0035) after attribute name" once the
+    // attribute boundary is broken by the inner opening quote.
     const src = [
-      'HTML is a markup language.',
+      'DCE platform with AI Lab.',
       '',
-      '*[HTML]: Hyper Text Markup Language',
+      '*[DCE]: An abbreviation for DaoCloud Enterprise, a next-generation AI computing platform',
+      '*[AI]: DCE 5.0 has an integrated AI Lab',
       '',
     ].join('\n');
+    const out = normalizeAbbreviations(src);
+    // Each term wrapped exactly once.
+    expect(out.match(/<abbr title="[^"]*">DCE<\/abbr>/g)?.length ?? 0).toBe(1);
+    expect(out.match(/<abbr title="[^"]*">AI<\/abbr>/g)?.length ?? 0).toBe(1);
+    // No nested `<abbr>` inside an attribute value.
+    expect(out).not.toMatch(/title="[^"]*<abbr/);
+  });
+
+  it('is idempotent — running twice equals running once', () => {
+    const src = ['HTML is a markup language.', '', '*[HTML]: Hyper Text Markup Language', ''].join(
+      '\n',
+    );
     const once = normalizeAbbreviations(src);
     expect(normalizeAbbreviations(once)).toBe(once);
   });

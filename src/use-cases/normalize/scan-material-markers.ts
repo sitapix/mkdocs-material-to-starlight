@@ -20,6 +20,7 @@
 
 import { createDiagnostic, type Diagnostic } from '../../domain/diagnostics/diagnostic.js';
 import { isFenceLine } from '../../domain/syntax/fence.js';
+
 const TAGS_MARKER_RE = /<!--\s*material\/tags(?:\s*\{[^}]*\})?\s*-->/;
 const MORE_MARKER_RE = /^<!--\s*more\s*-->\s*$/;
 const FRONTMATTER_RE = /^---\n([\s\S]*?)\n---\n/;
@@ -36,7 +37,7 @@ export function scanMaterialMarkers(source: string): ReadonlyArray<Diagnostic> {
         ruleId: 'comments-frontmatter-detected',
         source: 'normalize/scan-material-markers',
         message:
-          'Page frontmatter sets `comments: true`, Material\'s flag for activating the optional Giscus comment widget. Starlight has no built-in comments. Install the `starlight-giscus` community plugin (dragomano/starlight-giscus) to recreate the per-page comments UX, or remove the flag if comments were disabled at the theme level.',
+          "Page frontmatter sets `comments: true`, Material's flag for activating the optional Giscus comment widget. Starlight has no built-in comments. Install the `starlight-giscus` community plugin (dragomano/starlight-giscus) to recreate the per-page comments UX, or remove the flag if comments were disabled at the theme level.",
       }),
     );
   }
@@ -58,7 +59,7 @@ export function scanMaterialMarkers(source: string): ReadonlyArray<Diagnostic> {
           ruleId: 'material-tags-marker-detected',
           source: 'normalize/scan-material-markers',
           message:
-            'Material\'s `<!-- material/tags -->` index marker detected — used to render a list of all tagged pages on a tags index page. Starlight has no equivalent; the marker becomes an inert HTML comment in the converted output. Install the `starlight-tags` plugin (frostybee/starlight-tags) and replace this marker with its `<TagsList />` JSX component (the file becomes `.mdx`).',
+            "Material's `<!-- material/tags -->` index marker detected — used to render a list of all tagged pages on a tags index page. Starlight has no equivalent; the marker becomes an inert HTML comment in the converted output. Install the `starlight-tags` plugin (frostybee/starlight-tags) and replace this marker with its `<TagsList />` JSX component (the file becomes `.mdx`).",
           place: { line: lineNumber, column: 1 },
         }),
       );

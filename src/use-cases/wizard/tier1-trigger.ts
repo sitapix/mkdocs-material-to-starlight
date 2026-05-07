@@ -33,9 +33,7 @@ const ORDER: ReadonlyArray<Tier1Trigger> = [
 export function triggerSet(plan: ConversionPlan): ReadonlyArray<Tier1Trigger> {
   const themeFeatures = collectThemeFeatures(plan);
   const pluginNames = new Set(plan.config.plugins.map((p) => p.name));
-  const extensionNames = new Set(
-    plan.config.markdownExtensions.map((e) => e.name),
-  );
+  const extensionNames = new Set(plan.config.markdownExtensions.map((e) => e.name));
 
   const fired = new Set<Tier1Trigger>();
   if (themeFeatures.includes('content.tabs.link')) fired.add('tabs');

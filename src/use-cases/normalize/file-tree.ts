@@ -42,10 +42,7 @@ interface FenceBlock {
   readonly end: number;
 }
 
-function readFenceBlock(
-  lines: ReadonlyArray<string>,
-  startIdx: number,
-): FenceBlock | null {
+function readFenceBlock(lines: ReadonlyArray<string>, startIdx: number): FenceBlock | null {
   const openLine = lines[startIdx] ?? '';
   const openMatch = FENCE_OPEN_RE.exec(openLine);
   if (openMatch === null) return null;
@@ -105,7 +102,7 @@ function asciiTreeToList(contentLines: ReadonlyArray<string>): string[] {
 
     // Count tree structure characters at start
     // Pattern: (│   |    )* then (├── |└── ) then name
-    const depthMatch = rawLine.match(/^((?:[│|]   |    )*)/);
+    const depthMatch = rawLine.match(/^((?:[│|] {3}| {4})*)/);
     if (depthMatch !== null) {
       // Each "│   " or "    " = 4 chars = one depth level
       depth = Math.floor((depthMatch[1] ?? '').length / 4);

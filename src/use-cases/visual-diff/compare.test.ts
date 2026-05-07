@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { compareSites } from './compare.js';
-import { ok, err } from '../../domain/result.js';
 import type { BrowserAutomator } from '../../domain/ports/browser-automator.js';
 import type { ImageDiffer } from '../../domain/ports/image-differ.js';
+import { err, ok } from '../../domain/result.js';
+import { compareSites } from './compare.js';
 
 const PNG_A = new Uint8Array([1, 2, 3]);
 const PNG_B = new Uint8Array([4, 5, 6]);
@@ -47,9 +47,7 @@ describe('compareSites', () => {
 
   it('marks a page as match when mismatch ratio is at or below threshold', async () => {
     const report = await compareSites({
-      pairs: [
-        { path: '/', baselineUrl: 'http://b/', convertedUrl: 'http://c/' },
-      ],
+      pairs: [{ path: '/', baselineUrl: 'http://b/', convertedUrl: 'http://c/' }],
       browser: fakeBrowser({
         'http://b/': Promise.resolve(ok(PNG_A)),
         'http://c/': Promise.resolve(ok(PNG_B)),
@@ -65,9 +63,7 @@ describe('compareSites', () => {
 
   it('marks a page as mismatch when mismatch ratio exceeds threshold', async () => {
     const report = await compareSites({
-      pairs: [
-        { path: '/', baselineUrl: 'http://b/', convertedUrl: 'http://c/' },
-      ],
+      pairs: [{ path: '/', baselineUrl: 'http://b/', convertedUrl: 'http://c/' }],
       browser: fakeBrowser({
         'http://b/': Promise.resolve(ok(PNG_A)),
         'http://c/': Promise.resolve(ok(PNG_B)),
@@ -81,9 +77,7 @@ describe('compareSites', () => {
 
   it('marks a page capture-failed when the baseline cannot be captured', async () => {
     const report = await compareSites({
-      pairs: [
-        { path: '/', baselineUrl: 'http://b/', convertedUrl: 'http://c/' },
-      ],
+      pairs: [{ path: '/', baselineUrl: 'http://b/', convertedUrl: 'http://c/' }],
       browser: fakeBrowser({
         'http://b/': Promise.resolve(
           err({ code: 'navigation-failed', url: 'http://b/', message: 'down' }),
@@ -100,16 +94,12 @@ describe('compareSites', () => {
 
   it('marks a page diff-failed when the differ rejects (dimension mismatch)', async () => {
     const report = await compareSites({
-      pairs: [
-        { path: '/', baselineUrl: 'http://b/', convertedUrl: 'http://c/' },
-      ],
+      pairs: [{ path: '/', baselineUrl: 'http://b/', convertedUrl: 'http://c/' }],
       browser: fakeBrowser({
         'http://b/': Promise.resolve(ok(PNG_A)),
         'http://c/': Promise.resolve(ok(PNG_B)),
       }),
-      differ: fakeDiffer(
-        err({ code: 'dimension-mismatch', message: '800x600 vs 1024x768' }),
-      ),
+      differ: fakeDiffer(err({ code: 'dimension-mismatch', message: '800x600 vs 1024x768' })),
       threshold: 0.01,
     });
     expect(report.results[0]?.status).toBe('diff-failed');
@@ -140,9 +130,7 @@ describe('compareSites', () => {
 
   it('threshold = 0 means any mismatched pixel fails', async () => {
     const report = await compareSites({
-      pairs: [
-        { path: '/', baselineUrl: 'http://b/', convertedUrl: 'http://c/' },
-      ],
+      pairs: [{ path: '/', baselineUrl: 'http://b/', convertedUrl: 'http://c/' }],
       browser: fakeBrowser({
         'http://b/': Promise.resolve(ok(PNG_A)),
         'http://c/': Promise.resolve(ok(PNG_B)),

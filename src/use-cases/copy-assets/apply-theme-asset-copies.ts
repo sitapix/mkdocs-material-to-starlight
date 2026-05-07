@@ -16,8 +16,8 @@
  */
 
 import { join, posix } from 'node:path';
-import { atomicCopyFile, atomicWriteText } from '../../infrastructure/fs/atomic-write.js';
 import { createDiagnostic, type Diagnostic } from '../../domain/diagnostics/diagnostic.js';
+import { atomicCopyFile, atomicWriteText } from '../../infrastructure/fs/atomic-write.js';
 
 const SOURCE = 'mkdocs-material-to-starlight';
 

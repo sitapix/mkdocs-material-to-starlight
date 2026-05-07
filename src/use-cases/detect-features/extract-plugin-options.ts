@@ -15,9 +15,9 @@
  */
 
 import { join } from 'node:path';
+import type { MkdocsPlugin } from '../../domain/config/mkdocs-config.js';
 import type { FileSystem } from '../../domain/ports/file-system.js';
 import type { YamlDecoder } from '../../domain/ports/yaml-decoder.js';
-import type { MkdocsPlugin } from '../../domain/config/mkdocs-config.js';
 
 export interface PluginOptions {
   readonly blogOptions: Readonly<Record<string, unknown>> | undefined;
@@ -44,8 +44,8 @@ export async function extractPluginOptions(
   // the `authors` field of the plugin invocation; without this, every
   // blog post fails with "Author 'X' not found in the blog configuration."
   const blogDir =
-    typeof blogPlugin?.options['blog_dir'] === 'string'
-      ? (blogPlugin.options['blog_dir'] as string)
+    typeof blogPlugin?.options.blog_dir === 'string'
+      ? (blogPlugin.options.blog_dir as string)
       : 'blog';
   const authorsFromFile = await readAuthorsYml(
     input.fs,
@@ -62,7 +62,7 @@ export async function extractPluginOptions(
   //      flag wins under "any defined" semantics and the file's contents
   //      never reach starlight-blog — every post then fails with
   //      "Author 'ksaaskil' not found in the blog configuration."
-  const baseAuthors = blogOptionsBase['authors'];
+  const baseAuthors = blogOptionsBase.authors;
   const baseAuthorsIsObjectMap =
     baseAuthors !== null && typeof baseAuthors === 'object' && !Array.isArray(baseAuthors);
   const blogOptions =
@@ -78,7 +78,7 @@ export async function extractPluginOptions(
       ? tagsPlugin.options
       : undefined;
 
-  const rawSocialLayout = socialPlugin?.options['cards_layout_options'];
+  const rawSocialLayout = socialPlugin?.options.cards_layout_options;
   const socialCardsLayoutOptions =
     rawSocialLayout !== null && typeof rawSocialLayout === 'object'
       ? (rawSocialLayout as Readonly<Record<string, unknown>>)
@@ -98,7 +98,7 @@ async function readAuthorsYml(
   if (!decoded.ok) return undefined;
   const root = decoded.value as Record<string, unknown> | null;
   if (root === null || typeof root !== 'object') return undefined;
-  const authors = root['authors'];
+  const authors = root.authors;
   if (authors === null || typeof authors !== 'object') return undefined;
   return authors as Record<string, unknown>;
 }

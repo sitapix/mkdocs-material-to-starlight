@@ -8,9 +8,7 @@ import re
 def on_page_markdown(markdown, **kwargs):
     return re.sub(r"<!--\\s*md:version\\s*(\\S+)\\s*-->", repl, markdown)
 `;
-    expect(classifyHook(src)).toEqual([
-      'shortcode-replacement',
-    ]);
+    expect(classifyHook(src)).toEqual(['shortcode-replacement']);
   });
 
   it('returns i18n-fallback when on_files subclasses File or filters by language', () => {

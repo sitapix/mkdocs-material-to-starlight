@@ -12,8 +12,8 @@
  */
 
 import { join } from 'node:path';
-import type { FileSystem } from '../../domain/ports/file-system.js';
 import { createDiagnostic, type Diagnostic } from '../../domain/diagnostics/diagnostic.js';
+import type { FileSystem } from '../../domain/ports/file-system.js';
 import { classifyHook } from './hook-archetypes.js';
 
 const SOURCE = 'mkdocs-material-to-starlight';
@@ -45,8 +45,7 @@ export async function diagnoseHooks(
           severity: 'warning',
           ruleId: 'hook-file-not-found',
           source: SOURCE,
-          message:
-            `mkdocs.yml hooks: references "${hookRel}" but the file could not be read at ${hookFull}.`,
+          message: `mkdocs.yml hooks: references "${hookRel}" but the file could not be read at ${hookFull}.`,
         }),
       });
       continue;
@@ -58,17 +57,14 @@ export async function diagnoseHooks(
         severity: 'warning',
         ruleId: 'hook-archetype-detected',
         source: SOURCE,
-        message:
-          `Python hook archetypes: ${archetypes.join(', ')}. The converter cannot evaluate Python; reproduce the behaviour as remark/rehype plugin, Starlight component override, or Astro endpoint.`,
+        message: `Python hook archetypes: ${archetypes.join(', ')}. The converter cannot evaluate Python; reproduce the behaviour as remark/rehype plugin, Starlight component override, or Astro endpoint.`,
       }),
     });
   }
   return out;
 }
 
-export function extractHookPaths(
-  extras: Readonly<Record<string, unknown>>,
-): ReadonlyArray<string> {
+export function extractHookPaths(extras: Readonly<Record<string, unknown>>): ReadonlyArray<string> {
   const raw = extras.hooks;
   if (!Array.isArray(raw)) return [];
   return raw.filter((p): p is string => typeof p === 'string');

@@ -57,7 +57,7 @@ export function normalizeMedia(source: string): NormalizeMediaResult {
     out.push(
       line.replace(MEDIA_RE, (_match, kind: 'audio' | 'video', url: string) => {
         promotions.push({ line: i + 1, kind, url });
-        return '<' + kind + ' src="' + escapeAttr(url) + '" controls></' + kind + '>';
+        return `<${kind} src="${escapeAttr(url)}" controls></${kind}>`;
       }),
     );
   }

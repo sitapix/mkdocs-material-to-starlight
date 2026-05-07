@@ -17,8 +17,8 @@
  * compromise the user's terminal session.
  */
 
-import type { TaggedDiagnostic } from '../../use-cases/convert-site/convert.js';
 import { sanitizeForSingleLine } from '../../infrastructure/terminal/sanitize-terminal-output.js';
+import type { TaggedDiagnostic } from '../../use-cases/convert-site/convert.js';
 
 // When a single ruleId has more than COLLAPSE_AT occurrences, only the first
 // SHOW_FIRST are printed and the rest are summarised on one line. This stops
@@ -28,9 +28,25 @@ import { sanitizeForSingleLine } from '../../infrastructure/terminal/sanitize-te
 const COLLAPSE_AT = 5;
 const SHOW_FIRST = 3;
 
-export function formatReport(diagnostics: ReadonlyArray<TaggedDiagnostic>): string {
+export function formatReport(
+  diagnostics: ReadonlyArray<TaggedDiagnostic>,
+  outputDir?: string,
+): string {
+  const notesPath =
+    outputDir !== undefined && outputDir.length > 0
+      ? `${sanitizeForSingleLine(outputDir).replace(/\/$/, '')}/MIGRATION_NOTES.md`
+      : 'MIGRATION_NOTES.md';
+
   if (diagnostics.length === 0) {
-    return 'OK — 0 issues found.\n';
+    const where =
+      outputDir !== undefined && outputDir.length > 0
+        ? sanitizeForSingleLine(outputDir).replace(/\/$/, '')
+        : '<output-dir>';
+    return (
+      `OK — 0 issues found. Site converted cleanly.\n` +
+      `Next: cd ${where} && npm install && npm run dev\n` +
+      `Docs: https://starlight.astro.build/\n`
+    );
   }
 
   const groups = groupByRuleId(diagnostics);
@@ -43,13 +59,14 @@ export function formatReport(diagnostics: ReadonlyArray<TaggedDiagnostic>): stri
     }
     if (collapse) {
       const hidden = items.length - SHOW_FIRST;
-      lines.push(
-        `  … and ${String(hidden)} more "${ruleId}" — see MIGRATION_NOTES.md for the full list`,
-      );
+      lines.push(`  … and ${String(hidden)} more "${ruleId}" — see ${notesPath} for the full list`);
     }
   }
   lines.push('', summarize(diagnostics));
-  return lines.join('\n') + '\n';
+  if (diagnostics.length > 0) {
+    lines.push(`Full report with descriptions and fixes: ${notesPath}`);
+  }
+  return `${lines.join('\n')}\n`;
 }
 
 interface RuleGroup {
@@ -61,9 +78,7 @@ interface RuleGroup {
 // Groups stay together so a user reading the report sees every "broken-link"
 // before every "unknown-frontmatter-field", which is more useful than the
 // per-file interleaving the input might have.
-function groupByRuleId(
-  diagnostics: ReadonlyArray<TaggedDiagnostic>,
-): ReadonlyArray<RuleGroup> {
+function groupByRuleId(diagnostics: ReadonlyArray<TaggedDiagnostic>): ReadonlyArray<RuleGroup> {
   const order: string[] = [];
   const buckets = new Map<string, TaggedDiagnostic[]>();
   for (const tagged of diagnostics) {
@@ -85,9 +100,7 @@ function formatOne(tagged: TaggedDiagnostic): string {
   const safeMessage = sanitizeForSingleLine(tagged.diagnostic.message);
   const place = tagged.diagnostic.place;
   const locator =
-    place === undefined
-      ? safePath
-      : `${safePath}:${String(place.line)}:${String(place.column)}`;
+    place === undefined ? safePath : `${safePath}:${String(place.line)}:${String(place.column)}`;
   return `${locator}  ${tagged.diagnostic.severity}  ${safeRuleId}  ${safeMessage}`;
 }
 

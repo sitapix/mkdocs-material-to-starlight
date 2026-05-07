@@ -8,9 +8,7 @@ describe('normalizeCriticMarkup', () => {
   });
 
   it('rewrites {++added++} into <ins>added</ins>', () => {
-    expect(normalizeCriticMarkup('Text {++added++} here.\n')).toBe(
-      'Text <ins>added</ins> here.\n',
-    );
+    expect(normalizeCriticMarkup('Text {++added++} here.\n')).toBe('Text <ins>added</ins> here.\n');
   });
 
   it('rewrites {--deleted--} into <del>deleted</del>', () => {
@@ -90,14 +88,7 @@ describe('normalizeCriticMarkup', () => {
   it('does not match a critic span split by a fenced code block', () => {
     // Spans must NOT cross fences — fence shielding is preserved by the
     // per-block batching strategy.
-    const src = [
-      '{==',
-      '```',
-      'literal inside code',
-      '```',
-      '==}',
-      '',
-    ].join('\n');
+    const src = ['{==', '```', 'literal inside code', '```', '==}', ''].join('\n');
     const out = normalizeCriticMarkup(src);
     expect(out).toContain('{==');
     expect(out).toContain('==}');

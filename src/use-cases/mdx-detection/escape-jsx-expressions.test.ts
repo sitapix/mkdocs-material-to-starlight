@@ -25,7 +25,7 @@ describe('escapeJsxExpressionsForMdx', () => {
     expect(out).toContain('`{{ b }}`');
   });
 
-  it('handles a real polars-style expression with nested punctuation', () => {
+  it('handles a real Jinja-style expression with nested punctuation', () => {
     const out = escapeJsxExpressionsForMdx(
       "{{code_block('user-guide/getting-started','df',['DataFrame'])}}\n",
     );
@@ -44,8 +44,8 @@ describe('escapeJsxExpressionsForMdx', () => {
     expect(second).toBe(first);
   });
 
-  it('handles multi-line {{...}} expressions (real-world polars shape)', () => {
-    // Real-world polars source: code_block macro split across two lines
+  it('handles multi-line {{...}} expressions (real-world Jinja shape)', () => {
+    // Real-world source: code_block macro split across two lines
     const src = "{{code_block('user-guide', 'semi-join', [],\n['join-flag'])}}\n";
     const out = escapeJsxExpressionsForMdx(src);
     // Multi-line spans cannot be inline-code-wrapped (backticks don't span lines).
@@ -90,6 +90,24 @@ describe('escapeJsxExpressionsForMdx', () => {
     const out = escapeJsxExpressionsForMdx(src);
     expect(out).toContain('`{% set project = projects.arko %}`');
     expect(out).toContain('`{{ project.name }}`');
+  });
+
+  it('does NOT inline-code-wrap {{ ... }} sitting inside a markdown link URL', () => {
+    // Real-world (cv4x_svstudio-manual/docs/index.md): a markdown link
+    // contains a Jinja template variable in its URL:
+    //   [text {{ git.short_commit }}](https://example.com/commit/{{ git.short_commit }})
+    // Wrapping the URL-side `{{...}}` in backticks puts a backtick INSIDE
+    // the link target, which remark mis-parses (the target gets split on
+    // the backtick → cascading malformed link → MDX acorn parse failure).
+    // Inside a URL, entity-escape (`&#123;&#123;`) is the safe form: it
+    // satisfies MDX without confusing the link parser.
+    const src = '[text {{ x }}](https://example.com/commit/{{ x }})\n';
+    const out = escapeJsxExpressionsForMdx(src);
+    // Link text side: backtick-wrapped (existing behaviour).
+    expect(out).toContain('[text `{{ x }}`]');
+    // Link URL side: entity-escaped, NOT backtick-wrapped.
+    expect(out).toContain('commit/&#123;&#123; x &#125;&#125;');
+    expect(out).not.toContain('commit/`{{');
   });
 
   it('escapes multi-line {% blocks %} via entity escape', () => {

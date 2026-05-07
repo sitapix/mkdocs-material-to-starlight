@@ -7,9 +7,7 @@ describe('scanFrontmatterFields', () => {
   });
 
   it('returns no diagnostics for plain frontmatter (title, description, tags)', () => {
-    const src = ['---', 'title: Hello', 'description: x', 'tags: [a, b]', '---', ''].join(
-      '\n',
-    );
+    const src = ['---', 'title: Hello', 'description: x', 'tags: [a, b]', '---', ''].join('\n');
     expect(scanFrontmatterFields(src)).toHaveLength(0);
   });
 
@@ -46,17 +44,13 @@ describe('scanFrontmatterFields', () => {
     it('emits an info diagnostic for pin', () => {
       const src = ['---', 'pin: true', '---', ''].join('\n');
       const diags = scanFrontmatterFields(src);
-      expect(
-        diags.find((x) => x.ruleId === 'frontmatter-blog-pin'),
-      ).toBeDefined();
+      expect(diags.find((x) => x.ruleId === 'frontmatter-blog-pin')).toBeDefined();
     });
 
     it('emits an info diagnostic for links: (related-reading list)', () => {
       const src = ['---', 'links:', '  - other.md', '---', ''].join('\n');
       const diags = scanFrontmatterFields(src);
-      expect(
-        diags.find((x) => x.ruleId === 'frontmatter-blog-links'),
-      ).toBeDefined();
+      expect(diags.find((x) => x.ruleId === 'frontmatter-blog-links')).toBeDefined();
     });
   });
 
@@ -83,15 +77,7 @@ describe('scanFrontmatterFields', () => {
   });
 
   it('does not match fields appearing outside the leading frontmatter block', () => {
-    const src = [
-      '# Heading',
-      '',
-      'pin: true',
-      '',
-      'search:',
-      '  boost: 2',
-      '',
-    ].join('\n');
+    const src = ['# Heading', '', 'pin: true', '', 'search:', '  boost: 2', ''].join('\n');
     expect(scanFrontmatterFields(src)).toHaveLength(0);
   });
 
@@ -99,9 +85,7 @@ describe('scanFrontmatterFields', () => {
     it('emits info when social.cards: false is set in frontmatter', () => {
       const src = ['---', 'social:', '  cards: false', '---', ''].join('\n');
       const diags = scanFrontmatterFields(src);
-      expect(
-        diags.find((d) => d.ruleId === 'frontmatter-social-cards'),
-      ).toBeDefined();
+      expect(diags.find((d) => d.ruleId === 'frontmatter-social-cards')).toBeDefined();
     });
 
     it('emits info when social.cards_layout is set', () => {
@@ -115,9 +99,7 @@ describe('scanFrontmatterFields', () => {
     it('does not emit when no social: block is present', () => {
       const src = ['---', 'title: x', '---', ''].join('\n');
       const diags = scanFrontmatterFields(src);
-      expect(
-        diags.find((d) => d.ruleId === 'frontmatter-social-cards'),
-      ).toBeUndefined();
+      expect(diags.find((d) => d.ruleId === 'frontmatter-social-cards')).toBeUndefined();
     });
   });
 });

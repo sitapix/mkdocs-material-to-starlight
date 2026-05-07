@@ -1,10 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import {
-  tier1DocsUrl,
-  pluginDocsUrl,
-  TIER1_DOCS,
-  PLUGIN_DOCS,
-} from './docs-links.js';
+import { PLUGIN_DOCS, pluginDocsUrl, TIER1_DOCS, tier1DocsUrl } from './docs-links.js';
 import type { Tier1Trigger } from './tier1-trigger.js';
 
 describe('tier1DocsUrl — every Tier 1 trigger has a learn-more URL', () => {

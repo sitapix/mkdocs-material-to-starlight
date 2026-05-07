@@ -18,11 +18,8 @@
  * extend them in their own `src/styles/`.
  */
 
-import type {
-  PaletteStrategy,
-  StarlightPalette,
-} from '../../domain/starlight/palette-mapping.js';
 import type { MaterialFontConfig } from '../../domain/starlight/font-mapping.js';
+import type { PaletteStrategy, StarlightPalette } from '../../domain/starlight/palette-mapping.js';
 
 const STYLESHEET = `/*
  * mkdocs-material-to-starlight migration shim.
@@ -131,12 +128,9 @@ function buildFontOverride(fonts: MaterialFontConfig): string {
 function buildPaletteOverride(palette: StarlightPalette): string {
   const lightHue = String(palette.accentHue);
   const lightChroma = palette.accentChroma.toFixed(2);
-  const darkHue =
-    palette.darkAccentHue === undefined ? lightHue : String(palette.darkAccentHue);
+  const darkHue = palette.darkAccentHue === undefined ? lightHue : String(palette.darkAccentHue);
   const darkChroma =
-    palette.darkAccentChroma === undefined
-      ? lightChroma
-      : palette.darkAccentChroma.toFixed(2);
+    palette.darkAccentChroma === undefined ? lightChroma : palette.darkAccentChroma.toFixed(2);
   const sourceComment =
     palette.darkSourceName === undefined
       ? `\`theme.palette.primary: ${palette.sourceName}\``

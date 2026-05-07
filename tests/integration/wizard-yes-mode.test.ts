@@ -1,8 +1,8 @@
-import { describe, expect, it } from 'vitest';
-import { runCli } from '../../src/interface/cli/main.js';
-import { mkdtempSync, writeFileSync, mkdirSync, readFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { describe, expect, it } from 'vitest';
+import { runCli } from '../../src/interface/cli/main.js';
 
 describe('--yes mode (non-interactive equivalent of wizard defaults)', () => {
   it('runs convert successfully against a minimal mkdocs project with --yes', async () => {

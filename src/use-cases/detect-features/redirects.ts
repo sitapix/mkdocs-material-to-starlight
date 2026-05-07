@@ -21,15 +21,13 @@ import type { MkdocsPlugin } from '../../domain/config/mkdocs-config.js';
 
 export type RedirectMap = Readonly<Record<string, string>>;
 
-export function extractRedirects(
-  plugins: ReadonlyArray<MkdocsPlugin>,
-): RedirectMap {
+export function extractRedirects(plugins: ReadonlyArray<MkdocsPlugin>): RedirectMap {
   const out: Record<string, string> = {};
   for (const plugin of plugins) {
     if (plugin.name !== 'redirects') {
       continue;
     }
-    const raw = plugin.options['redirect_maps'];
+    const raw = plugin.options.redirect_maps;
     if (!isStringRecord(raw)) {
       continue;
     }

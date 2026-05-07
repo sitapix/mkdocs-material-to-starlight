@@ -19,19 +19,19 @@
 import { join } from 'node:path';
 import { err, ok, type Result } from '../../domain/result.js';
 import { atomicCopyFile, atomicWriteText } from '../../infrastructure/fs/atomic-write.js';
+import { buildSidebar } from '../../use-cases/compile-navigation/build-sidebar.js';
 import { convertSite, type TaggedDiagnostic } from '../../use-cases/convert-site/convert.js';
-import { type AssetCopy } from '../../use-cases/copy-assets/plan.js';
+import { applyThemeAssetCopies } from '../../use-cases/copy-assets/apply-theme-asset-copies.js';
+import type { AssetCopy } from '../../use-cases/copy-assets/plan.js';
+import { extractPluginOptions } from '../../use-cases/detect-features/extract-plugin-options.js';
 import { detectFeaturesFromPlugins } from '../../use-cases/detect-features/from-plugins.js';
 import { detectFeaturesFromThemeFeatures } from '../../use-cases/detect-features/from-theme-features.js';
 import { resolveThemeAssets } from '../../use-cases/detect-features/resolve-theme-assets.js';
-import { extractPluginOptions } from '../../use-cases/detect-features/extract-plugin-options.js';
-import { buildSidebar } from '../../use-cases/compile-navigation/build-sidebar.js';
-import { assembleConfigOutputs } from '../../use-cases/serialize-config/assemble-config-outputs.js';
 import { runConfigAnalysis } from '../../use-cases/detect-features/run-config-analysis.js';
-import { applyThemeAssetCopies } from '../../use-cases/copy-assets/apply-theme-asset-copies.js';
-import { buildOutputSources } from '../../use-cases/serialize-config/build-output-sources.js';
 import { prepareConvertContext } from '../../use-cases/load-config/prepare-convert-context.js';
+import { assembleConfigOutputs } from '../../use-cases/serialize-config/assemble-config-outputs.js';
 import { serializeBiomeConfig } from '../../use-cases/serialize-config/biome-config.js';
+import { buildOutputSources } from '../../use-cases/serialize-config/build-output-sources.js';
 import { serializeContentConfig } from '../../use-cases/serialize-config/content-config.js';
 import { serializeSidebar } from '../../use-cases/serialize-config/sidebar.js';
 
@@ -200,11 +200,11 @@ export async function convertSiteFromDisk(
       const bp = config.value.plugins.find((p) => p.name === 'blog');
       if (bp === undefined) return {};
       const dir =
-        typeof bp.options['blog_dir'] === 'string' ? (bp.options['blog_dir'] as string) : 'blog';
+        typeof bp.options.blog_dir === 'string' ? (bp.options.blog_dir as string) : 'blog';
       return { blogDir: dir };
     })(),
     snippetDedentSubsections:
-      snippetExtensionOptions(config.value.markdownExtensions)['dedent_subsections'] === true,
+      snippetExtensionOptions(config.value.markdownExtensions).dedent_subsections === true,
     ...(resolvedSnippetBasePaths === undefined
       ? {}
       : { snippetBasePaths: resolvedSnippetBasePaths }),
@@ -304,39 +304,35 @@ export async function convertSiteFromDisk(
       fs,
       docsDir,
     });
-  const {
-    astroConfigSource,
-    packageJsonSource,
-    migrationNotesSource,
-    extendedFrontmatterFields,
-  } = assembleConfigOutputs({
-    siteName: config.value.siteName,
-    siteDescription: config.value.siteDescription,
-    siteUrl: config.value.siteUrl,
-    useDirectoryUrls: config.value.useDirectoryUrls,
-    sidebar: sidebarWithPages,
-    detectedFeatures: allFeatures,
-    redirects,
-    enableLinksValidator: input.linksValidator === true,
-    extraAssets,
-    themeFonts,
-    i18n,
-    social,
-    editLinkBaseUrl,
-    tableOfContents,
-    logoSrc,
-    faviconRaw,
-    logoReplacesTitle: input.logoReplacesTitle === true,
-    expressiveCodeConfig,
-    analytics,
-    mikeVersions: input.mikeVersions,
-    blogOptions,
-    tagsOptions,
-    packageName: input.packageName,
-    files: siteResult.value.files,
-    allDiagnostics,
-    extras: config.value.extras,
-  });
+  const { astroConfigSource, packageJsonSource, migrationNotesSource, extendedFrontmatterFields } =
+    assembleConfigOutputs({
+      siteName: config.value.siteName,
+      siteDescription: config.value.siteDescription,
+      siteUrl: config.value.siteUrl,
+      useDirectoryUrls: config.value.useDirectoryUrls,
+      sidebar: sidebarWithPages,
+      detectedFeatures: allFeatures,
+      redirects,
+      enableLinksValidator: input.linksValidator === true,
+      extraAssets,
+      themeFonts,
+      i18n,
+      social,
+      editLinkBaseUrl,
+      tableOfContents,
+      logoSrc,
+      faviconRaw,
+      logoReplacesTitle: input.logoReplacesTitle === true,
+      expressiveCodeConfig,
+      analytics,
+      mikeVersions: input.mikeVersions,
+      blogOptions,
+      tagsOptions,
+      packageName: input.packageName,
+      files: siteResult.value.files,
+      allDiagnostics,
+      extras: config.value.extras,
+    });
 
   const { stylesheetSource, rssEndpointSource, ogEndpointSource, tagsYmlSource, preserveSlugs } =
     buildOutputSources({
@@ -395,7 +391,6 @@ export async function convertSiteFromDisk(
     migrationNotesSource,
   });
 }
-
 
 function snippetExtensionOptions(
   exts: ReadonlyArray<{
@@ -491,4 +486,3 @@ async function writeOne(target: string, content: string): Promise<Result<true, s
   // the full new content, never half-written.
   return atomicWriteText(target, content);
 }
-

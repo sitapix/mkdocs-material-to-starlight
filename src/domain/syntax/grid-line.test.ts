@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parseGridOpenLine, isGridCloseLine } from './grid-line.js';
+import { isGridCloseLine, parseGridOpenLine } from './grid-line.js';
 
 describe('parseGridOpenLine', () => {
   it('returns null for non-grid lines', () => {

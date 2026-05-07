@@ -19,38 +19,38 @@
  * bulk-scan phase read source files via the FileSystem port.
  */
 
+import type { MkdocsConfig } from '../../domain/config/mkdocs-config.js';
 import { createDiagnostic, type Diagnostic } from '../../domain/diagnostics/diagnostic.js';
 import type { FileSystem } from '../../domain/ports/file-system.js';
-import type { MkdocsConfig } from '../../domain/config/mkdocs-config.js';
 import { mapAnalyticsToHeadEntries } from '../../domain/starlight/analytics-mapping.js';
 import {
   mapMaterialPaletteToStarlight,
   type StarlightPalette,
 } from '../../domain/starlight/palette-mapping.js';
-import { detectExtraWarnings } from './extra-warnings.js';
-import { extractExtraAssets } from './extra-assets.js';
-import { extractAlternateLocales } from './extra-alternate.js';
+import type { TaggedDiagnostic } from '../convert-site/convert.js';
+import { buildDeferredWizardDiagnostics } from '../convert-site/wizard-decision-diagnostics.js';
+import { type DirectoryReaderLike, runBulkScans } from '../scan-occurrences/run-bulk-scans.js';
+import { diagnoseAnalytics } from './diagnose-analytics.js';
+import { diagnoseExpressiveCode } from './diagnose-expressive-code.js';
+import { diagnoseHooks, extractHookPaths } from './diagnose-hooks.js';
+import { diagnosePalette } from './diagnose-palette.js';
+import { diagnosePlugins } from './diagnose-plugins.js';
+import { diagnoseThemeFeatures } from './diagnose-theme-features.js';
+import { diagnoseThemeFonts } from './diagnose-theme-fonts.js';
+import { diagnoseThemeLanguage } from './diagnose-theme-language.js';
+import { deriveEditLinkBaseUrl } from './edit-link.js';
 import { extractExpressiveCodeConfig } from './expressive-code-config.js';
+import { extractAlternateLocales } from './extra-alternate.js';
+import { extractExtraAssets } from './extra-assets.js';
+import { detectExtraWarnings } from './extra-warnings.js';
 import { extractI18nConfig, type I18nConfig } from './i18n-config.js';
+import { detectInsidersFeatures } from './insiders-features.js';
 import { extractRedirects } from './redirects.js';
 import { extractSocial } from './social.js';
+import { detectLongtailFeatures } from './theme-features-longtail.js';
 import { extractThemeFonts } from './theme-fonts.js';
 import { extractThemeLanguage } from './theme-language.js';
 import { extractTocConfig } from './toc-config.js';
-import { detectInsidersFeatures } from './insiders-features.js';
-import { detectLongtailFeatures } from './theme-features-longtail.js';
-import { deriveEditLinkBaseUrl } from './edit-link.js';
-import { diagnosePlugins } from './diagnose-plugins.js';
-import { diagnoseHooks, extractHookPaths } from './diagnose-hooks.js';
-import { diagnosePalette } from './diagnose-palette.js';
-import { diagnoseThemeFeatures } from './diagnose-theme-features.js';
-import { diagnoseExpressiveCode } from './diagnose-expressive-code.js';
-import { diagnoseThemeLanguage } from './diagnose-theme-language.js';
-import { diagnoseAnalytics } from './diagnose-analytics.js';
-import { diagnoseThemeFonts } from './diagnose-theme-fonts.js';
-import { runBulkScans, type DirectoryReaderLike } from '../scan-occurrences/run-bulk-scans.js';
-import { buildDeferredWizardDiagnostics } from '../convert-site/wizard-decision-diagnostics.js';
-import type { TaggedDiagnostic } from '../convert-site/convert.js';
 
 const SOURCE = 'mkdocs-material-to-starlight';
 
@@ -118,8 +118,7 @@ export async function runConfigAnalysis(
   const analytics = mapAnalyticsToHeadEntries(config.extras);
 
   const i18nFromPlugin = extractI18nConfig(config.plugins);
-  const i18nFromAlternate =
-    i18nFromPlugin === null ? extractAlternateLocales(config.extras) : null;
+  const i18nFromAlternate = i18nFromPlugin === null ? extractAlternateLocales(config.extras) : null;
   const themeLanguage =
     i18nFromPlugin === null && i18nFromAlternate === null
       ? extractThemeLanguage(config.theme?.options ?? {})

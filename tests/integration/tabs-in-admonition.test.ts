@@ -14,10 +14,10 @@
  * Reproduces the squidfunk/mkdocs-material `creating-your-site.md` artifact.
  */
 
-import { describe, expect, it } from 'vitest';
-import { mkdtempSync, mkdirSync, rmSync, writeFileSync, readFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { describe, expect, it } from 'vitest';
 import { convertSiteFromDisk } from '../../src/interface/api/convert-site.js';
 
 describe('tabs inside admonition (mkdocs-material regression)', () => {
@@ -26,10 +26,7 @@ describe('tabs inside admonition (mkdocs-material regression)', () => {
     const outputDir = mkdtempSync(join(tmpdir(), 'mts-tab-admon-out-'));
     try {
       mkdirSync(join(projectDir, 'docs'), { recursive: true });
-      writeFileSync(
-        join(projectDir, 'mkdocs.yml'),
-        'site_name: Test\ndocs_dir: docs\n',
-      );
+      writeFileSync(join(projectDir, 'mkdocs.yml'), 'site_name: Test\ndocs_dir: docs\n');
       writeFileSync(
         join(projectDir, 'docs', 'index.md'),
         [
@@ -52,10 +49,7 @@ describe('tabs inside admonition (mkdocs-material regression)', () => {
         throw new Error(`Conversion failed: ${JSON.stringify(result.error)}`);
       }
 
-      const indexOut = readFileSync(
-        join(outputDir, 'src', 'content', 'docs', 'index.mdx'),
-        'utf8',
-      );
+      const indexOut = readFileSync(join(outputDir, 'src', 'content', 'docs', 'index.mdx'), 'utf8');
 
       // The output must NOT contain escaped directive markers — these would
       // render as visible garbage in the Starlight page.

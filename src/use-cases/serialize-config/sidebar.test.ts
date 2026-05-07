@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { serializeSidebar } from './sidebar.js';
 import type { SidebarEntry } from '../../domain/starlight/sidebar.js';
+import { serializeSidebar } from './sidebar.js';
 
 describe('serializeSidebar', () => {
   it('serializes an empty list to []', () => {
@@ -13,12 +13,8 @@ describe('serializeSidebar', () => {
   });
 
   it('serializes a slug entry with a label as an object', () => {
-    const entries: ReadonlyArray<SidebarEntry> = [
-      { kind: 'slug', slug: 'api/auth', label: 'API' },
-    ];
-    expect(serializeSidebar(entries)).toBe(
-      `[\n  { slug: 'api/auth', label: 'API' },\n]`,
-    );
+    const entries: ReadonlyArray<SidebarEntry> = [{ kind: 'slug', slug: 'api/auth', label: 'API' }];
+    expect(serializeSidebar(entries)).toBe(`[\n  { slug: 'api/auth', label: 'API' },\n]`);
   });
 
   it('serializes an empty-slug entry (root index) as a link to "/"', () => {
@@ -30,9 +26,7 @@ describe('serializeSidebar', () => {
     const withLabel: ReadonlyArray<SidebarEntry> = [
       { kind: 'slug', slug: '', label: 'Introduction' },
     ];
-    expect(serializeSidebar(withLabel)).toBe(
-      `[\n  { label: 'Introduction', link: '/' },\n]`,
-    );
+    expect(serializeSidebar(withLabel)).toBe(`[\n  { label: 'Introduction', link: '/' },\n]`);
   });
 
   it('serializes an empty-slug entry without a label using the "Overview" default label', () => {
@@ -42,9 +36,7 @@ describe('serializeSidebar', () => {
     // "sidebar.0.items.0: Did not match union" — real-world: PowerTools
     // `mkdocs.yml` declares `Homepage: [index.md, …]` with no inline label.
     const withoutLabel: ReadonlyArray<SidebarEntry> = [{ kind: 'slug', slug: '' }];
-    expect(serializeSidebar(withoutLabel)).toBe(
-      `[\n  { label: 'Overview', link: '/' },\n]`,
-    );
+    expect(serializeSidebar(withoutLabel)).toBe(`[\n  { label: 'Overview', link: '/' },\n]`);
   });
 
   it('serializes a link entry as { label, link }', () => {

@@ -29,8 +29,5 @@ export type OutputValidationResult =
   | { readonly kind: 'driver-missing'; readonly hint: string };
 
 export interface OutputValidator {
-  validate(
-    text: string,
-    extension: 'md' | 'mdx',
-  ): Promise<OutputValidationResult>;
+  validate(text: string, extension: 'md' | 'mdx'): Promise<OutputValidationResult>;
 }

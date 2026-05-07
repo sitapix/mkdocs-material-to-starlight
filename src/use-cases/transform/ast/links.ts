@@ -16,12 +16,12 @@
  * `diagnostics` (sink; never throws).
  */
 
-import { visit, SKIP } from 'unist-util-visit';
-import type { Plugin } from 'unified';
 import type { Image, Link, Root } from 'mdast';
-import { rewriteInternalLink } from '../rewrite-links.js';
-import type { SlugMap } from '../../../domain/starlight/slug-map.js';
+import type { Plugin } from 'unified';
+import { SKIP, visit } from 'unist-util-visit';
 import { createDiagnostic, type Diagnostic } from '../../../domain/diagnostics/diagnostic.js';
+import type { SlugMap } from '../../../domain/starlight/slug-map.js';
+import { rewriteInternalLink } from '../rewrite-links.js';
 
 export interface LinkTransformOptions {
   readonly fromSourcePath: string;
@@ -60,11 +60,7 @@ export const transformLinkNodes: Plugin<[LinkTransformOptions], Root> = (options
         // surfaced the lost target in MIGRATION_NOTES.md.
         if (parent !== undefined && index !== undefined) {
           if (linkLike.type === 'link') {
-            (parent.children as unknown[]).splice(
-              index,
-              1,
-              ...(linkLike.children ?? []),
-            );
+            (parent.children as unknown[]).splice(index, 1, ...(linkLike.children ?? []));
             return [SKIP, index];
           }
           if (linkLike.type === 'image') {

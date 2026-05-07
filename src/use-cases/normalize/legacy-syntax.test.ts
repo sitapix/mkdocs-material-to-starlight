@@ -54,18 +54,13 @@ describe('normalizeLegacySyntax', () => {
   describe('Asciidoc cross-reference <<page#anchor, label>>', () => {
     it('rewrites <<anchor, label>> to a same-page link', () => {
       const src = 'See <<addBatch, stores in memory>> for more.\n';
-      expect(normalizeLegacySyntax(src)).toBe(
-        'See [stores in memory](#addBatch) for more.\n',
-      );
+      expect(normalizeLegacySyntax(src)).toBe('See [stores in memory](#addBatch) for more.\n');
     });
 
     it('rewrites <<page.md#anchor, label>> to a cross-page link', () => {
-      const src =
-        'See <<physical/Foo.md#processBatch, process the batch>> next.\n';
+      const src = 'See <<physical/Foo.md#processBatch, process the batch>> next.\n';
       const out = normalizeLegacySyntax(src);
-      expect(out).toBe(
-        'See [process the batch](physical/Foo.md#processBatch) next.\n',
-      );
+      expect(out).toBe('See [process the batch](physical/Foo.md#processBatch) next.\n');
     });
 
     it('rewrites bare <<anchor>> (no label) to [anchor](#anchor)', () => {

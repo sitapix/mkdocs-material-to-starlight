@@ -27,8 +27,6 @@ describe('serializeOgEndpoint', () => {
   });
 
   it('idempotent: serializing twice with the same input yields identical strings', () => {
-    expect(serializeOgEndpoint({ siteName: 'X' })).toBe(
-      serializeOgEndpoint({ siteName: 'X' }),
-    );
+    expect(serializeOgEndpoint({ siteName: 'X' })).toBe(serializeOgEndpoint({ siteName: 'X' }));
   });
 });

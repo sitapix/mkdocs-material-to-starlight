@@ -6,7 +6,7 @@
  * and order plugins by stage without ever running them.
  */
 
-import { ok, err, type Result } from '../result.js';
+import { err, ok, type Result } from '../result.js';
 
 export const PIPELINE_STAGES = [
   'normalize',

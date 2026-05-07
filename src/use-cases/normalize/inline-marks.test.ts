@@ -13,9 +13,7 @@ describe('normalizeInlineMarks', () => {
     });
 
     it('handles multiple occurrences in a paragraph', () => {
-      expect(normalizeInlineMarks('==a== and ==b==')).toBe(
-        '<mark>a</mark> and <mark>b</mark>',
-      );
+      expect(normalizeInlineMarks('==a== and ==b==')).toBe('<mark>a</mark> and <mark>b</mark>');
     });
 
     it('rejects unbalanced or empty mark spans', () => {
@@ -62,9 +60,7 @@ describe('normalizeInlineMarks', () => {
 
   describe('keyboard keys (++ctrl+alt+del++)', () => {
     it('rewrites a single key', () => {
-      expect(normalizeInlineMarks('Press ++enter++ now.')).toBe(
-        'Press <kbd>Enter</kbd> now.',
-      );
+      expect(normalizeInlineMarks('Press ++enter++ now.')).toBe('Press <kbd>Enter</kbd> now.');
     });
 
     it('rewrites a key combination joining with the literal + character', () => {

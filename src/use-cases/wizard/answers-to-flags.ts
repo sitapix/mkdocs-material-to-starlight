@@ -75,25 +75,19 @@ export function answersToFlags(a: WizardAnswers): ReadonlyArray<string> {
     out.push('--snippet-dedent-subsections');
   if (a.linksValidator !== DEFAULTS.linksValidator)
     out.push(a.linksValidator ? '--links-validator' : '--no-links-validator');
-  if (a.expressiveCodeTheme !== null)
-    out.push(`--expressive-code-theme=${a.expressiveCodeTheme}`);
+  if (a.expressiveCodeTheme !== null) out.push(`--expressive-code-theme=${a.expressiveCodeTheme}`);
   if (a.cards !== DEFAULTS.cards) out.push(`--cards=${a.cards}`);
   if (a.mdxMode !== DEFAULTS.mdxMode) out.push(`--mdx-mode=${a.mdxMode}`);
   if (a.logoReplacesTitle) out.push('--logo-replaces-title');
-  if (a.admonitionMapPath !== null)
-    out.push(`--admonition-map=${a.admonitionMapPath}`);
+  if (a.admonitionMapPath !== null) out.push(`--admonition-map=${a.admonitionMapPath}`);
   if (a.keepExplicitHeadingIds) out.push('--keep-explicit-heading-ids');
-  if (a.smartSymbols !== DEFAULTS.smartSymbols && !a.smartSymbols)
-    out.push('--no-smart-symbols');
+  if (a.smartSymbols !== DEFAULTS.smartSymbols && !a.smartSymbols) out.push('--no-smart-symbols');
   if (a.emojiShortcodes !== DEFAULTS.emojiShortcodes && !a.emojiShortcodes)
     out.push('--no-emoji-shortcodes');
-  if (a.inlineMarks !== DEFAULTS.inlineMarks && !a.inlineMarks)
-    out.push('--no-inline-marks');
-  if (a.autoAppend !== DEFAULTS.autoAppend && !a.autoAppend)
-    out.push('--no-auto-append');
+  if (a.inlineMarks !== DEFAULTS.inlineMarks && !a.inlineMarks) out.push('--no-inline-marks');
+  if (a.autoAppend !== DEFAULTS.autoAppend && !a.autoAppend) out.push('--no-auto-append');
   for (const r of a.suppressRules) out.push(`--suppress=${r}`);
-  if (a.configFormat !== DEFAULTS.configFormat)
-    out.push(`--config-format=${a.configFormat}`);
+  if (a.configFormat !== DEFAULTS.configFormat) out.push(`--config-format=${a.configFormat}`);
   if (a.packageName !== null) out.push(`--package-name=${a.packageName}`);
 
   return out;

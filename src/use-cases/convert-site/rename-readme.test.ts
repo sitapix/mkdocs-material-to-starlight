@@ -117,10 +117,7 @@ describe('rewriteReadmePaths', () => {
 
     it('keeps X/index.md when there is no sibling X.md', () => {
       // No conflict — index.md is the section landing on its own.
-      const out = rewriteReadmePaths([
-        'core/metrics/index.md',
-        'core/metrics/datadog.md',
-      ]);
+      const out = rewriteReadmePaths(['core/metrics/index.md', 'core/metrics/datadog.md']);
       expect(out.paths).toContain('core/metrics/index.md');
     });
 
@@ -133,10 +130,7 @@ describe('rewriteReadmePaths', () => {
     it('does not confuse partially-overlapping prefixes', () => {
       // `core/metrics-extra.md` is NOT a sibling of `core/metrics/...`.
       // Only the EXACT prefix match should trigger the conflict drop.
-      const out = rewriteReadmePaths([
-        'core/metrics-extra.md',
-        'core/metrics/index.md',
-      ]);
+      const out = rewriteReadmePaths(['core/metrics-extra.md', 'core/metrics/index.md']);
       expect(out.paths).toContain('core/metrics-extra.md');
       expect(out.paths).toContain('core/metrics/index.md');
     });
@@ -147,11 +141,7 @@ describe('rewriteReadmePaths', () => {
       // derive slug `dataset` and `buildSlugMap` errors. The case-folded
       // sibling check must catch this even when the case doesn't match
       // exactly.
-      const out = rewriteReadmePaths([
-        'Dataset.md',
-        'dataset/index.md',
-        'dataset/encoder.md',
-      ]);
+      const out = rewriteReadmePaths(['Dataset.md', 'dataset/index.md', 'dataset/encoder.md']);
       expect(out.paths).toContain('Dataset.md');
       expect(out.paths).not.toContain('dataset/index.md');
       expect(out.dropped).toContain('dataset/index.md');

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { convertFile } from '../../src/use-cases/convert-file/convert.js';
 import { buildSlugMap } from '../../src/domain/starlight/slug-map.js';
+import { convertFile } from '../../src/use-cases/convert-file/convert.js';
 
 /**
  * Regression test for the colon-count nesting bug.
@@ -23,7 +23,12 @@ function map(paths: ReadonlyArray<string>) {
   return result.value;
 }
 
-function structuralCheck(text: string, openTag: string, closeMarker: string, items: ReadonlyArray<string>): void {
+function structuralCheck(
+  text: string,
+  openTag: string,
+  closeMarker: string,
+  items: ReadonlyArray<string>,
+): void {
   const openIdx = text.indexOf(openTag);
   expect(openIdx).toBeGreaterThanOrEqual(0);
   const closeIdx = text.lastIndexOf(closeMarker);

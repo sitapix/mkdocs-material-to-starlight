@@ -24,12 +24,12 @@
  * Idempotent (output has no `<div class="grid"`) and fence-shielded.
  */
 
-import {
-  parseGridOpenLine,
-  isGridCloseLine,
-  type GridOpening,
-} from '../../domain/syntax/grid-line.js';
 import { isFenceLine } from '../../domain/syntax/fence.js';
+import {
+  type GridOpening,
+  isGridCloseLine,
+  parseGridOpenLine,
+} from '../../domain/syntax/grid-line.js';
 
 /**
  * Matches a bare Markdown link as the sole non-blank content of a card body.
@@ -39,7 +39,7 @@ import { isFenceLine } from '../../domain/syntax/fence.js';
  * This avoids promoting cards whose link text would render as literal markdown
  * escapes inside an HTML attribute (e.g. `__Validators__` → bad).
  */
-const BARE_LINK_RE = /^\[([^\]_*:!\[]+)\]\(([^)]+)\)\s*$/;
+const BARE_LINK_RE = /^\[([^\]_*:![]+)\]\(([^)]+)\)\s*$/;
 
 /**
  * Material's icon shortcode (e.g. `:material-clock:`, `:fontawesome-solid-rocket:`,
@@ -124,10 +124,7 @@ interface GridBody {
   readonly nextIndex: number;
 }
 
-function readGridBody(
-  lines: ReadonlyArray<string>,
-  startIndex: number,
-): GridBody | null {
+function readGridBody(lines: ReadonlyArray<string>, startIndex: number): GridBody | null {
   const body: string[] = [];
   for (let i = startIndex; i < lines.length; i += 1) {
     const line = lines[i] ?? '';
@@ -147,11 +144,7 @@ function renderGrid(
   if (opening.kind === 'cards') {
     return renderCardGrid(indent, bodyLines);
   }
-  return [
-    `${indent}::::grid`,
-    ...bodyLines,
-    `${indent}::::`,
-  ];
+  return [`${indent}::::grid`, ...bodyLines, `${indent}::::`];
 }
 
 function renderCardGrid(
@@ -209,9 +202,10 @@ function tryRenderLinkCard(
   const { title, href, restStartIndex } = linkInfo;
   const description = extractPlainDescription(dedented, restStartIndex);
   if (description === 'reject') return null;
-  const attrs = description === null
-    ? `title="${title}" href="${href}"`
-    : `title="${title}" href="${href}" description="${escapeAttr(description)}"`;
+  const attrs =
+    description === null
+      ? `title="${title}" href="${href}"`
+      : `title="${title}" href="${href}" description="${escapeAttr(description)}"`;
   return [`${indent}<LinkCard ${attrs} />`];
 }
 
@@ -228,9 +222,7 @@ interface LeadingLink {
  * Markdown link. Returns the captured title/href and the index of the line
  * *after* the link line, so the caller can scan for a description paragraph.
  */
-function matchLeadingBareLink(
-  dedented: ReadonlyArray<string>,
-): LeadingLink | null {
+function matchLeadingBareLink(dedented: ReadonlyArray<string>): LeadingLink | null {
   for (let i = 0; i < dedented.length; i += 1) {
     const line = (dedented[i] ?? '').trim();
     if (line.length === 0) continue;
@@ -326,9 +318,7 @@ function escapeAttr(text: string): string {
  * Nested list items (indented deeper) are retained as body content of the
  * enclosing card.
  */
-function splitListItems(
-  bodyLines: ReadonlyArray<string>,
-): ReadonlyArray<ReadonlyArray<string>> {
+function splitListItems(bodyLines: ReadonlyArray<string>): ReadonlyArray<ReadonlyArray<string>> {
   const items: string[][] = [];
   let current: string[] | null = null;
   let topIndent: number | null = null;
@@ -395,16 +385,15 @@ function dedentLines(lines: ReadonlyArray<string>): ReadonlyArray<string> {
 
   // Step 1: title-strip. Flushes the item to column 0 when nested inside
   // an outer container.
-  const afterTitle = titleIndent === 0
-    ? lines.slice()
-    : lines.map((l) => (l.trim().length === 0 ? '' : l.slice(titleIndent)));
+  const afterTitle =
+    titleIndent === 0
+      ? lines.slice()
+      : lines.map((l) => (l.trim().length === 0 ? '' : l.slice(titleIndent)));
 
   // Step 2: body-shift. Body lines = anything deeper than the title. If the
   // body lines all share an indent ≥ 1, slide them down by that amount so
   // they collapse to column 0 (the title's new column).
-  const bodyDepths = indents
-    .filter((n) => n > titleIndent)
-    .map((n) => n - titleIndent);
+  const bodyDepths = indents.filter((n) => n > titleIndent).map((n) => n - titleIndent);
   if (bodyDepths.length === 0) return afterTitle;
   const bodyShift = Math.min(...bodyDepths);
   if (bodyShift === 0) return afterTitle;

@@ -13,24 +13,22 @@
  * a precise tool, and silent resampling would mask real differences.
  */
 
-import { ok, err, type Result } from '../../domain/result.js';
 import type {
   DiffOptions,
   DiffStats,
   ImageDiffer,
   ImageDifferError,
 } from '../../domain/ports/image-differ.js';
+import { err, ok, type Result } from '../../domain/result.js';
 
-interface PixelmatchFn {
-  (
-    img1: Uint8Array,
-    img2: Uint8Array,
-    output: Uint8Array | null,
-    width: number,
-    height: number,
-    options?: { threshold?: number },
-  ): number;
-}
+type PixelmatchFn = (
+  img1: Uint8Array,
+  img2: Uint8Array,
+  output: Uint8Array | null,
+  width: number,
+  height: number,
+  options?: { threshold?: number },
+) => number;
 
 interface PngjsModule {
   readonly PNG: {
@@ -66,8 +64,8 @@ export function createPixelmatchDiffer(): ImageDiffer {
         return err({ code: 'driver-missing', message: INSTALL_HINT });
       }
 
-      let baselineImage;
-      let convertedImage;
+      let baselineImage: ReturnType<typeof png.sync.read>;
+      let convertedImage: ReturnType<typeof png.sync.read>;
       try {
         baselineImage = png.sync.read(baseline);
         convertedImage = png.sync.read(converted);

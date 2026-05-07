@@ -24,15 +24,11 @@ describe('normalizeSmartSymbols', () => {
   });
 
   it('rewrites arrows --> <-- <-->', () => {
-    expect(normalizeSmartSymbols('Flow A --> B <-- C <--> D.\n')).toBe(
-      'Flow A → B ← C ↔ D.\n',
-    );
+    expect(normalizeSmartSymbols('Flow A --> B <-- C <--> D.\n')).toBe('Flow A → B ← C ↔ D.\n');
   });
 
   it('rewrites care-of c/o and not-equal =/=', () => {
-    expect(normalizeSmartSymbols('Send c/o Alice. x =/= y.\n')).toBe(
-      'Send ℅ Alice. x ≠ y.\n',
-    );
+    expect(normalizeSmartSymbols('Send c/o Alice. x =/= y.\n')).toBe('Send ℅ Alice. x ≠ y.\n');
   });
 
   it('rewrites common fractions 1/2 1/4 3/4', () => {

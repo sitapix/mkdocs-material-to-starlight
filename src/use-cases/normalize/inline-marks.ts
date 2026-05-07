@@ -22,8 +22,8 @@ const MARK_RE = /==(?=\S)([^=\s][^=]*[^=\s]|[^=\s])==/g;
 const SUB_RE = /~(?=\S)([^~\s][^~]*[^~\s]|[^~\s])~/g;
 // Double-caret `pymdownx.caret` insert form. Must run before SUP_RE so the
 // outer `^^` wins. Body cannot contain `^^` (no nesting).
-const INS_RE = /\^\^(?=\S)([^\s][^\^]*[^\s]|[^\s\^])\^\^/g;
-const SUP_RE = /\^(?=\S)([^\^\s][^\^]*[^\^\s]|[^\^\s])\^/g;
+const INS_RE = /\^\^(?=\S)([^\s][^^]*[^\s]|[^\s^])\^\^/g;
+const SUP_RE = /\^(?=\S)([^^\s][^^]*[^^\s]|[^^\s])\^/g;
 const KEYS_RE = /\+\+([A-Za-z0-9-]+(?:\+[A-Za-z0-9-]+)*)\+\+/g;
 
 export function normalizeInlineMarks(source: string): string {

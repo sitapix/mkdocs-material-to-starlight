@@ -50,14 +50,63 @@ function rewriteSingleLine(source: string): string {
 }
 
 function rewriteOutsideBackticks(line: string): string {
-  // Walk the line, toggling inside/outside backtick state. Only rewrite in
-  // outside-state segments. This preserves `{{ var }}` already inside an
-  // inline-code span (the user's own escape).
+  // Walk the line, toggling inside/outside backtick state and tracking
+  // markdown-link URL context. Only rewrite in outside-state segments.
+  //
+  // Backtick-wrap form is great for inline prose (renders as monospace,
+  // grep-able) but is *toxic* inside a link target `[text](url)` — a
+  // backtick inside the URL gets parsed as the start of an inline-code
+  // span by remark, which then splits the link and produces a malformed
+  // structure that cascades into MDX acorn errors. Real-world (cv4x/
+  // svstudio-manual): `[git: {{ short }}](https://x/commit/{{ short }})`
+  // turned into `[text `{{ short }}`]( ... `{{ ... )` — broken.
+  //
+  // Inside a URL, fall back to entity escapes (`&#123;&#123;` etc.):
+  // satisfies MDX without inserting characters the link parser cares about.
   let out = '';
   let i = 0;
   let inCode = false;
+  let inLinkUrl = false;
+  let linkUrlParenDepth = 0;
   while (i < line.length) {
     const ch = line[i];
+    if (!inCode && !inLinkUrl && ch === ']' && line[i + 1] === '(') {
+      // Enter link-URL context. The transition is `](` — we emit both
+      // characters and start tracking paren depth from 1.
+      out += '](';
+      inLinkUrl = true;
+      linkUrlParenDepth = 1;
+      i += 2;
+      continue;
+    }
+    if (inLinkUrl) {
+      // Track nested parens inside URLs (Wikipedia-style `(foo)` segments).
+      if (ch === '(') {
+        linkUrlParenDepth += 1;
+        out += ch;
+        i += 1;
+        continue;
+      }
+      if (ch === ')') {
+        linkUrlParenDepth -= 1;
+        out += ch;
+        i += 1;
+        if (linkUrlParenDepth === 0) inLinkUrl = false;
+        continue;
+      }
+      // Inside the URL: entity-escape Jinja braces instead of backtick-
+      // wrapping.
+      const slice = line.slice(i);
+      const jinja = matchJinjaExpression(slice);
+      if (jinja !== null) {
+        out += entityEscapeJinja(jinja);
+        i += jinja.length;
+        continue;
+      }
+      out += ch;
+      i += 1;
+      continue;
+    }
     if (ch === '`') {
       out += ch;
       inCode = !inCode;
@@ -69,10 +118,6 @@ function rewriteOutsideBackticks(line: string): string {
       i += 1;
       continue;
     }
-    // Try to match a Jinja expression starting at i:
-    //   {{ ... }}  variable
-    //   {% ... %}  block (with optional whitespace-control `-`)
-    //   {# ... #}  comment
     const slice = line.slice(i);
     const jinja = matchJinjaExpression(slice);
     if (jinja !== null) {
@@ -84,6 +129,22 @@ function rewriteOutsideBackticks(line: string): string {
     i += 1;
   }
   return out;
+}
+
+/** Replace the leading and trailing brace pair of a Jinja expression with
+ *  HTML entities, leaving the body untouched. Used inside markdown-link
+ *  URLs where backticks would split the link target. */
+function entityEscapeJinja(jinja: string): string {
+  if (jinja.startsWith('{{') && jinja.endsWith('}}')) {
+    return `&#123;&#123;${jinja.slice(2, -2)}&#125;&#125;`;
+  }
+  if (jinja.startsWith('{%') && jinja.endsWith('%}')) {
+    return `&#123;%${jinja.slice(2, -2)}%&#125;`;
+  }
+  if (jinja.startsWith('{#') && jinja.endsWith('#}')) {
+    return `&#123;#${jinja.slice(2, -2)}#&#125;`;
+  }
+  return jinja;
 }
 
 function matchJinjaExpression(slice: string): string | null {

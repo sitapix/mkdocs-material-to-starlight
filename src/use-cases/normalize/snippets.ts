@@ -17,10 +17,7 @@
  * Pure and fence-shielded.
  */
 
-import {
-  parseSnippetLine,
-  type SnippetReference,
-} from '../../domain/syntax/snippet-line.js';
+import { parseSnippetLine, type SnippetReference } from '../../domain/syntax/snippet-line.js';
 
 export type SnippetDetection = InlineDetection | BlockDetection | MalformedDetection;
 

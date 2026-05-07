@@ -1,16 +1,16 @@
-import { describe, expect, it, beforeEach, afterEach } from 'vitest';
 import {
-  mkdtempSync,
-  mkdirSync,
-  rmSync,
-  writeFileSync,
-  readFileSync,
   existsSync,
+  mkdirSync,
+  mkdtempSync,
   readdirSync,
+  readFileSync,
+  rmSync,
   statSync,
+  writeFileSync,
 } from 'node:fs';
-import { join, relative } from 'node:path';
 import { tmpdir } from 'node:os';
+import { join, relative } from 'node:path';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { convertSiteFromDisk } from '../../src/interface/api/convert-site.js';
 
 /**
@@ -57,10 +57,7 @@ describe('full feature coverage end-to-end', () => {
     expect(result.ok).toBe(true);
     if (!result.ok) throw new Error(`${result.error.code}: ${result.error.message}`);
 
-    const indexOut = readFileSync(
-      join(outputDir, 'src', 'content', 'docs', 'index.mdx'),
-      'utf8',
-    );
+    const indexOut = readFileSync(join(outputDir, 'src', 'content', 'docs', 'index.mdx'), 'utf8');
 
     // pymdownx.blocks.* — /// note → :::note (admonition)
     expect(indexOut).toContain(':::note[Modern Block]');
@@ -75,8 +72,12 @@ describe('full feature coverage end-to-end', () => {
     expect(indexOut).toContain('<TabItem label="Ruby">');
 
     // Material buttons → <LinkButton variant="primary|secondary"> (.mdx)
-    expect(indexOut).toContain('<LinkButton href="#subscribe" variant="primary">Subscribe</LinkButton>');
-    expect(indexOut).toContain('<LinkButton href="#learn" variant="secondary">Learn more</LinkButton>');
+    expect(indexOut).toContain(
+      '<LinkButton href="#subscribe" variant="primary">Subscribe</LinkButton>',
+    );
+    expect(indexOut).toContain(
+      '<LinkButton href="#learn" variant="secondary">Learn more</LinkButton>',
+    );
     expect(indexOut).not.toContain('.md-button');
 
     // Definition lists → <dl>/<dt>/<dd>. The term `API` is wrapped by the
@@ -109,9 +110,7 @@ describe('full feature coverage end-to-end', () => {
     expect(indexOut).toContain('graph LR');
 
     // Recommended-dep loop fired for source-driven features
-    const packageJson = JSON.parse(
-      readFileSync(join(outputDir, 'package.json'), 'utf8'),
-    );
+    const packageJson = JSON.parse(readFileSync(join(outputDir, 'package.json'), 'utf8'));
     expect(packageJson.dependencies).toHaveProperty('remark-math');
     expect(packageJson.dependencies).toHaveProperty('rehype-katex');
     expect(packageJson.dependencies).toHaveProperty('astro-mermaid');
@@ -121,10 +120,7 @@ describe('full feature coverage end-to-end', () => {
     expect(packageJson.dependencies).toHaveProperty('starlight-versions');
 
     // astro.config.mjs imports and wires every detected plugin
-    const astroConfig = readFileSync(
-      join(outputDir, 'astro.config.mjs'),
-      'utf8',
-    );
+    const astroConfig = readFileSync(join(outputDir, 'astro.config.mjs'), 'utf8');
     expect(astroConfig).toContain(`import remarkMath from 'remark-math';`);
     expect(astroConfig).toContain(`import rehypeKatex from 'rehype-katex';`);
     expect(astroConfig).toContain(`import mermaid from 'astro-mermaid';`);

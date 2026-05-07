@@ -23,13 +23,11 @@ import type { MkdocsConfig } from '../../domain/config/mkdocs-config.js';
 const SNIPPETS_EXTENSION = 'pymdownx.snippets';
 const FALLBACK_BASE_PATH = 'docs';
 
-export function extractSnippetBasePaths(
-  config: MkdocsConfig,
-): ReadonlyArray<string> {
+export function extractSnippetBasePaths(config: MkdocsConfig): ReadonlyArray<string> {
   const ext = config.markdownExtensions.find((e) => e.name === SNIPPETS_EXTENSION);
   if (ext === undefined) return [];
 
-  const raw = ext.options['base_path'];
+  const raw = ext.options.base_path;
   if (raw === undefined || raw === null) return [FALLBACK_BASE_PATH];
 
   if (typeof raw === 'string') return [raw];

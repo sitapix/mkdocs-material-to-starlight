@@ -29,13 +29,13 @@
  * untouched because the test sees the leading `'`).
  */
 
-const NEEDS_QUOTING = /[:#&*!|>'"%@`{}\[\]]/;
+const NEEDS_QUOTING = /[:#&*!|>'"%@`{}[\]]/;
 const COERCED_SCALAR = new RegExp(
   '^(?:' +
     String.raw`\d{4}-\d{2}-\d{2}(?:[Tt ]\d{2}:\d{2}(?::\d{2})?(?:\.\d+)?(?:[Zz]|[+-]\d{2}:?\d{2})?)?` +
     String.raw`|[+-]?(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?` +
     '|true|false|yes|no|on|off|null|~|True|False|Yes|No|On|Off|Null|TRUE|FALSE|YES|NO|ON|OFF|NULL' +
-  ')$',
+    ')$',
 );
 
 /** Return the value as a YAML scalar that round-trips as a string. */

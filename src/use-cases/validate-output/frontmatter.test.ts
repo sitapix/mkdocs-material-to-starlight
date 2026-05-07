@@ -42,15 +42,9 @@ describe('validateFrontmatter', () => {
   });
 
   it('does not flag indented (nested) keys — only top-level', () => {
-    const source = [
-      '---',
-      'title: X',
-      'sidebar:',
-      '  label: Custom',
-      '  order: 1',
-      '---',
-      '',
-    ].join('\n');
+    const source = ['---', 'title: X', 'sidebar:', '  label: Custom', '  order: 1', '---', ''].join(
+      '\n',
+    );
     expect(validateFrontmatter(source)).toEqual([]);
   });
 
@@ -63,9 +57,7 @@ describe('validateFrontmatter', () => {
   it('flags a file that is missing the required `title` field', () => {
     const source = '---\ndescription: D\n---\n\nBody.\n';
     const diagnostics = validateFrontmatter(source);
-    expect(diagnostics.some((d) => d.ruleId === 'missing-required-title')).toBe(
-      true,
-    );
+    expect(diagnostics.some((d) => d.ruleId === 'missing-required-title')).toBe(true);
   });
 
   it('does not flag missing title when there is no frontmatter at all', () => {

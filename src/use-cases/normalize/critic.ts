@@ -69,8 +69,9 @@ export function normalizeCriticMarkup(source: string): string {
 
 function rewriteBlock(line: string): string {
   let out = line;
-  out = out.replace(SUBSTITUTION_RE, (_match, oldText: string, newText: string) =>
-    `<del>${oldText}</del><ins>${newText}</ins>`,
+  out = out.replace(
+    SUBSTITUTION_RE,
+    (_match, oldText: string, newText: string) => `<del>${oldText}</del><ins>${newText}</ins>`,
   );
   out = out.replace(INSERT_RE, (_match, body: string) => `<ins>${body}</ins>`);
   out = out.replace(DELETE_RE, (_match, body: string) => `<del>${body}</del>`);

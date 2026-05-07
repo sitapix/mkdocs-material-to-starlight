@@ -1,8 +1,8 @@
-import { describe, expect, it } from 'vitest';
-import { unified } from 'unified';
+import remarkDirective from 'remark-directive';
 import remarkParse from 'remark-parse';
 import remarkStringify from 'remark-stringify';
-import remarkDirective from 'remark-directive';
+import { unified } from 'unified';
+import { describe, expect, it } from 'vitest';
 import { transformGridDirectives } from './grid.js';
 
 function process(source: string): string {

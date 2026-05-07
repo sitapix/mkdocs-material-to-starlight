@@ -15,9 +15,9 @@
  * the file contains many tab groups, to keep MIGRATION_NOTES.md focused.
  */
 
-import { parseTabLine } from '../../domain/syntax/tab-line.js';
 import { createDiagnostic, type Diagnostic } from '../../domain/diagnostics/diagnostic.js';
 import { isFenceLine } from '../../domain/syntax/fence.js';
+import { parseTabLine } from '../../domain/syntax/tab-line.js';
 
 export function scanTabAnchors(source: string): ReadonlyArray<Diagnostic> {
   const lines = source.split('\n');

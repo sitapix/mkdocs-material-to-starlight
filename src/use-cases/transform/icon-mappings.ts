@@ -507,6 +507,4 @@ export const ICON_SET_PREFIXES = [
  * has a shortcode matching a Starlight icon NOT in this set, they can
  * extend the map via the converter's config.
  */
-export const STARLIGHT_ICON_NAMES: ReadonlySet<string> = new Set(
-  Object.values(CURATED_ICON_MAP),
-);
+export const STARLIGHT_ICON_NAMES: ReadonlySet<string> = new Set(Object.values(CURATED_ICON_MAP));

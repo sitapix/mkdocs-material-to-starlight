@@ -45,13 +45,13 @@ export function parseBlocksLine(line: string): BlocksLine {
   const openMatch = line.match(OPEN_PATTERN);
   if (openMatch !== null && openMatch.groups !== undefined) {
     const groups = openMatch.groups;
-    const rawTitle = groups['title'];
+    const rawTitle = groups.title;
     return {
       kind: 'open',
-      name: groups['name'] ?? '',
+      name: groups.name ?? '',
       title: rawTitle === undefined || rawTitle === '' ? null : rawTitle,
-      fenceLength: (groups['fence'] ?? '').length,
-      indent: (groups['indent'] ?? '').length,
+      fenceLength: (groups.fence ?? '').length,
+      indent: (groups.indent ?? '').length,
     };
   }
 
@@ -60,8 +60,8 @@ export function parseBlocksLine(line: string): BlocksLine {
     const groups = closeMatch.groups;
     return {
       kind: 'close',
-      fenceLength: (groups['fence'] ?? '').length,
-      indent: (groups['indent'] ?? '').length,
+      fenceLength: (groups.fence ?? '').length,
+      indent: (groups.indent ?? '').length,
     };
   }
 

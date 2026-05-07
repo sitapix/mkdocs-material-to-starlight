@@ -11,20 +11,14 @@
  */
 
 import type { MkdocsConfig } from '../../domain/config/mkdocs-config.js';
-import type {
-  DefaultAnswers,
-  PackageManager,
-} from '../../domain/wizard/answers.js';
+import type { DefaultAnswers, PackageManager } from '../../domain/wizard/answers.js';
 
 export interface DeriveDefaultsContext {
   readonly userAgent: string | undefined;
   readonly env: Readonly<Record<string, string | undefined>>;
 }
 
-export function deriveDefaults(
-  _config: MkdocsConfig,
-  ctx: DeriveDefaultsContext,
-): DefaultAnswers {
+export function deriveDefaults(_config: MkdocsConfig, ctx: DeriveDefaultsContext): DefaultAnswers {
   return {
     packageManager: guessPackageManager(ctx.userAgent),
     check: true,
@@ -55,9 +49,7 @@ export function deriveDefaults(
   };
 }
 
-export function guessPackageManager(
-  userAgent: string | undefined,
-): PackageManager {
+export function guessPackageManager(userAgent: string | undefined): PackageManager {
   if (userAgent === undefined) return 'npm';
   if (userAgent.startsWith('pnpm/')) return 'pnpm';
   if (userAgent.startsWith('yarn/')) return 'yarn';

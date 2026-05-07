@@ -96,11 +96,11 @@ const INSIDERS_THEME_FEATURES: ReadonlyMap<string, string> = new Map([
 const INSIDERS_PLUGINS: ReadonlyMap<string, string> = new Map([
   [
     'meta',
-    'Material Insiders plugin — folder-scoped frontmatter cascade via `.meta.yml`. The public converter cannot reproduce this; closest path is to inline the cascade values into each page\'s frontmatter or extend `docsSchema()` manually.',
+    "Material Insiders plugin — folder-scoped frontmatter cascade via `.meta.yml`. The public converter cannot reproduce this; closest path is to inline the cascade values into each page's frontmatter or extend `docsSchema()` manually.",
   ],
   [
     'optimize',
-    'Material Insiders plugin — image-asset optimization at build time. Astro\'s built-in `astro:assets` / sharp pipeline subsumes this on the Astro side.',
+    "Material Insiders plugin — image-asset optimization at build time. Astro's built-in `astro:assets` / sharp pipeline subsumes this on the Astro side.",
   ],
   [
     'privacy',
@@ -108,7 +108,7 @@ const INSIDERS_PLUGINS: ReadonlyMap<string, string> = new Map([
   ],
   [
     'typeset',
-    'Material Insiders plugin — rich nav/TOC formatting. Starlight\'s sidebar accepts plain strings only; nav formatting is intentionally lost in the migration.',
+    "Material Insiders plugin — rich nav/TOC formatting. Starlight's sidebar accepts plain strings only; nav formatting is intentionally lost in the migration.",
   ],
   [
     'projects',

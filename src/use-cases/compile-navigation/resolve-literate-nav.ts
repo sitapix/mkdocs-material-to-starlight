@@ -7,9 +7,9 @@
  */
 
 import { join } from 'node:path';
-import type { FileSystem } from '../../domain/ports/file-system.js';
-import { createDiagnostic, type Diagnostic } from '../../domain/diagnostics/diagnostic.js';
 import type { MkdocsNavEntry } from '../../domain/config/mkdocs-config.js';
+import { createDiagnostic, type Diagnostic } from '../../domain/diagnostics/diagnostic.js';
+import type { FileSystem } from '../../domain/ports/file-system.js';
 import { parseLiterateNav } from '../config/parse-literate-nav.js';
 
 export interface LiterateNavResult {

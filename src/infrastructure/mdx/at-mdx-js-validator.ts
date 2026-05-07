@@ -16,15 +16,15 @@
  * column so users can jump straight to the problem.
  */
 
-import { unified } from 'unified';
-import remarkParse from 'remark-parse';
-import remarkGfm from 'remark-gfm';
-import remarkFrontmatter from 'remark-frontmatter';
 import remarkDirective from 'remark-directive';
+import remarkFrontmatter from 'remark-frontmatter';
+import remarkGfm from 'remark-gfm';
 import remarkMath from 'remark-math';
+import remarkParse from 'remark-parse';
+import { unified } from 'unified';
 import type {
-  OutputValidator,
   OutputValidationResult,
+  OutputValidator,
 } from '../../domain/ports/output-validator.js';
 
 interface MdxCompileOptions {

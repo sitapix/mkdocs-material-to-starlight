@@ -41,9 +41,7 @@ describe('detectInsidersFeatures', () => {
   });
 
   it('returns empty for empty input', () => {
-    expect(
-      detectInsidersFeatures({ themeFeatures: [], pluginNames: [] }),
-    ).toHaveLength(0);
+    expect(detectInsidersFeatures({ themeFeatures: [], pluginNames: [] })).toHaveLength(0);
   });
 
   it('each entry carries a non-empty rationale describing the Insiders status', () => {

@@ -1,8 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import {
-  mapMaterialPaletteToStarlight,
-  type StarlightPalette,
-} from './palette-mapping.js';
+import { mapMaterialPaletteToStarlight, type StarlightPalette } from './palette-mapping.js';
 
 describe('mapMaterialPaletteToStarlight', () => {
   it('returns null for an empty/missing palette', () => {
@@ -28,10 +25,27 @@ describe('mapMaterialPaletteToStarlight', () => {
 
   it('handles all 21 Material primary colors without throwing', () => {
     const colors = [
-      'red', 'pink', 'purple', 'deep purple', 'indigo',
-      'blue', 'light blue', 'cyan', 'teal', 'green',
-      'light green', 'lime', 'yellow', 'amber', 'orange',
-      'deep orange', 'brown', 'grey', 'blue grey', 'black', 'white',
+      'red',
+      'pink',
+      'purple',
+      'deep purple',
+      'indigo',
+      'blue',
+      'light blue',
+      'cyan',
+      'teal',
+      'green',
+      'light green',
+      'lime',
+      'yellow',
+      'amber',
+      'orange',
+      'deep orange',
+      'brown',
+      'grey',
+      'blue grey',
+      'black',
+      'white',
     ];
     for (const c of colors) {
       const r = mapMaterialPaletteToStarlight({ primary: c });
@@ -41,7 +55,12 @@ describe('mapMaterialPaletteToStarlight', () => {
 
   it('accepts a palette array (multi-toggle) and uses the first scheme', () => {
     const palette = [
-      { media: '(prefers-color-scheme: light)', scheme: 'default', primary: 'pink', accent: 'pink' },
+      {
+        media: '(prefers-color-scheme: light)',
+        scheme: 'default',
+        primary: 'pink',
+        accent: 'pink',
+      },
       { media: '(prefers-color-scheme: dark)', scheme: 'slate', primary: 'pink', accent: 'pink' },
     ];
     const result = mapMaterialPaletteToStarlight(palette);

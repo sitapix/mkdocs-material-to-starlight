@@ -1,10 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { explainConversion } from './explain.js';
 import type { MkdocsConfig } from '../../domain/config/mkdocs-config.js';
+import { explainConversion } from './explain.js';
 
-function makeConfig(
-  partial: Partial<MkdocsConfig> = {},
-): MkdocsConfig {
+function makeConfig(partial: Partial<MkdocsConfig> = {}): MkdocsConfig {
   return {
     siteName: 'Test',
     siteDescription: null,

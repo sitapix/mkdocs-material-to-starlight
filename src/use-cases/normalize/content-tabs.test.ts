@@ -8,14 +8,7 @@ describe('normalizeContentTabs', () => {
   });
 
   it('groups two adjacent tabs into a single :::tabs container', () => {
-    const src = [
-      '=== "C"',
-      '    code one',
-      '',
-      '=== "C++"',
-      '    code two',
-      '',
-    ].join('\n');
+    const src = ['=== "C"', '    code one', '', '=== "C++"', '    code two', ''].join('\n');
     const expected = [
       '::::tabs',
       ':::tab[C]',
@@ -32,14 +25,7 @@ describe('normalizeContentTabs', () => {
 
   it('emits a single-tab group when only one === block is present', () => {
     const src = '=== "Only"\n    body\n';
-    const expected = [
-      '::::tabs',
-      ':::tab[Only]',
-      'body',
-      ':::',
-      '::::',
-      '',
-    ].join('\n');
+    const expected = ['::::tabs', ':::tab[Only]', 'body', ':::', '::::', ''].join('\n');
     expect(normalizeContentTabs(src)).toBe(expected);
   });
 
@@ -65,13 +51,7 @@ describe('normalizeContentTabs', () => {
   });
 
   it('does not touch tab-looking lines inside fenced code', () => {
-    const src = [
-      '```',
-      '=== "Not a tab"',
-      '    just code',
-      '```',
-      '',
-    ].join('\n');
+    const src = ['```', '=== "Not a tab"', '    just code', '```', ''].join('\n');
     expect(normalizeContentTabs(src)).toBe(src);
   });
 
@@ -115,12 +95,7 @@ describe('normalizeContentTabs', () => {
   });
 
   it('is idempotent for nested tab groups', () => {
-    const src = [
-      '=== "Outer"',
-      '    === "Inner"',
-      '        body',
-      '',
-    ].join('\n');
+    const src = ['=== "Outer"', '    === "Inner"', '        body', ''].join('\n');
     const once = normalizeContentTabs(src);
     expect(normalizeContentTabs(once)).toBe(once);
   });

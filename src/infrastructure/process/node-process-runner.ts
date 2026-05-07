@@ -12,19 +12,19 @@
  */
 
 import { spawn } from 'node:child_process';
-import { ok, err, type Result } from '../../domain/result.js';
 import type {
   ProcessOutput,
-  ProcessRunOptions,
   ProcessRunner,
   ProcessRunnerError,
+  ProcessRunOptions,
 } from '../../domain/ports/process-runner.js';
+import { err, ok, type Result } from '../../domain/result.js';
 
 export function createNodeProcessRunner(): ProcessRunner {
   return {
     run(command, args, options) {
       return new Promise<Result<ProcessOutput, ProcessRunnerError>>((resolve) => {
-        let child;
+        let child: ReturnType<typeof spawn>;
         try {
           child = spawn(command, [...args], buildSpawnOptions(options));
         } catch (cause) {
@@ -78,10 +78,7 @@ function buildSpawnOptions(options: ProcessRunOptions): {
   cwd: string;
   env: NodeJS.ProcessEnv;
 } {
-  const env =
-    options.env === undefined
-      ? { ...process.env }
-      : { ...process.env, ...options.env };
+  const env = options.env === undefined ? { ...process.env } : { ...process.env, ...options.env };
   return { cwd: options.cwd, env };
 }
 

@@ -27,9 +27,7 @@ export interface MaterialFontConfig {
   readonly code?: { readonly family: string; readonly package: string };
 }
 
-export function mapMaterialFontsToFontsource(
-  raw: unknown,
-): MaterialFontConfig | null {
+export function mapMaterialFontsToFontsource(raw: unknown): MaterialFontConfig | null {
   // `theme.font: false` disables Google Fonts entirely — nothing to map.
   if (raw === false) return null;
   if (raw === null || raw === undefined) return null;
@@ -45,9 +43,7 @@ export function mapMaterialFontsToFontsource(
   };
 }
 
-function mapOne(
-  rawFamily: unknown,
-): { family: string; package: string } | null {
+function mapOne(rawFamily: unknown): { family: string; package: string } | null {
   if (typeof rawFamily !== 'string') return null;
   const family = rawFamily.replace(/\s+/g, ' ').trim();
   if (family.length === 0) return null;
@@ -62,8 +58,16 @@ function mapOne(
   // are exposed as CSS variants under the same package, not separate packages.
   // Without this, families like `Inter Regular` resolve to a 404 package name.
   const WEIGHT_STYLE_TOKENS = new Set([
-    'regular', 'bold', 'italic', 'medium', 'semibold', 'extrabold',
-    'black', 'thin', 'extralight', 'light',
+    'regular',
+    'bold',
+    'italic',
+    'medium',
+    'semibold',
+    'extrabold',
+    'black',
+    'thin',
+    'extralight',
+    'light',
   ]);
   const tokens = family.split(' ');
   const trimmed = (() => {

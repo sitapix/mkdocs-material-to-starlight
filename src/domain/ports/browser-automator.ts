@@ -32,8 +32,5 @@ export interface CaptureOptions {
 }
 
 export interface BrowserAutomator {
-  capture(
-    url: string,
-    options: CaptureOptions,
-  ): Promise<Result<Uint8Array, BrowserAutomatorError>>;
+  capture(url: string, options: CaptureOptions): Promise<Result<Uint8Array, BrowserAutomatorError>>;
 }

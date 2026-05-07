@@ -5,17 +5,13 @@ describe('normalizeMedia', () => {
   it('promotes ![type:video](url) to a native HTML5 video element', () => {
     const r = normalizeMedia('![type:video](https://example.com/clip.mp4)');
     expect(r.text).toBe('<video src="https://example.com/clip.mp4" controls></video>');
-    expect(r.promotions).toEqual([
-      { line: 1, kind: 'video', url: 'https://example.com/clip.mp4' },
-    ]);
+    expect(r.promotions).toEqual([{ line: 1, kind: 'video', url: 'https://example.com/clip.mp4' }]);
   });
 
   it('promotes ![type:audio](url) to a native HTML5 audio element', () => {
     const r = normalizeMedia('![type:audio](/audio/talk.mp3)');
     expect(r.text).toBe('<audio src="/audio/talk.mp3" controls></audio>');
-    expect(r.promotions).toEqual([
-      { line: 1, kind: 'audio', url: '/audio/talk.mp3' },
-    ]);
+    expect(r.promotions).toEqual([{ line: 1, kind: 'audio', url: '/audio/talk.mp3' }]);
   });
 
   it('does NOT touch a regular image', () => {
@@ -53,9 +49,7 @@ describe('normalizeMedia', () => {
   });
 
   it('promotes multiple media nodes in one document with one promotion record each', () => {
-    const r = normalizeMedia(
-      '![type:video](v.mp4)\n\n![type:audio](a.mp3)\n',
-    );
+    const r = normalizeMedia('![type:video](v.mp4)\n\n![type:audio](a.mp3)\n');
     expect(r.text).toContain('<video src="v.mp4" controls></video>');
     expect(r.text).toContain('<audio src="a.mp3" controls></audio>');
     expect(r.promotions).toEqual([
@@ -72,9 +66,7 @@ describe('normalizeMedia', () => {
   });
 
   it('is fence-shielded — media markers inside fenced code are NOT promoted', () => {
-    const r = normalizeMedia(
-      '```\n![type:video](v.mp4)\n```\n\n![type:video](real.mp4)\n',
-    );
+    const r = normalizeMedia('```\n![type:video](v.mp4)\n```\n\n![type:video](real.mp4)\n');
     // Code-fenced version stays as-is.
     expect(r.text).toContain('```\n![type:video](v.mp4)\n```');
     // Outside-fence version is promoted.
@@ -109,9 +101,7 @@ describe('normalizeMedia', () => {
   });
 
   it('preserves surrounding markdown around the media', () => {
-    const r = normalizeMedia(
-      '# Heading\n\nBefore.\n\n![type:video](v.mp4)\n\n> After.',
-    );
+    const r = normalizeMedia('# Heading\n\nBefore.\n\n![type:video](v.mp4)\n\n> After.');
     expect(r.text).toContain('# Heading');
     expect(r.text).toContain('Before.');
     expect(r.text).toContain('<video src="v.mp4" controls></video>');

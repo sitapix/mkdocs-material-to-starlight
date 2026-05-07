@@ -10,13 +10,13 @@
  * should not have to live inline in the API wiring shell.
  */
 
-import type { Diagnostic } from '../../domain/diagnostics/diagnostic.js';
 import type { MkdocsNavEntry } from '../../domain/config/mkdocs-config.js';
+import type { Diagnostic } from '../../domain/diagnostics/diagnostic.js';
+import { err, ok, type Result } from '../../domain/result.js';
 import type { SidebarEntry } from '../../domain/starlight/sidebar.js';
-import { ok, err, type Result } from '../../domain/result.js';
-import { parseNavTree } from '../config/nav-tree.js';
 import { compileNavigation } from '../compile-navigation/compile.js';
 import { applySectionIndex } from '../compile-navigation/section-index.js';
+import { parseNavTree } from '../config/nav-tree.js';
 import { scanNavTopics } from '../detect-features/nav-topics.js';
 
 export interface CompiledSidebar {
@@ -53,16 +53,13 @@ export async function compileSidebarEntries(
   // sidebar entry whose slug is exactly the blog dir would 500 at build
   // time ("slug 'blog' does not exist"). Rewrite those to a link entry
   // pointing at the prefix-routed landing page (`/blog/`).
-  const finalEntries = options.blogDir !== undefined
-    ? rewriteBlogIndexSidebar(sidebar.entries, options.blogDir)
-    : sidebar.entries;
+  const finalEntries =
+    options.blogDir !== undefined
+      ? rewriteBlogIndexSidebar(sidebar.entries, options.blogDir)
+      : sidebar.entries;
   return ok({
     entries: finalEntries,
-    diagnostics: [
-      ...transformed.diagnostics,
-      ...sidebar.diagnostics,
-      ...topicDiagnostics,
-    ],
+    diagnostics: [...transformed.diagnostics, ...sidebar.diagnostics, ...topicDiagnostics],
   });
 }
 

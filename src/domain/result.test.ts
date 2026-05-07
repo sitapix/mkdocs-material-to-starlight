@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ok, err, mapResult, mapErr, isOk, isErr, type Result } from './result.js';
+import { err, isErr, isOk, mapErr, mapResult, ok, type Result } from './result.js';
 
 describe('Result constructors and predicates', () => {
   it('ok wraps a value', () => {

@@ -24,9 +24,9 @@
  */
 
 import { posix } from 'node:path';
-import { ok, err, type Result } from '../../domain/result.js';
-import type { FileSystem } from '../../domain/ports/file-system.js';
 import type { ConfigDiscoverer } from '../../domain/ports/config-discoverer.js';
+import type { FileSystem } from '../../domain/ports/file-system.js';
+import { err, ok, type Result } from '../../domain/result.js';
 import { rankCandidates } from './rank-candidates.js';
 
 interface AutoDiscoveryNote {
@@ -53,9 +53,14 @@ export async function resolveProjectDir(
   fs: FileSystem,
   discoverer: ConfigDiscoverer,
 ): Promise<Result<ResolvedProjectDir, ResolveProjectDirError>> {
-  const rootConfigPath = joinPosix(inputDir, 'mkdocs.yml');
-  if (await fs.exists(rootConfigPath)) {
-    return ok({ projectDir: inputDir, autoDiscovery: null });
+  // MkDocs accepts both `mkdocs.yml` and `mkdocs.yaml` at the project
+  // root. Real-world (lawmurray/doxide): root-level `mkdocs.yaml` was
+  // previously missed here, falling through to the discoverer, which
+  // emitted a redirect path that downstream code couldn't open.
+  for (const name of ['mkdocs.yml', 'mkdocs.yaml']) {
+    if (await fs.exists(joinPosix(inputDir, name))) {
+      return ok({ projectDir: inputDir, autoDiscovery: null });
+    }
   }
 
   const discovery = await discoverer.findMkdocsConfigs(inputDir);
@@ -67,10 +72,7 @@ export async function resolveProjectDir(
     return err({ kind: 'no-config-anywhere', searchedDir: inputDir });
   }
   if (ranked.alternatives.length > 0) {
-    const candidates = [
-      ranked.primary.relPath,
-      ...ranked.alternatives.map((c) => c.relPath),
-    ];
+    const candidates = [ranked.primary.relPath, ...ranked.alternatives.map((c) => c.relPath)];
     return err({ kind: 'ambiguous', searchedDir: inputDir, candidates });
   }
   const projectDir = joinPosix(inputDir, ranked.primary.configDir);

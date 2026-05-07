@@ -26,9 +26,7 @@ export interface InteractivityDecision {
   readonly color: boolean;
 }
 
-export function resolveInteractivity(
-  input: InteractivityInput,
-): InteractivityDecision {
+export function resolveInteractivity(input: InteractivityInput): InteractivityDecision {
   const { flags, env, stdoutIsTTY, stdinIsTTY } = input;
 
   const interactive = (() => {

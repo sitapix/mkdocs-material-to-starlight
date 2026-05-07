@@ -26,7 +26,7 @@ export function parseGridOpenLine(line: string): GridOpening | null {
   if (match === null || match.groups === undefined) {
     return null;
   }
-  const attrs = match.groups['attrs'] ?? '';
+  const attrs = match.groups.attrs ?? '';
   if (!hasMarkdownAttr(attrs)) {
     return null;
   }
@@ -35,10 +35,10 @@ export function parseGridOpenLine(line: string): GridOpening | null {
     return null;
   }
   if (cls.includes('grid') && cls.includes('cards')) {
-    return { kind: 'cards', indent: (match.groups['indent'] ?? '').length };
+    return { kind: 'cards', indent: (match.groups.indent ?? '').length };
   }
   if (cls.split(/\s+/).includes('grid')) {
-    return { kind: 'generic', indent: (match.groups['indent'] ?? '').length };
+    return { kind: 'generic', indent: (match.groups.indent ?? '').length };
   }
   return null;
 }

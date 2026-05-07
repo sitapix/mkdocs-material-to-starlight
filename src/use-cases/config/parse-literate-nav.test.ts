@@ -15,16 +15,12 @@ describe('parseLiterateNav', () => {
 
   it('parses a single file link as a FileEntry', () => {
     const { nav } = parseLiterateNav('* [Home](index.md)\n');
-    expect(nav).toEqual([
-      { kind: 'file', title: 'Home', path: 'index.md' },
-    ]);
+    expect(nav).toEqual([{ kind: 'file', title: 'Home', path: 'index.md' }]);
   });
 
   it('parses an external link as an ExternalEntry', () => {
     const { nav } = parseLiterateNav('* [NASA](https://www.nasa.gov/)\n');
-    expect(nav).toEqual([
-      { kind: 'external', title: 'NASA', href: 'https://www.nasa.gov/' },
-    ]);
+    expect(nav).toEqual([{ kind: 'external', title: 'NASA', href: 'https://www.nasa.gov/' }]);
   });
 
   it('treats http and https links as external; .md as file', () => {
@@ -45,12 +41,7 @@ describe('parseLiterateNav', () => {
 
   it('parses a nested list with a plain-text parent as a SectionEntry', () => {
     const { nav } = parseLiterateNav(
-      [
-        '* Guide',
-        '    * [Intro](guide/intro.md)',
-        '    * [Setup](guide/setup.md)',
-        '',
-      ].join('\n'),
+      ['* Guide', '    * [Intro](guide/intro.md)', '    * [Setup](guide/setup.md)', ''].join('\n'),
     );
     expect(nav).toEqual([
       {
@@ -88,12 +79,7 @@ describe('parseLiterateNav', () => {
 
   it('handles deep recursion (sections within sections)', () => {
     const { nav } = parseLiterateNav(
-      [
-        '* API',
-        '    * V1',
-        '        * [Auth](api/v1/auth.md)',
-        '',
-      ].join('\n'),
+      ['* API', '    * V1', '        * [Auth](api/v1/auth.md)', ''].join('\n'),
     );
     const top = nav[0];
     if (top?.kind !== 'section') return;
@@ -109,12 +95,7 @@ describe('parseLiterateNav', () => {
 
   it('parses multiple top-level entries in source order', () => {
     const { nav } = parseLiterateNav(
-      [
-        '* [Home](index.md)',
-        '* [About](about.md)',
-        '* [Contact](contact.md)',
-        '',
-      ].join('\n'),
+      ['* [Home](index.md)', '* [About](about.md)', '* [Contact](contact.md)', ''].join('\n'),
     );
     expect(nav.map((e) => e.kind === 'file' && e.path)).toEqual([
       'index.md',
@@ -147,13 +128,7 @@ describe('parseLiterateNav', () => {
     // A bullet line with only whitespace produces a list item without a link
     // and without a nested list. Markdown parsers vary in how they represent
     // this; we just need ONE failure path covered to lock the contract.
-    const { diagnostics } = parseLiterateNav(
-      [
-        '* [Home](index.md)',
-        '* ',
-        '',
-      ].join('\n'),
-    );
+    const { diagnostics } = parseLiterateNav(['* [Home](index.md)', '* ', ''].join('\n'));
     // Either no diagnostic (if the parser strips empty items) or a
     // plugin-literate-nav-malformed; both are acceptable. The contract is:
     // we never throw and we tag any unparseable items.
@@ -163,12 +138,7 @@ describe('parseLiterateNav', () => {
   });
 
   it('idempotency: parsing the same source twice yields identical nav', () => {
-    const source = [
-      '* [Home](index.md)',
-      '* API',
-      '    * [Auth](api/auth.md)',
-      '',
-    ].join('\n');
+    const source = ['* [Home](index.md)', '* API', '    * [Auth](api/auth.md)', ''].join('\n');
     expect(parseLiterateNav(source).nav).toEqual(parseLiterateNav(source).nav);
   });
 });

@@ -13,8 +13,8 @@
  * mainstream CLI (`rm -i`, `git clean`, `cargo init --force`).
  */
 
-import type { Prompter } from '../../domain/wizard/ports/prompter.js';
 import type { DirInspector } from '../../domain/wizard/ports/dir-inspector.js';
+import type { Prompter } from '../../domain/wizard/ports/prompter.js';
 
 export type ConfirmOverwriteResult = 'no-need' | 'confirmed' | 'cancelled';
 

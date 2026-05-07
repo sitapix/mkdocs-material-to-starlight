@@ -21,8 +21,7 @@ const ANSI_RE = /\u001b\[[0-9;]*m/g;
 const SINGLE_LINE_RE =
   /^(?<path>\S+):(?<line>\d+):(?<column>\d+)\s*-\s*(?<severity>Error|Warning|Hint):\s*(?<message>.+)$/;
 const PATH_LINE_RE = /^(?<path>\S+\.\w+):(?<line>\d+):(?<column>\d+)\s*$/;
-const INDENTED_MESSAGE_RE =
-  /^\s+(?<severity>Error|Warning|Hint):\s*(?<message>.+)$/;
+const INDENTED_MESSAGE_RE = /^\s+(?<severity>Error|Warning|Hint):\s*(?<message>.+)$/;
 
 const SEVERITY_TO_RULE: Readonly<Record<string, { ruleId: string; severity: Severity }>> = {
   Error: { ruleId: 'astro-check-error', severity: 'error' },

@@ -14,9 +14,7 @@ describe('extractSocial', () => {
     const result = extractSocial({
       social: [{ icon: 'fontawesome/brands/github', link: 'https://github.com/x' }],
     });
-    expect(result).toEqual([
-      { icon: 'github', label: 'github', href: 'https://github.com/x' },
-    ]);
+    expect(result).toEqual([{ icon: 'github', label: 'github', href: 'https://github.com/x' }]);
   });
 
   it('uses Material `name` as label when present', () => {
@@ -50,11 +48,9 @@ describe('extractSocial', () => {
     expect(icons).toContain('youtube');
   });
 
-  it('falls back to `external` for unknown icons (Starlight\'s social-icon enum is finite)', () => {
+  it("falls back to `external` for unknown icons (Starlight's social-icon enum is finite)", () => {
     const result = extractSocial({
-      social: [
-        { icon: 'fontawesome/brands/funky-network', link: 'https://example.com' },
-      ],
+      social: [{ icon: 'fontawesome/brands/funky-network', link: 'https://example.com' }],
     });
     expect(result[0]?.icon).toBe('external');
   });

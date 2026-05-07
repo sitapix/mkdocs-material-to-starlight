@@ -1,7 +1,7 @@
-import { describe, expect, it, beforeEach, afterEach } from 'vitest';
-import { mkdtempSync, mkdirSync, rmSync, writeFileSync, readFileSync, existsSync } from 'node:fs';
-import { join } from 'node:path';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { convertSiteFromDisk } from '../../src/interface/api/convert-site.js';
 
 describe('interface/api/convertSiteFromDisk', () => {
@@ -26,22 +26,11 @@ describe('interface/api/convertSiteFromDisk', () => {
     );
     writeFileSync(
       join(projectDir, 'docs', 'index.md'),
-      [
-        '# Welcome',
-        '',
-        '!!! warning "Heads up"',
-        '    See [auth](api/auth.md).',
-        '',
-      ].join('\n'),
+      ['# Welcome', '', '!!! warning "Heads up"', '    See [auth](api/auth.md).', ''].join('\n'),
     );
     writeFileSync(
       join(projectDir, 'docs', 'api', 'auth.md'),
-      [
-        '# Authentication',
-        '',
-        ':material-rocket: launch the API.',
-        '',
-      ].join('\n'),
+      ['# Authentication', '', ':material-rocket: launch the API.', ''].join('\n'),
     );
   });
 
@@ -59,10 +48,7 @@ describe('interface/api/convertSiteFromDisk', () => {
     expect(result.ok).toBe(true);
     if (!result.ok) return;
 
-    const indexOut = readFileSync(
-      join(outputDir, 'src', 'content', 'docs', 'index.md'),
-      'utf8',
-    );
+    const indexOut = readFileSync(join(outputDir, 'src', 'content', 'docs', 'index.md'), 'utf8');
     expect(indexOut).toContain(':::caution');
     expect(indexOut).toContain('Heads up');
     expect(indexOut).toContain('[auth](/api/auth)');
@@ -83,10 +69,7 @@ describe('interface/api/convertSiteFromDisk', () => {
     // Only informational diagnostics produced: `mdx-promotion` (auth.md
     // → .mdx because of the `<Icon>` tag) and `duplicate-h1-stripped`
     // (the body H1 → frontmatter title dedupe). No actual problems.
-    const informationalIds = new Set([
-      'mdx-promotion',
-      'duplicate-h1-stripped',
-    ]);
+    const informationalIds = new Set(['mdx-promotion', 'duplicate-h1-stripped']);
     const nonInformational = result.value.diagnostics.filter(
       (d) => !informationalIds.has(d.diagnostic.ruleId),
     );
@@ -122,9 +105,7 @@ describe('interface/api/convertSiteFromDisk', () => {
 
     // Output is written under the user's chosen outputDir, with the site
     // resolved against the discovered website/ subdir.
-    expect(
-      existsSync(join(outputDir, 'src', 'content', 'docs', 'index.md')),
-    ).toBe(true);
+    expect(existsSync(join(outputDir, 'src', 'content', 'docs', 'index.md'))).toBe(true);
 
     // The redirect is surfaced as an info diagnostic.
     const redirect = result.value.diagnostics.find(
@@ -140,10 +121,7 @@ describe('interface/api/convertSiteFromDisk', () => {
     for (const sub of ['website', 'docs-site', 'examples/foo']) {
       const dir = join(projectDir, sub);
       mkdirSync(join(dir, 'docs'), { recursive: true });
-      writeFileSync(
-        join(dir, 'mkdocs.yml'),
-        ['site_name: Demo', 'docs_dir: docs', ''].join('\n'),
-      );
+      writeFileSync(join(dir, 'mkdocs.yml'), ['site_name: Demo', 'docs_dir: docs', ''].join('\n'));
       writeFileSync(join(dir, 'docs', 'index.md'), '# Welcome\n');
     }
 
@@ -220,9 +198,7 @@ describe('interface/api/convertSiteFromDisk', () => {
     expect(biomeJson.files?.includes ?? []).toContain('!**/*.mdx');
 
     // package.json carries Biome as a devDep + the `format`/`lint` scripts.
-    const pkg = JSON.parse(
-      readFileSync(join(outputDir, 'package.json'), 'utf8'),
-    ) as {
+    const pkg = JSON.parse(readFileSync(join(outputDir, 'package.json'), 'utf8')) as {
       scripts?: Record<string, string>;
       devDependencies?: Record<string, string>;
     };
@@ -236,13 +212,7 @@ describe('interface/api/convertSiteFromDisk', () => {
     rmSync(join(projectDir, 'docs'), { recursive: true });
     writeFileSync(
       join(projectDir, 'mkdocs.yml'),
-      [
-        'site_name: Demo',
-        'docs_dir: docs',
-        'plugins:',
-        '  - monorepo',
-        '',
-      ].join('\n'),
+      ['site_name: Demo', 'docs_dir: docs', 'plugins:', '  - monorepo', ''].join('\n'),
     );
     const result = await convertSiteFromDisk({ projectDir, outputDir });
     expect(result.ok).toBe(false);
@@ -263,16 +233,10 @@ describe('interface/api/convertSiteFromDisk', () => {
 
   it('writes outputs idempotently — running twice yields identical files', async () => {
     await convertSiteFromDisk({ projectDir, outputDir });
-    const indexOnce = readFileSync(
-      join(outputDir, 'src', 'content', 'docs', 'index.md'),
-      'utf8',
-    );
+    const indexOnce = readFileSync(join(outputDir, 'src', 'content', 'docs', 'index.md'), 'utf8');
 
     await convertSiteFromDisk({ projectDir, outputDir });
-    const indexTwice = readFileSync(
-      join(outputDir, 'src', 'content', 'docs', 'index.md'),
-      'utf8',
-    );
+    const indexTwice = readFileSync(join(outputDir, 'src', 'content', 'docs', 'index.md'), 'utf8');
 
     expect(indexTwice).toBe(indexOnce);
   });
@@ -283,9 +247,7 @@ describe('interface/api/convertSiteFromDisk', () => {
     expect(existsSync(join(outputDir, 'src', 'content', 'docs', 'index.md'))).toBe(true);
     // auth.md uses `:material-rocket:` which now emits a JSX `<Icon>` and
     // therefore promotes the file to `.mdx`.
-    expect(
-      existsSync(join(outputDir, 'src', 'content', 'docs', 'api', 'auth.mdx')),
-    ).toBe(true);
+    expect(existsSync(join(outputDir, 'src', 'content', 'docs', 'api', 'auth.mdx'))).toBe(true);
   });
 
   it('copies non-Markdown assets to outputDir/public/ preserving paths', async () => {
@@ -300,16 +262,10 @@ describe('interface/api/convertSiteFromDisk', () => {
   });
 
   it('synthesizes a title for source files that lack frontmatter', async () => {
-    writeFileSync(
-      join(projectDir, 'docs', 'index.md'),
-      'No frontmatter here, just body.\n',
-    );
+    writeFileSync(join(projectDir, 'docs', 'index.md'), 'No frontmatter here, just body.\n');
     const result = await convertSiteFromDisk({ projectDir, outputDir });
     expect(result.ok).toBe(true);
-    const indexOut = readFileSync(
-      join(outputDir, 'src', 'content', 'docs', 'index.md'),
-      'utf8',
-    );
+    const indexOut = readFileSync(join(outputDir, 'src', 'content', 'docs', 'index.md'), 'utf8');
     expect(indexOut).toContain('title: Home');
   });
 
@@ -362,10 +318,7 @@ describe('interface/api/convertSiteFromDisk', () => {
     );
     const result = await convertSiteFromDisk({ projectDir, outputDir });
     expect(result.ok).toBe(true);
-    const cfg = readFileSync(
-      join(outputDir, 'astro.config.mjs'),
-      'utf8',
-    );
+    const cfg = readFileSync(join(outputDir, 'astro.config.mjs'), 'utf8');
     expect(cfg).toContain('redirects: {');
     expect(cfg).toContain(`'/old': '/api/auth'`);
     expect(cfg).toContain(`'/gone': 'https://elsewhere.example/page'`);
@@ -620,19 +573,11 @@ describe('interface/api/convertSiteFromDisk', () => {
     writeFileSync(join(projectDir, 'docs', 'index.md'), '# Home\n');
     writeFileSync(
       join(projectDir, 'mkdocs.yml'),
-      [
-        'site_name: My Docs',
-        'docs_dir: docs',
-        'nav:',
-        '  - Home: index.md',
-        '',
-      ].join('\n'),
+      ['site_name: My Docs', 'docs_dir: docs', 'nav:', '  - Home: index.md', ''].join('\n'),
     );
     const result = await convertSiteFromDisk({ projectDir, outputDir });
     expect(result.ok).toBe(true);
-    expect(
-      existsSync(join(outputDir, 'src', 'pages', 'og', '[...slug].png.ts')),
-    ).toBe(false);
+    expect(existsSync(join(outputDir, 'src', 'pages', 'og', '[...slug].png.ts'))).toBe(false);
     const pkg = JSON.parse(readFileSync(join(outputDir, 'package.json'), 'utf8'));
     expect(pkg.dependencies['astro-og-canvas']).toBeUndefined();
   });
@@ -641,13 +586,7 @@ describe('interface/api/convertSiteFromDisk', () => {
     writeFileSync(join(projectDir, 'docs', 'index.md'), '# Home\n');
     writeFileSync(
       join(projectDir, 'mkdocs.yml'),
-      [
-        'site_name: My Docs',
-        'docs_dir: docs',
-        'nav:',
-        '  - Home: index.md',
-        '',
-      ].join('\n'),
+      ['site_name: My Docs', 'docs_dir: docs', 'nav:', '  - Home: index.md', ''].join('\n'),
     );
     const result = await convertSiteFromDisk({ projectDir, outputDir });
     expect(result.ok).toBe(true);
@@ -658,18 +597,10 @@ describe('interface/api/convertSiteFromDisk', () => {
 
   it('expands {% include %} directives when include-markdown plugin is enabled', async () => {
     mkdirSync(join(projectDir, 'docs', 'snippets'), { recursive: true });
-    writeFileSync(
-      join(projectDir, 'docs', 'snippets', 'shared.md'),
-      'shared inline body',
-    );
+    writeFileSync(join(projectDir, 'docs', 'snippets', 'shared.md'), 'shared inline body');
     writeFileSync(
       join(projectDir, 'docs', 'index.md'),
-      [
-        '# Home',
-        '',
-        '{% include "snippets/shared.md" %}',
-        '',
-      ].join('\n'),
+      ['# Home', '', '{% include "snippets/shared.md" %}', ''].join('\n'),
     );
     writeFileSync(
       join(projectDir, 'mkdocs.yml'),
@@ -685,10 +616,7 @@ describe('interface/api/convertSiteFromDisk', () => {
     );
     const result = await convertSiteFromDisk({ projectDir, outputDir });
     expect(result.ok).toBe(true);
-    const indexOut = readFileSync(
-      join(outputDir, 'src', 'content', 'docs', 'index.md'),
-      'utf8',
-    );
+    const indexOut = readFileSync(join(outputDir, 'src', 'content', 'docs', 'index.md'), 'utf8');
     expect(indexOut).toContain('shared inline body');
     expect(indexOut).not.toContain('{% include');
     const notes = readFileSync(join(outputDir, 'MIGRATION_NOTES.md'), 'utf8');
@@ -714,10 +642,7 @@ describe('interface/api/convertSiteFromDisk', () => {
     );
     const result = await convertSiteFromDisk({ projectDir, outputDir });
     expect(result.ok).toBe(true);
-    const css = readFileSync(
-      join(outputDir, 'src', 'styles', 'mkdocs-migration.css'),
-      'utf8',
-    );
+    const css = readFileSync(join(outputDir, 'src', 'styles', 'mkdocs-migration.css'), 'utf8');
     expect(css).toContain('--sl-hue-accent');
     const notes = readFileSync(join(outputDir, 'MIGRATION_NOTES.md'), 'utf8');
     expect(notes).toContain('palette-translated');
@@ -746,10 +671,7 @@ describe('interface/api/convertSiteFromDisk', () => {
     );
     const result = await convertSiteFromDisk({ projectDir, outputDir });
     expect(result.ok).toBe(true);
-    const css = readFileSync(
-      join(outputDir, 'src', 'styles', 'mkdocs-migration.css'),
-      'utf8',
-    );
+    const css = readFileSync(join(outputDir, 'src', 'styles', 'mkdocs-migration.css'), 'utf8');
     // Light :root uses indigo (hue 270)
     expect(css).toMatch(/:root\s*{[\s\S]*?--sl-hue-accent:\s*270/);
     // Dark block uses amber (hue 75) — the slate scheme color
@@ -801,9 +723,7 @@ describe('interface/api/convertSiteFromDisk', () => {
     const result = await convertSiteFromDisk({ projectDir, outputDir });
     expect(result.ok).toBe(true);
     const cfg = readFileSync(join(outputDir, 'astro.config.mjs'), 'utf8');
-    expect(cfg).toContain(
-      "editLink: { baseUrl: 'https://github.com/x/y/edit/main/docs/' }",
-    );
+    expect(cfg).toContain("editLink: { baseUrl: 'https://github.com/x/y/edit/main/docs/' }");
   });
 
   it('translates toc extension config to tableOfContents', async () => {
@@ -850,9 +770,7 @@ describe('interface/api/convertSiteFromDisk', () => {
     if (!result.ok) return;
 
     const cfg = readFileSync(join(outputDir, 'astro.config.mjs'), 'utf8');
-    expect(cfg).toContain(
-      "expressiveCode: { themes: ['github-light', 'monokai'] }",
-    );
+    expect(cfg).toContain("expressiveCode: { themes: ['github-light', 'monokai'] }");
 
     const notes = readFileSync(join(outputDir, 'MIGRATION_NOTES.md'), 'utf8');
     expect(notes).toContain('expressive-code-theme-applied');
@@ -880,9 +798,7 @@ describe('interface/api/convertSiteFromDisk', () => {
     if (!result.ok) return;
 
     const cfg = readFileSync(join(outputDir, 'astro.config.mjs'), 'utf8');
-    expect(cfg).toContain(
-      "expressiveCode: { themes: ['github-light', 'github-dark'] }",
-    );
+    expect(cfg).toContain("expressiveCode: { themes: ['github-light', 'github-dark'] }");
 
     const notes = readFileSync(join(outputDir, 'MIGRATION_NOTES.md'), 'utf8');
     expect(notes).toContain('expressive-code-theme-fallback');
@@ -912,10 +828,10 @@ describe('interface/api/convertSiteFromDisk', () => {
         '  name: material',
         '  features:',
         '    - navigation.indexes', // replaced-by-default
-        '    - toc.follow',         // replaced-by-default
-        '    - toc.integrate',      // unsupported
-        '    - announce.dismiss',   // unsupported
-        '    - navigation.tabs',    // handled-elsewhere (existing emitter)
+        '    - toc.follow', // replaced-by-default
+        '    - toc.integrate', // unsupported
+        '    - announce.dismiss', // unsupported
+        '    - navigation.tabs', // handled-elsewhere (existing emitter)
         '    - not.a.real.feature', // unknown
         'nav:',
         '  - Home: index.md',
@@ -1039,9 +955,9 @@ describe('interface/api/convertSiteFromDisk', () => {
     const result = await convertSiteFromDisk({ projectDir, outputDir });
     expect(result.ok).toBe(true);
 
-    const pkgJson = JSON.parse(
-      readFileSync(join(outputDir, 'package.json'), 'utf8'),
-    ) as { dependencies: Record<string, string> };
+    const pkgJson = JSON.parse(readFileSync(join(outputDir, 'package.json'), 'utf8')) as {
+      dependencies: Record<string, string>;
+    };
     expect(pkgJson.dependencies['@fontsource/roboto']).toBeDefined();
     expect(pkgJson.dependencies['@fontsource/jetbrains-mono']).toBeDefined();
 
@@ -1049,10 +965,7 @@ describe('interface/api/convertSiteFromDisk', () => {
     expect(cfg).toContain("'@fontsource/roboto'");
     expect(cfg).toContain("'@fontsource/jetbrains-mono'");
 
-    const css = readFileSync(
-      join(outputDir, 'src', 'styles', 'mkdocs-migration.css'),
-      'utf8',
-    );
+    const css = readFileSync(join(outputDir, 'src', 'styles', 'mkdocs-migration.css'), 'utf8');
     expect(css).toContain("--sl-font: 'Roboto'");
     expect(css).toContain("--sl-font-mono: 'JetBrains Mono'");
 
@@ -1077,11 +990,10 @@ describe('interface/api/convertSiteFromDisk', () => {
     );
     const result = await convertSiteFromDisk({ projectDir, outputDir });
     expect(result.ok).toBe(true);
-    const pkgJson = JSON.parse(
-      readFileSync(join(outputDir, 'package.json'), 'utf8'),
-    ) as { dependencies: Record<string, string> };
-    expect(Object.keys(pkgJson.dependencies).some((k) => k.startsWith('@fontsource')))
-      .toBe(false);
+    const pkgJson = JSON.parse(readFileSync(join(outputDir, 'package.json'), 'utf8')) as {
+      dependencies: Record<string, string>;
+    };
+    expect(Object.keys(pkgJson.dependencies).some((k) => k.startsWith('@fontsource'))).toBe(false);
   });
 
   it('translates extra.analytics (Google Analytics) into starlight head[] script entries', async () => {
@@ -1219,13 +1131,8 @@ describe('interface/api/convertSiteFromDisk', () => {
     );
     const result = await convertSiteFromDisk({ projectDir, outputDir });
     expect(result.ok).toBe(true);
-    expect(
-      existsSync(join(outputDir, 'src', 'content', 'docs', 'index.mdx')),
-    ).toBe(true);
-    const mdx = readFileSync(
-      join(outputDir, 'src', 'content', 'docs', 'index.mdx'),
-      'utf8',
-    );
+    expect(existsSync(join(outputDir, 'src', 'content', 'docs', 'index.mdx'))).toBe(true);
+    const mdx = readFileSync(join(outputDir, 'src', 'content', 'docs', 'index.mdx'), 'utf8');
     expect(mdx).toContain('<Tabs syncKey="');
     expect(mdx).toContain('<TabItem label="Bash">');
     expect(mdx).toContain('<TabItem label="Python">');
@@ -1244,13 +1151,8 @@ describe('interface/api/convertSiteFromDisk', () => {
     );
     const result = await convertSiteFromDisk({ projectDir, outputDir });
     expect(result.ok).toBe(true);
-    expect(
-      existsSync(join(outputDir, 'src', 'content', 'docs', 'index.mdx')),
-    ).toBe(true);
-    const mdx = readFileSync(
-      join(outputDir, 'src', 'content', 'docs', 'index.mdx'),
-      'utf8',
-    );
+    expect(existsSync(join(outputDir, 'src', 'content', 'docs', 'index.mdx'))).toBe(true);
+    const mdx = readFileSync(join(outputDir, 'src', 'content', 'docs', 'index.mdx'), 'utf8');
     expect(mdx).toMatch(/<Tabs[\s>]/);
     expect(mdx).toContain('<TabItem label="Bash">');
     expect(mdx).toContain('<TabItem label="Python">');
@@ -1283,16 +1185,9 @@ describe('interface/api/convertSiteFromDisk', () => {
     );
     const result = await convertSiteFromDisk({ projectDir, outputDir });
     expect(result.ok).toBe(true);
-    expect(
-      existsSync(join(outputDir, 'src', 'content', 'docs', 'index.mdx')),
-    ).toBe(true);
-    expect(
-      existsSync(join(outputDir, 'src', 'content', 'docs', 'index.md')),
-    ).toBe(false);
-    const mdx = readFileSync(
-      join(outputDir, 'src', 'content', 'docs', 'index.mdx'),
-      'utf8',
-    );
+    expect(existsSync(join(outputDir, 'src', 'content', 'docs', 'index.mdx'))).toBe(true);
+    expect(existsSync(join(outputDir, 'src', 'content', 'docs', 'index.md'))).toBe(false);
+    const mdx = readFileSync(join(outputDir, 'src', 'content', 'docs', 'index.mdx'), 'utf8');
     expect(mdx).toContain("from '@astrojs/starlight/components'");
     expect(mdx).toContain('Aside');
     expect(mdx).toContain('Card');
@@ -1314,12 +1209,8 @@ describe('interface/api/convertSiteFromDisk', () => {
     );
     const result = await convertSiteFromDisk({ projectDir, outputDir });
     expect(result.ok).toBe(true);
-    expect(
-      existsSync(join(outputDir, 'src', 'content', 'docs', 'index.md')),
-    ).toBe(true);
-    expect(
-      existsSync(join(outputDir, 'src', 'content', 'docs', 'index.mdx')),
-    ).toBe(false);
+    expect(existsSync(join(outputDir, 'src', 'content', 'docs', 'index.md'))).toBe(true);
+    expect(existsSync(join(outputDir, 'src', 'content', 'docs', 'index.mdx'))).toBe(false);
   });
 
   it('classifies Python hook files referenced from mkdocs.yml hooks:', async () => {
@@ -1356,7 +1247,17 @@ describe('interface/api/convertSiteFromDisk', () => {
   it('infers Zod types in the auto-generated docsSchema extend block from real frontmatter', async () => {
     writeFileSync(
       join(projectDir, 'docs', 'index.md'),
-      ['---', 'title: Home', 'tags: [a, b]', 'rating: 4.5', 'reviewed: 2024-08-09', '---', '', 'Body.', ''].join('\n'),
+      [
+        '---',
+        'title: Home',
+        'tags: [a, b]',
+        'rating: 4.5',
+        'reviewed: 2024-08-09',
+        '---',
+        '',
+        'Body.',
+        '',
+      ].join('\n'),
     );
     writeFileSync(
       join(projectDir, 'mkdocs.yml'),

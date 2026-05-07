@@ -7,12 +7,12 @@
  * structural correctness that won't drift with future MDX point releases.
  */
 
-import { describe, expect, it } from 'vitest';
-import { unified } from 'unified';
-import remarkParse from 'remark-parse';
-import remarkDirective from 'remark-directive';
-import { visit } from 'unist-util-visit';
 import type { Root } from 'mdast';
+import remarkDirective from 'remark-directive';
+import remarkParse from 'remark-parse';
+import { unified } from 'unified';
+import { visit } from 'unist-util-visit';
+import { describe, expect, it } from 'vitest';
 import { transformTabDirectives } from './tabs.js';
 
 interface TypedNode {
@@ -43,9 +43,7 @@ describe('transformTabDirectives — structural AST emit', () => {
     const tree = parse('::::tabs\n:::tab[A]\nbody\n:::\n::::\n');
     const nodes = collect(tree);
 
-    const hasMdxTabs = nodes.some(
-      (n) => n.type === 'mdxJsxFlowElement' && n.name === 'Tabs',
-    );
+    const hasMdxTabs = nodes.some((n) => n.type === 'mdxJsxFlowElement' && n.name === 'Tabs');
     const hasHtmlTabs = nodes.some(
       (n) => n.type === 'html' && typeof n.value === 'string' && /<Tabs[\s>]/.test(n.value),
     );
@@ -58,9 +56,7 @@ describe('transformTabDirectives — structural AST emit', () => {
     const tree = parse('::::tabs\n:::tab[A]\nbody-a\n:::\n:::tab[B]\nbody-b\n:::\n::::\n');
     const nodes = collect(tree);
 
-    const tabItems = nodes.filter(
-      (n) => n.type === 'mdxJsxFlowElement' && n.name === 'TabItem',
-    );
+    const tabItems = nodes.filter((n) => n.type === 'mdxJsxFlowElement' && n.name === 'TabItem');
     const htmlTabItems = nodes.filter(
       (n) => n.type === 'html' && typeof n.value === 'string' && /<TabItem/.test(n.value),
     );

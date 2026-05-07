@@ -14,7 +14,7 @@
  * No I/O. POSIX path arithmetic (forward slashes throughout).
  */
 
-import { ok, err, type Result } from '../../domain/result.js';
+import { err, ok, type Result } from '../../domain/result.js';
 import type { SlugMap } from '../../domain/starlight/slug-map.js';
 
 export interface RewriteInput {
@@ -35,9 +35,7 @@ export interface BrokenLink {
   readonly fromSourcePath: string;
 }
 
-export function rewriteInternalLink(
-  input: RewriteInput,
-): Result<RewrittenLink, BrokenLink> {
+export function rewriteInternalLink(input: RewriteInput): Result<RewrittenLink, BrokenLink> {
   const { href } = input;
 
   if (isExternal(href)) {
@@ -52,9 +50,7 @@ export function rewriteInternalLink(
     return ok({ kind: 'asset', href: rewriteAssetHref(split, input.fromSourcePath) });
   }
 
-  const targetSourcePath = decodePathSegments(
-    resolveRelative(input.fromSourcePath, split.path),
-  );
+  const targetSourcePath = decodePathSegments(resolveRelative(input.fromSourcePath, split.path));
   const record = input.slugMap.getBySourcePath(targetSourcePath);
   if (record === undefined) {
     return err({
@@ -69,11 +65,7 @@ export function rewriteInternalLink(
 }
 
 function isExternal(href: string): boolean {
-  return (
-    href.startsWith('http://') ||
-    href.startsWith('https://') ||
-    href.startsWith('mailto:')
-  );
+  return href.startsWith('http://') || href.startsWith('https://') || href.startsWith('mailto:');
 }
 
 interface SplitHref {

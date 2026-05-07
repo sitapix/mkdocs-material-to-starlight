@@ -14,8 +14,8 @@
  * edge-case false positives surface as warnings, not errors.
  */
 
-import { STARLIGHT_COMPONENTS } from '../../domain/starlight/component-allowlist.js';
 import type { Diagnostic } from '../../domain/diagnostics/diagnostic.js';
+import { STARLIGHT_COMPONENTS } from '../../domain/starlight/component-allowlist.js';
 
 const JSX_TAG = /<([A-Z][A-Za-z0-9_.]*)/g;
 const NAMED_IMPORT = /import\s*\{([^}]*)\}\s*from\s*['"][^'"]+['"]/g;

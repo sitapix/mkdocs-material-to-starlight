@@ -3,15 +3,11 @@ import { normalizeInlineHilite } from './inlinehilite.js';
 
 describe('normalizeInlineHilite', () => {
   it('strips :::lang prefix from inline code', () => {
-    expect(normalizeInlineHilite('Use `:::python x = 1` here.')).toBe(
-      'Use `x = 1` here.',
-    );
+    expect(normalizeInlineHilite('Use `:::python x = 1` here.')).toBe('Use `x = 1` here.');
   });
 
   it('strips #!lang prefix from inline code', () => {
-    expect(normalizeInlineHilite('Use `#!python x = 1` here.')).toBe(
-      'Use `x = 1` here.',
-    );
+    expect(normalizeInlineHilite('Use `#!python x = 1` here.')).toBe('Use `x = 1` here.');
   });
 
   it('leaves regular inline code alone', () => {
@@ -24,8 +20,6 @@ describe('normalizeInlineHilite', () => {
 
   it('idempotent', () => {
     const src = 'Use `:::python x = 1`.';
-    expect(normalizeInlineHilite(normalizeInlineHilite(src))).toBe(
-      normalizeInlineHilite(src),
-    );
+    expect(normalizeInlineHilite(normalizeInlineHilite(src))).toBe(normalizeInlineHilite(src));
   });
 });

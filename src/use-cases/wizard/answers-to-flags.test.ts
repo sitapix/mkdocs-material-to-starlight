@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { answersToFlags } from './answers-to-flags.js';
 import type { WizardAnswers } from '../../domain/wizard/answers.js';
 import { parseArgs } from '../../interface/cli/parse-args.js';
+import { answersToFlags } from './answers-to-flags.js';
 
 const baseline: WizardAnswers = {
   projectDir: './project',

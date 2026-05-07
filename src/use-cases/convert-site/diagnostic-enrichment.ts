@@ -34,10 +34,50 @@ export function collectUnknownFrontmatterFieldNames(
 // what to do instead of returning a bare "directory not found".
 const DOCS_GENERATING_PLUGINS = ['gen-files', 'monorepo', 'macros'] as const;
 
+/**
+ * Layout context for the missing-docs-dir error. Supplied by the caller
+ * when it has already inspected the project: whether the directory that
+ * holds `mkdocs.yml` itself contains markdown, plus the configured
+ * `docs_dir` value. With this info the enricher can suggest the exact
+ * one-line config fix (`docs_dir: .`) for legacy MkDocs sites whose docs
+ * sit alongside the config without an explicit `docs_dir`.
+ */
+export interface LegacyLayoutHint {
+  readonly configDirHasMarkdown: boolean;
+  readonly configDirRelative: string;
+  readonly configuredDocsDir: string;
+}
+
 export function enrichMissingDocsDirMessage(
   baseMessage: string,
   plugins: ReadonlyArray<{ readonly name: string }>,
+  layout?: LegacyLayoutHint,
 ): string {
+  const lines: string[] = [baseMessage];
+
+  // Show the layout hint first when it applies — it's the most
+  // actionable: a single one-line edit to mkdocs.yml unblocks the
+  // conversion. Real-world sources: jondot/awesome-react-native,
+  // Riverside-Software/pct-mkdocs (legacy mkdocs.yml at root with docs
+  // alongside it); yetone/olo, smarie/python-parsyfiles (mkdocs.yml in
+  // a `docs/` subdirectory with sources next to it).
+  if (
+    layout?.configDirHasMarkdown &&
+    layout.configuredDocsDir !== '.' &&
+    layout.configuredDocsDir !== ''
+  ) {
+    const where =
+      layout.configDirRelative === '.' || layout.configDirRelative === ''
+        ? 'next to your `mkdocs.yml` (project root)'
+        : `next to your \`mkdocs.yml\` in \`${layout.configDirRelative}/\``;
+    lines.push(
+      `hint: your markdown lives ${where}, but \`docs_dir\` points at ` +
+        `\`${layout.configuredDocsDir}\` (which doesn't exist). ` +
+        `Add \`docs_dir: .\` to your \`mkdocs.yml\` so the converter ` +
+        `reads the config directory itself, then re-run.`,
+    );
+  }
+
   const generators = plugins
     .map((p) => p.name)
     .filter((n): n is (typeof DOCS_GENERATING_PLUGINS)[number] =>
@@ -45,27 +85,22 @@ export function enrichMissingDocsDirMessage(
     );
   if (generators.length > 0) {
     const list = generators.map((n) => `\`${n}\``).join(', ');
-    return (
-      `${baseMessage}\n` +
+    lines.push(
       `hint: mkdocs.yml lists the ${list} plugin, which generates docs/ at ` +
-      `build time. Run \`mkdocs build\` (or the plugin's generator script) ` +
-      `first, then point this converter at the materialised docs/ tree.`
+        `build time. Run \`mkdocs build\` (or the plugin's generator script) ` +
+        `first, then point this converter at the materialised docs/ tree.`,
     );
-  }
-  // Generic fallback for the long tail of CI-only generators (custom
-  // plugins, repo-private content pipelines). Tell the user the most
-  // likely cause and what to do — the absence of a recognised generator
-  // doesn't mean the site isn't generator-driven, just that we couldn't
-  // name the specific plugin.
-  if (plugins.length > 0) {
+  } else if (lines.length === 1 && plugins.length > 0) {
+    // Only show the generic plugin fallback when we have no other hint —
+    // otherwise it adds noise without changing the recommended action.
     const detected = plugins.map((p) => `\`${p.name}\``).join(', ');
-    return (
-      `${baseMessage}\n` +
+    lines.push(
       `hint: mkdocs.yml lists ${plugins.length} plugin(s) (${detected}). ` +
-      `One of them may generate the docs/ tree at build time. Try running ` +
-      `\`mkdocs build\` first to materialise the tree, then point this ` +
-      `converter at the resulting directory.`
+        `One of them may generate the docs/ tree at build time. Try running ` +
+        `\`mkdocs build\` first to materialise the tree, then point this ` +
+        `converter at the resulting directory.`,
     );
   }
-  return baseMessage;
+
+  return lines.join('\n');
 }

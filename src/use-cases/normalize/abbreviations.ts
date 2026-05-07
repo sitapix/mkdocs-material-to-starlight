@@ -37,8 +37,8 @@ export function normalizeAbbreviations(source: string): string {
     }
     const match = line.match(DEFINITION);
     if (match !== null && match.groups !== undefined) {
-      const term = match.groups['term'] ?? '';
-      const title = match.groups['title'] ?? '';
+      const term = match.groups.term ?? '';
+      const title = match.groups.title ?? '';
       if (term.length > 0 && !definitions.has(term)) {
         definitions.set(term, title);
       }
@@ -83,14 +83,20 @@ function rewriteLine(
   sortedTerms: ReadonlyArray<string>,
   definitions: ReadonlyMap<string, string>,
 ): string {
-  let out = line;
-  for (const term of sortedTerms) {
-    const title = definitions.get(term) ?? '';
-    const escaped = escapeRegex(term);
-    const pattern = new RegExp(`(?<![A-Za-z0-9_])${escaped}(?![A-Za-z0-9_])`, 'g');
-    out = out.replace(pattern, `<abbr title="${title}">${term}</abbr>`);
-  }
-  return out;
+  if (sortedTerms.length === 0) return line;
+  // Single combined pass, longest-first alternation. A per-term sequential
+  // pass would let the second term match text *inside* the first term's
+  // freshly-injected `<abbr title="…">` attribute value — producing nested
+  // `<abbr>` tags inside an attribute, which MDX rejects (real-world:
+  // DaoCloud_DaoCloud-docs/dce/index.md, where `*[DCE]:` defines a title
+  // containing the literal `AI` and `*[AI]:` defines a title containing
+  // `DCE 5.0`).
+  const escaped = sortedTerms.map((t) => escapeRegex(t)).join('|');
+  const pattern = new RegExp(`(?<![A-Za-z0-9_])(?:${escaped})(?![A-Za-z0-9_])`, 'g');
+  return line.replace(pattern, (match) => {
+    const title = definitions.get(match) ?? '';
+    return `<abbr title="${title}">${match}</abbr>`;
+  });
 }
 
 function escapeRegex(value: string): string {

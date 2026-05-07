@@ -11,19 +11,18 @@
  */
 
 import { join } from 'node:path';
+import type { MkdocsNavEntry, MkdocsPlugin } from '../../domain/config/mkdocs-config.js';
+import type { Diagnostic } from '../../domain/diagnostics/diagnostic.js';
 import type { FileSystem } from '../../domain/ports/file-system.js';
 import type { YamlDecoder } from '../../domain/ports/yaml-decoder.js';
-import type { MkdocsPlugin } from '../../domain/config/mkdocs-config.js';
-import type { MkdocsNavEntry } from '../../domain/config/mkdocs-config.js';
-import type { Diagnostic } from '../../domain/diagnostics/diagnostic.js';
 import type { Result } from '../../domain/result.js';
+import { err, ok } from '../../domain/result.js';
 import type { SidebarEntry } from '../../domain/starlight/sidebar.js';
 import type { SlugMap } from '../../domain/starlight/slug-map.js';
-import { ok, err } from '../../domain/result.js';
-import { collectCandidateDirectories } from './collect-candidate-directories.js';
 import { loadAwesomePagesFiles } from '../config/load-awesome-pages.js';
 import { compileSidebarEntries } from '../convert-site/compile-sidebar-entries.js';
 import { applyPagesOverrides } from './apply-pages.js';
+import { collectCandidateDirectories } from './collect-candidate-directories.js';
 import { filterSidebarSlugs } from './filter-sidebar-slugs.js';
 import { resolveLiterateNav } from './resolve-literate-nav.js';
 
@@ -109,16 +108,14 @@ export async function buildSidebar(
 function readBlogDirOption(plugins: ReadonlyArray<MkdocsPlugin>): { readonly blogDir?: string } {
   const bp = plugins.find((p) => p.name === 'blog');
   if (bp === undefined) return {};
-  const dir =
-    typeof bp.options['blog_dir'] === 'string' ? (bp.options['blog_dir'] as string) : 'blog';
+  const dir = typeof bp.options.blog_dir === 'string' ? (bp.options.blog_dir as string) : 'blog';
   return { blogDir: dir };
 }
 
 function blogDroppedSlugs(plugins: ReadonlyArray<MkdocsPlugin>): ReadonlySet<string> {
   const bp = plugins.find((p) => p.name === 'blog');
   if (bp === undefined) return new Set<string>();
-  const dir =
-    typeof bp.options['blog_dir'] === 'string' ? (bp.options['blog_dir'] as string) : 'blog';
+  const dir = typeof bp.options.blog_dir === 'string' ? (bp.options.blog_dir as string) : 'blog';
   return new Set([`${dir}/posts/index`, `${dir}/posts/tags`, `${dir}/posts/archive`]);
 }
 

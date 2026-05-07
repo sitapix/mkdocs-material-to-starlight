@@ -15,9 +15,9 @@
  *   - Pure given the AST: no I/O.
  */
 
-import { visit } from 'unist-util-visit';
-import type { Plugin } from 'unified';
 import type { Root } from 'mdast';
+import type { Plugin } from 'unified';
+import { visit } from 'unist-util-visit';
 
 interface ContainerDirectiveLike {
   type: 'containerDirective';

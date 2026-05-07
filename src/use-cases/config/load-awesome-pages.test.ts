@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { loadAwesomePagesFiles } from './load-awesome-pages.js';
 import type { FileSystem } from '../../domain/ports/file-system.js';
-import { ok, err } from '../../domain/result.js';
+import { err, ok } from '../../domain/result.js';
 import { createJsYamlDecoder } from '../../infrastructure/yaml/js-yaml-decoder.js';
+import { loadAwesomePagesFiles } from './load-awesome-pages.js';
 
 function makeFs(files: Record<string, string>): FileSystem {
   return {
@@ -14,7 +14,7 @@ function makeFs(files: Record<string, string>): FileSystem {
       return ok(content);
     },
     async exists(path) {
-      return Object.prototype.hasOwnProperty.call(files, path);
+      return Object.hasOwn(files, path);
     },
     async realpath(path) {
       return ok(path);

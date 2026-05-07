@@ -51,11 +51,11 @@ export async function resolveThemeAssets(
 ): Promise<ThemeAssetsResolution> {
   const isLocalAssetPath = (v: unknown): v is string =>
     typeof v === 'string' && !ABSOLUTE_URL.test(v);
-  const logoSrcCandidate = isLocalAssetPath(input.themeOptions['logo'])
-    ? input.themeOptions['logo']
+  const logoSrcCandidate = isLocalAssetPath(input.themeOptions.logo)
+    ? input.themeOptions.logo
     : null;
-  const faviconRawCandidate = isLocalAssetPath(input.themeOptions['favicon'])
-    ? input.themeOptions['favicon']
+  const faviconRawCandidate = isLocalAssetPath(input.themeOptions.favicon)
+    ? input.themeOptions.favicon
     : null;
 
   const exists = async (rel: string | null): Promise<boolean> =>

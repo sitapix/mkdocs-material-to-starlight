@@ -13,13 +13,13 @@
  *   4. A plugin's dependency must appear in an earlier (or same) stage.
  */
 
+import { err, ok, type Result } from '../../domain/result.js';
 import {
   PIPELINE_STAGES,
-  validatePluginDescriptor,
   type PipelineStage,
   type PluginDescriptor,
+  validatePluginDescriptor,
 } from '../../domain/transform/plugin-contract.js';
-import { ok, err, type Result } from '../../domain/result.js';
 
 interface AssemblyError {
   readonly message: string;
@@ -27,9 +27,7 @@ interface AssemblyError {
 
 export type AssemblyResult = Result<ReadonlyArray<PluginDescriptor>, AssemblyError>;
 
-export function assemblePipeline(
-  plugins: ReadonlyArray<PluginDescriptor>,
-): AssemblyResult {
+export function assemblePipeline(plugins: ReadonlyArray<PluginDescriptor>): AssemblyResult {
   const descriptorError = findDescriptorError(plugins);
   if (descriptorError !== null) {
     return err(descriptorError);
@@ -48,9 +46,7 @@ export function assemblePipeline(
   return ok(orderByStage(plugins));
 }
 
-function findDescriptorError(
-  plugins: ReadonlyArray<PluginDescriptor>,
-): AssemblyError | null {
+function findDescriptorError(plugins: ReadonlyArray<PluginDescriptor>): AssemblyError | null {
   for (const p of plugins) {
     const result = validatePluginDescriptor(p);
     if (!result.ok) {
@@ -60,9 +56,7 @@ function findDescriptorError(
   return null;
 }
 
-function findNamespaceCollision(
-  plugins: ReadonlyArray<PluginDescriptor>,
-): AssemblyError | null {
+function findNamespaceCollision(plugins: ReadonlyArray<PluginDescriptor>): AssemblyError | null {
   const seen = new Map<string, string>();
   for (const p of plugins) {
     for (const claim of p.ownsNamespaces) {
@@ -81,9 +75,7 @@ function findNamespaceCollision(
   return null;
 }
 
-function findDependencyError(
-  plugins: ReadonlyArray<PluginDescriptor>,
-): AssemblyError | null {
+function findDependencyError(plugins: ReadonlyArray<PluginDescriptor>): AssemblyError | null {
   const byId = new Map(plugins.map((p) => [p.id, p]));
   for (const p of plugins) {
     for (const depId of p.dependsOn) {
@@ -103,9 +95,7 @@ function findDependencyError(
   return null;
 }
 
-function orderByStage(
-  plugins: ReadonlyArray<PluginDescriptor>,
-): ReadonlyArray<PluginDescriptor> {
+function orderByStage(plugins: ReadonlyArray<PluginDescriptor>): ReadonlyArray<PluginDescriptor> {
   return [...plugins].sort((a, b) => stageIndex(a.stage) - stageIndex(b.stage));
 }
 

@@ -17,10 +17,17 @@ const FRONTMATTER_RE = /^---\n([\s\S]*?)\n---/;
 const SCALAR_LINE_RE = /^([A-Za-z_][A-Za-z0-9_-]*)\s*:\s*(.+?)\s*$/;
 const BLOCK_KEY_RE = /^([A-Za-z_][A-Za-z0-9_-]*)\s*:\s*$/;
 const ITEM_LINE_RE = /^[ \t]+-\s*(.*)\s*$/;
-const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}(?:T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+\-]\d{2}:?\d{2})?)?$/;
+const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}(?:T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:?\d{2})?)?$/;
 const INLINE_ARRAY_RE = /^\[(.*)\]$/;
 
-type Observation = 'string' | 'number' | 'boolean' | 'date' | 'array-of-string' | 'object' | 'unknown';
+type Observation =
+  | 'string'
+  | 'number'
+  | 'boolean'
+  | 'date'
+  | 'array-of-string'
+  | 'object'
+  | 'unknown';
 
 export interface FrontmatterDoc {
   readonly source: string;
@@ -107,7 +114,10 @@ function classifyScalar(rawValue: string): Observation {
   if (value.length === 0) return 'unknown';
   const inlineArr = value.match(INLINE_ARRAY_RE);
   if (inlineArr !== null) {
-    const items = (inlineArr[1] ?? '').split(',').map((s) => s.trim()).filter((s) => s.length > 0);
+    const items = (inlineArr[1] ?? '')
+      .split(',')
+      .map((s) => s.trim())
+      .filter((s) => s.length > 0);
     return items.length === 0 ? 'unknown' : 'array-of-string';
   }
   // YAML 1.2 recognises `true|True|TRUE|false|False|FALSE` as boolean —
@@ -123,11 +133,7 @@ function classifyScalar(rawValue: string): Observation {
   return 'string';
 }
 
-function addObservation(
-  out: Map<string, Set<Observation>>,
-  key: string,
-  obs: Observation,
-): void {
+function addObservation(out: Map<string, Set<Observation>>, key: string, obs: Observation): void {
   const set = out.get(key) ?? new Set<Observation>();
   set.add(obs);
   out.set(key, set);

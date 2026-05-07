@@ -7,15 +7,7 @@ describe('scanTabAnchors', () => {
   });
 
   it('emits one diagnostic when content tabs are present', () => {
-    const src = [
-      '# Demo',
-      '',
-      '=== "macOS"',
-      '    body',
-      '=== "Linux"',
-      '    body',
-      '',
-    ].join('\n');
+    const src = ['# Demo', '', '=== "macOS"', '    body', '=== "Linux"', '    body', ''].join('\n');
     const diags = scanTabAnchors(src);
     expect(diags).toHaveLength(1);
     expect(diags[0]?.ruleId).toBe('tab-anchors-not-preserved');

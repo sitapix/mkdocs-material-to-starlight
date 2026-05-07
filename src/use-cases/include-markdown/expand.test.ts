@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { expandIncludeMarkdown } from './expand.js';
 import type { FileSystem } from '../../domain/ports/file-system.js';
-import { ok, err } from '../../domain/result.js';
+import { err, ok } from '../../domain/result.js';
+import { expandIncludeMarkdown } from './expand.js';
 
 function memFs(files: Record<string, string>): FileSystem {
   return {
@@ -13,7 +13,7 @@ function memFs(files: Record<string, string>): FileSystem {
       return ok(value);
     },
     async exists(path) {
-      return Object.prototype.hasOwnProperty.call(files, path);
+      return Object.hasOwn(files, path);
     },
     async realpath(path) {
       return ok(path);
@@ -55,13 +55,7 @@ describe('expandIncludeMarkdown', () => {
   });
 
   it('extracts content between start= and end= markers (include-markdown only)', async () => {
-    const body = [
-      'pre',
-      '<!--start-->',
-      'pulled',
-      '<!--end-->',
-      'post',
-    ].join('\n');
+    const body = ['pre', '<!--start-->', 'pulled', '<!--end-->', 'post'].join('\n');
     const fs = memFs({ '/docs/snip.md': body });
     const out = await expandIncludeMarkdown({
       source: '{% include-markdown "snip.md" start="<!--start-->" end="<!--end-->" %}',
@@ -92,9 +86,9 @@ describe('expandIncludeMarkdown', () => {
       docsDir: '/docs',
       fs,
     });
-    expect(
-      out.diagnostics.some((d) => d.ruleId === 'plugin-include-markdown-not-found'),
-    ).toBe(true);
+    expect(out.diagnostics.some((d) => d.ruleId === 'plugin-include-markdown-not-found')).toBe(
+      true,
+    );
     // Marker should be left in place so the source stays inspectable.
     expect(out.text).toContain('{% include "missing.md" %}');
   });
@@ -114,13 +108,7 @@ describe('expandIncludeMarkdown', () => {
 
   it('handles multi-line directive blocks (Jinja-style multi-line {% ... %})', async () => {
     const fs = memFs({ '/docs/shared.md': 'shared body' });
-    const source = [
-      'before',
-      '{%',
-      '  include-markdown "shared.md"',
-      '%}',
-      'after',
-    ].join('\n');
+    const source = ['before', '{%', '  include-markdown "shared.md"', '%}', 'after'].join('\n');
     const out = await expandIncludeMarkdown({ source, docsDir: '/docs', fs });
     expect(out.text).toContain('shared body');
     expect(out.text).not.toContain('include-markdown');

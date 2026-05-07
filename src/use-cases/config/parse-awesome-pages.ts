@@ -11,40 +11,36 @@
  * compiler can decide where to place files not explicitly listed.
  */
 
-import { ok, err, type Result } from '../../domain/result.js';
 import type {
   AwesomePagesConfig,
   AwesomePagesNavEntry,
 } from '../../domain/config/awesome-pages.js';
+import { err, ok, type Result } from '../../domain/result.js';
 
 export interface ConfigError {
   readonly message: string;
 }
 
-export function parseAwesomePages(
-  raw: unknown,
-): Result<AwesomePagesConfig, ConfigError> {
+export function parseAwesomePages(raw: unknown): Result<AwesomePagesConfig, ConfigError> {
   if (!isPlainObject(raw)) {
     return err({ message: '.pages must be a YAML mapping (object)' });
   }
 
-  const navRaw = raw['nav'] ?? raw['arrange'] ?? null;
+  const navRaw = raw.nav ?? raw.arrange ?? null;
   const nav = navRaw === null ? null : parseNav(navRaw);
   if (nav !== null && !nav.ok) {
     return nav;
   }
 
   return ok({
-    title: typeof raw['title'] === 'string' ? raw['title'] : null,
+    title: typeof raw.title === 'string' ? raw.title : null,
     nav: nav === null ? null : nav.value,
-    collapse: typeof raw['collapse'] === 'boolean' ? raw['collapse'] : null,
-    hide: raw['hide'] === true,
+    collapse: typeof raw.collapse === 'boolean' ? raw.collapse : null,
+    hide: raw.hide === true,
   });
 }
 
-function parseNav(
-  raw: unknown,
-): Result<ReadonlyArray<AwesomePagesNavEntry>, ConfigError> {
+function parseNav(raw: unknown): Result<ReadonlyArray<AwesomePagesNavEntry>, ConfigError> {
   if (!Array.isArray(raw)) {
     return err({ message: 'nav (or arrange) must be a list' });
   }

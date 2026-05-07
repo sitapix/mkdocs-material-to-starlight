@@ -16,15 +16,15 @@
 
 import { access, readFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { createJsYamlDecoder } from '../../infrastructure/yaml/js-yaml-decoder.js';
-import { parseMkdocsConfig } from '../../use-cases/config/parse-mkdocs.js';
-import { createNodeConfigDiscoverer } from '../../infrastructure/fs/node-config-discoverer.js';
-import {
-  rankCandidates,
-  type ConfigCandidate,
-} from '../../use-cases/discover-config/rank-candidates.js';
 import type { MkdocsConfig } from '../../domain/config/mkdocs-config.js';
 import type { Prompter } from '../../domain/wizard/ports/prompter.js';
+import { createNodeConfigDiscoverer } from '../../infrastructure/fs/node-config-discoverer.js';
+import { createJsYamlDecoder } from '../../infrastructure/yaml/js-yaml-decoder.js';
+import { parseMkdocsConfig } from '../../use-cases/config/parse-mkdocs.js';
+import {
+  type ConfigCandidate,
+  rankCandidates,
+} from '../../use-cases/discover-config/rank-candidates.js';
 
 export interface LoadedConfig {
   readonly projectDir: string;
@@ -65,7 +65,10 @@ export async function readProjectDirInteractively(
     if (resolved === 'cancelled') return 'cancelled';
     if (resolved === 'not-found') {
       prompter.log.error(
-        `No mkdocs.yml at ${inputDir} or in any subdirectory (searched depth 4, pruning node_modules/dist/build/.git/site/...).`,
+        `No mkdocs.yml found at ${inputDir} (searched up to 4 levels deep). ` +
+          `Point this wizard at the directory that contains mkdocs.yml. That is ` +
+          `usually the project root, or a subdirectory like docs/ or website/. ` +
+          `Primer on mkdocs.yml: https://www.mkdocs.org/user-guide/configuration/.`,
       );
       hint = inputDir;
       continue;
@@ -101,7 +104,9 @@ export async function readProjectDirInteractively(
     };
   }
   prompter.log.error(
-    `Gave up after ${String(PROJECT_DIR_MAX_ATTEMPTS)} attempts. Run with --help to see CLI flags.`,
+    `Could not locate mkdocs.yml after ${String(PROJECT_DIR_MAX_ATTEMPTS)} attempts. ` +
+      `Re-run the wizard with the path as an argument (e.g. \`mkdocs-material-to-starlight ./docs/\`), ` +
+      `or run \`mkdocs-material-to-starlight --help\` for non-interactive options.`,
   );
   return 'cancelled';
 }

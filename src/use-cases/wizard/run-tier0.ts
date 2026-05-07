@@ -1,12 +1,12 @@
-import type { Prompter } from '../../domain/wizard/ports/prompter.js';
-import type { ConversionPlan } from '../../domain/wizard/plan.js';
+import { err, ok, type Result } from '../../domain/result.js';
 import {
   type DefaultAnswers,
   type PackageManager,
-  type WizardCancelled,
   WIZARD_CANCELLED,
+  type WizardCancelled,
 } from '../../domain/wizard/answers.js';
-import { type Result, err, ok } from '../../domain/result.js';
+import type { ConversionPlan } from '../../domain/wizard/plan.js';
+import type { Prompter } from '../../domain/wizard/ports/prompter.js';
 import { deriveOutputDirName } from './derive-defaults.js';
 
 export interface Tier0Answers {

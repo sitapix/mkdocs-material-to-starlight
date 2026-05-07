@@ -1,8 +1,9 @@
 /**
- * Pre-parse normalizer: wrap fastapi's `{* path *}` source-include marker
- * in a fenced code block so it round-trips through remark.
+ * Pre-parse normalizer: wrap a `{* path *}` source-include marker in a
+ * fenced code block so it round-trips through remark.
  *
- * fastapi inlines source files at build time:
+ * Some sites (Tiangolo-template projects) inline source files at build
+ * time using this directive:
  *   {* ../../docs_src/first_steps/tutorial001.py *}
  *   {* ../../docs_src/first_steps/tutorial001.py hl[3] *}
  *
@@ -19,9 +20,9 @@ import { isFenceLine } from '../../domain/syntax/fence.js';
 
 // Whole-line `{* ... *}` marker. Captures any payload between the markers
 // (path + optional `hl[N]` highlight, etc.) but does not require it.
-const FASTAPI_INCLUDE_LINE = /^\s*\{\*\s.+\s\*\}\s*$/;
+const SOURCE_INCLUDE_LINE = /^\s*\{\*\s.+\s\*\}\s*$/;
 
-export function normalizeFastapiIncludes(source: string): string {
+export function normalizeSourceIncludeFence(source: string): string {
   const lines = source.split('\n');
   const out: string[] = [];
   let inFence = false;
@@ -35,7 +36,7 @@ export function normalizeFastapiIncludes(source: string): string {
       out.push(line);
       continue;
     }
-    if (!FASTAPI_INCLUDE_LINE.test(line)) {
+    if (!SOURCE_INCLUDE_LINE.test(line)) {
       out.push(line);
       continue;
     }

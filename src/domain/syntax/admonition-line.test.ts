@@ -96,7 +96,9 @@ describe('parseAdmonitionLine', () => {
 
   it('parses an unquoted title (lenient — Material expects quotes but real-world content drops them)', () => {
     // Real-world example from pydantic: `!!! warning Polymorphic serialization of standard library dataclasses`
-    const out = parseAdmonitionLine('!!! warning Polymorphic serialization of standard library dataclasses');
+    const out = parseAdmonitionLine(
+      '!!! warning Polymorphic serialization of standard library dataclasses',
+    );
     expect(out).not.toBeNull();
     expect(out?.type).toBe('warning');
     expect(out?.title).toBe('Polymorphic serialization of standard library dataclasses');

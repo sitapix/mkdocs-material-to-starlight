@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { formatReport } from './format-report.js';
 import { createDiagnostic } from '../../domain/diagnostics/diagnostic.js';
+import { formatReport } from './format-report.js';
 
 describe('formatReport', () => {
   it('reports zero diagnostics with a success line', () => {

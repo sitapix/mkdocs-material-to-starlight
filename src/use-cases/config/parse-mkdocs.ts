@@ -13,7 +13,6 @@
  * walks them separately to produce a typed tree.
  */
 
-import { ok, err, type Result } from '../../domain/result.js';
 import type {
   MkdocsConfig,
   MkdocsMarkdownExtension,
@@ -21,6 +20,7 @@ import type {
   MkdocsPlugin,
   MkdocsTheme,
 } from '../../domain/config/mkdocs-config.js';
+import { err, ok, type Result } from '../../domain/result.js';
 
 export interface ConfigError {
   readonly message: string;
@@ -47,7 +47,7 @@ export function parseMkdocsConfig(raw: unknown): Result<MkdocsConfig, ConfigErro
     return err({ message: 'mkdocs config must be a YAML mapping (object)' });
   }
 
-  const siteName = raw['site_name'];
+  const siteName = raw.site_name;
   if (typeof siteName !== 'string') {
     return err({ message: 'site_name is required and must be a string' });
   }
@@ -56,20 +56,19 @@ export function parseMkdocsConfig(raw: unknown): Result<MkdocsConfig, ConfigErro
 
   return ok({
     siteName,
-    siteDescription: stringOrNull(raw['site_description']),
-    siteUrl: stringOrNull(raw['site_url']),
-    docsDir: typeof raw['docs_dir'] === 'string' ? raw['docs_dir'] : 'docs',
-    useDirectoryUrls:
-      typeof raw['use_directory_urls'] === 'boolean' ? raw['use_directory_urls'] : true,
-    repoUrl: stringOrNull(raw['repo_url']),
-    repoName: stringOrNull(raw['repo_name']),
-    editUri: stringOrNull(raw['edit_uri']),
-    copyright: stringOrNull(raw['copyright']),
-    theme: parseTheme(raw['theme']),
-    nav: parseRawNav(raw['nav']),
-    plugins: parseList(raw['plugins'], (entry) => entry satisfies MkdocsPlugin),
+    siteDescription: stringOrNull(raw.site_description),
+    siteUrl: stringOrNull(raw.site_url),
+    docsDir: typeof raw.docs_dir === 'string' ? raw.docs_dir : 'docs',
+    useDirectoryUrls: typeof raw.use_directory_urls === 'boolean' ? raw.use_directory_urls : true,
+    repoUrl: stringOrNull(raw.repo_url),
+    repoName: stringOrNull(raw.repo_name),
+    editUri: stringOrNull(raw.edit_uri),
+    copyright: stringOrNull(raw.copyright),
+    theme: parseTheme(raw.theme),
+    nav: parseRawNav(raw.nav),
+    plugins: parseList(raw.plugins, (entry) => entry satisfies MkdocsPlugin),
     markdownExtensions: parseList(
-      raw['markdown_extensions'],
+      raw.markdown_extensions,
       (entry) => entry satisfies MkdocsMarkdownExtension,
     ),
     extras: collectExtras(raw),
@@ -91,7 +90,7 @@ function parseTheme(value: unknown): MkdocsTheme | null {
   if (!isPlainObject(value)) {
     return null;
   }
-  const name = value['name'];
+  const name = value.name;
   if (typeof name !== 'string') {
     return null;
   }

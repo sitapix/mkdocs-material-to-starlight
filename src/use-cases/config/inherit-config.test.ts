@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { resolveInherits } from './inherit-config.js';
 import type { FileSystem } from '../../domain/ports/file-system.js';
-import { ok, err } from '../../domain/result.js';
+import { err, ok } from '../../domain/result.js';
+import { resolveInherits } from './inherit-config.js';
 
 function memFs(files: Record<string, string>): FileSystem {
   return {
@@ -11,7 +11,7 @@ function memFs(files: Record<string, string>): FileSystem {
       return ok(v);
     },
     async exists(p) {
-      return Object.prototype.hasOwnProperty.call(files, p);
+      return Object.hasOwn(files, p);
     },
     async realpath(p) {
       return ok(p);
@@ -134,14 +134,14 @@ describe('resolveInherits', () => {
     expect(parsed).toBeDefined();
 
     // theme.name comes from base
-    const theme = parsed['theme'] as Record<string, unknown>;
-    expect(theme['name']).toBe('material');
+    const theme = parsed.theme as Record<string, unknown>;
+    expect(theme.name).toBe('material');
 
     // theme.features = derived array (not concat)
-    expect(theme['features']).toEqual(['content.tabs.link']);
+    expect(theme.features).toEqual(['content.tabs.link']);
 
     // plugins = derived array (not concat)
-    expect(parsed['plugins']).toEqual(['rss']);
+    expect(parsed.plugins).toEqual(['rss']);
   });
 
   it('handles !ENV custom tags in inherited yaml without crashing (FastAPI/typer regression)', async () => {
@@ -164,7 +164,7 @@ describe('resolveInherits', () => {
       ].join('\n'),
     });
     const result = await resolveInherits(
-      await fs.readText('/p/mkdocs.yml').then(r => (r as { value: string }).value),
+      await fs.readText('/p/mkdocs.yml').then((r) => (r as { value: string }).value),
       '/p/mkdocs.yml',
       fs,
     );
@@ -199,7 +199,9 @@ describe('resolveInherits', () => {
 
     // Must parse without error
     const yaml = await import('js-yaml');
-    expect(() => { yaml.load(out.source); }).not.toThrow();
+    expect(() => {
+      yaml.load(out.source);
+    }).not.toThrow();
 
     // Only ONE markdown_extensions key at the top level
     const keyCount = (out.source.match(/^markdown_extensions:/gm) ?? []).length;

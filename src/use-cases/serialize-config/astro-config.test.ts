@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { serializeAstroConfig } from './astro-config.js';
 import type { SidebarEntry } from '../../domain/starlight/sidebar.js';
+import { serializeAstroConfig } from './astro-config.js';
 
 describe('serializeAstroConfig extraHeadEntries', () => {
   it('emits arbitrary head[] entries (script with content, link tags) alongside extraJsEntries', () => {
@@ -25,7 +25,7 @@ describe('serializeAstroConfig extraHeadEntries', () => {
       ],
     });
     expect(out).toContain("src: 'https://example.com/x.js'");
-    expect(out).toContain("content: \"console.log('inline')\"");
+    expect(out).toContain('content: "console.log(\'inline\')"');
     expect(out).toContain("tag: 'link'");
     expect(out).toContain("rel: 'preconnect'");
   });
@@ -142,9 +142,7 @@ describe('serializeAstroConfig', () => {
     // The output must not contain a literal newline inside the description
     // string — verify by reconstructing the description line and asserting
     // it stays on one line.
-    const descLine = out
-      .split('\n')
-      .find((l) => l.trim().startsWith('description:'));
+    const descLine = out.split('\n').find((l) => l.trim().startsWith('description:'));
     expect(descLine).toBeDefined();
     expect(descLine).not.toMatch(/\n/);
   });
@@ -567,7 +565,7 @@ describe('serializeAstroConfig mikeVersions', () => {
     expect(out).toContain("{ slug: '1.0' }");
     expect(out).toContain("{ slug: '2.0' }");
     expect(out).toContain("{ slug: '3.0' }");
-    expect(out).not.toContain("{ slug: '2.0' }," + "\n" + "          { slug: '3.0' }");
+    expect(out).not.toContain("{ slug: '2.0' }," + '\n' + "          { slug: '3.0' }");
   });
 
   it('emits an empty versions array when mikeVersions is an empty array', () => {
@@ -626,7 +624,7 @@ describe('serializeAstroConfig useDirectoryUrls', () => {
       useDirectoryUrls: true,
       sidebar: [],
     });
-    expect(out).not.toContain("build:");
+    expect(out).not.toContain('build:');
   });
 
   it('does NOT emit a build entry when useDirectoryUrls is omitted (defaults to MkDocs default)', () => {
@@ -636,6 +634,6 @@ describe('serializeAstroConfig useDirectoryUrls', () => {
       siteUrl: null,
       sidebar: [],
     });
-    expect(out).not.toContain("build:");
+    expect(out).not.toContain('build:');
   });
 });

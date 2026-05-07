@@ -16,13 +16,12 @@
  */
 
 import {
-  parseAdmonitionLine,
   type AdmonitionOpening,
+  parseAdmonitionLine,
 } from '../../domain/syntax/admonition-line.js';
-import { readIndentedBlock } from '../../domain/syntax/indented-block.js';
 import { parseBlocksLine } from '../../domain/syntax/blocks-line.js';
-
 import { isFenceLine } from '../../domain/syntax/fence.js';
+import { readIndentedBlock } from '../../domain/syntax/indented-block.js';
 
 const BODY_INDENT = 4;
 
@@ -92,11 +91,7 @@ function normalizeBlock(lines: ReadonlyArray<string>): NormalizedBlock {
       continue;
     }
 
-    const block = readIndentedBlock(
-      lines,
-      i + 1,
-      opening.indent + BODY_INDENT,
-    );
+    const block = readIndentedBlock(lines, i + 1, opening.indent + BODY_INDENT);
 
     // Recurse into the body before choosing our own fence depth: an
     // admonition that wraps other admonitions must use STRICTLY MORE colons

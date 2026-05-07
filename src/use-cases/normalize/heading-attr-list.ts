@@ -28,8 +28,7 @@ import { isFenceLine } from '../../domain/syntax/fence.js';
 //   group 1 = leading hashes + space + heading text (no trailing whitespace)
 //   group 2 = the attr_list blob (we discard it)
 //   group 3 = optional closing-hash suffix (preserved if present)
-const HEADING_WITH_ATTRS =
-  /^(#{1,6} [^\n{]+?)\s*\{[^}\n]*\}\s*(#*)\s*$/;
+const HEADING_WITH_ATTRS = /^(#{1,6} [^\n{]+?)\s*\{[^}\n]*\}\s*(#*)\s*$/;
 
 export function normalizeHeadingAttrList(source: string): string {
   const lines = source.split('\n');

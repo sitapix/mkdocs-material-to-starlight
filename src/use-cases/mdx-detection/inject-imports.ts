@@ -16,16 +16,15 @@
 import { starlightBuiltins } from './detect.js';
 
 const FRONTMATTER_RE = /^(---\n[\s\S]*?\n---\n)/;
-const STARLIGHT_IMPORT_RE = /^import\s*\{\s*([^}]*)\s*\}\s*from\s*['"]@astrojs\/starlight\/components['"];?/m;
+const STARLIGHT_IMPORT_RE =
+  /^import\s*\{\s*([^}]*)\s*\}\s*from\s*['"]@astrojs\/starlight\/components['"];?/m;
 
 export function injectStarlightImports(
   source: string,
   usedComponents: ReadonlyArray<string>,
 ): string {
   const builtins = starlightBuiltins();
-  const needed = [...new Set(usedComponents)]
-    .filter((name) => builtins.has(name))
-    .sort();
+  const needed = [...new Set(usedComponents)].filter((name) => builtins.has(name)).sort();
   if (needed.length === 0) return source;
 
   const existing = source.match(STARLIGHT_IMPORT_RE);

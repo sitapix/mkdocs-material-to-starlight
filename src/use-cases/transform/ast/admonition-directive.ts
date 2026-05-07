@@ -17,18 +17,18 @@
  *   - Pure given the AST. The source normalizer handles type fallbacks.
  */
 
-import { visit, SKIP } from 'unist-util-visit';
-import type { Plugin } from 'unified';
 import type { Blockquote, Root } from 'mdast';
+import type { Plugin } from 'unified';
+import { SKIP, visit } from 'unist-util-visit';
 import {
-  parseAdmonitionType,
   type AdmonitionType,
+  parseAdmonitionType,
 } from '../../../domain/syntax/admonition-type.js';
 import {
-  mapAdmonitionToAside,
   type AsideDescriptor,
   type BlockquoteDescriptor,
   type MappedAdmonition,
+  mapAdmonitionToAside,
 } from '../admonition-mapping.js';
 
 interface ContainerDirectiveLike {
@@ -45,12 +45,7 @@ interface DirectiveData {
   hProperties?: Record<string, string>;
 }
 
-const STARLIGHT_NAMES: ReadonlySet<string> = new Set([
-  'note',
-  'tip',
-  'caution',
-  'danger',
-]);
+const STARLIGHT_NAMES: ReadonlySet<string> = new Set(['note', 'tip', 'caution', 'danger']);
 
 export const transformAdmonitionDirectives: Plugin<[], Root> = () => {
   return (tree) => {
@@ -106,14 +101,14 @@ function replaceWithBlockquote(
 type CollapsibleState = 'open' | 'closed';
 
 function readCollapsible(directive: ContainerDirectiveLike): CollapsibleState | null {
-  const value = directive.attributes?.['collapsible'];
+  const value = directive.attributes?.collapsible;
   if (value === 'open') return 'open';
   if (value === 'closed') return 'closed';
   return null;
 }
 
 function readTitle(directive: ContainerDirectiveLike): string | null {
-  const attr = directive.attributes?.['title'] ?? directive.attributes?.['label'];
+  const attr = directive.attributes?.title ?? directive.attributes?.label;
   if (typeof attr === 'string' && attr.length > 0) {
     return attr;
   }
@@ -178,8 +173,8 @@ function applyAsideRename(
 
   if (mapping.iconHint !== undefined) {
     const attrs = directive.attributes ?? {};
-    if (attrs['icon'] === undefined || attrs['icon'] === null) {
-      attrs['icon'] = mapping.iconHint;
+    if (attrs.icon === undefined || attrs.icon === null) {
+      attrs.icon = mapping.iconHint;
     }
     directive.attributes = attrs;
   }

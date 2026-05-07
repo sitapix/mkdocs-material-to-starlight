@@ -35,7 +35,9 @@ export function extractAlternateLocales(
   if (!Array.isArray(raw)) return null;
   const entries = raw
     .map(parseEntry)
-    .filter((e): e is { code: string; label: string; isDefault: boolean; isRoot: boolean } => e !== null);
+    .filter(
+      (e): e is { code: string; label: string; isDefault: boolean; isRoot: boolean } => e !== null,
+    );
   if (entries.length === 0) return null;
 
   let defaultIdx = entries.findIndex((e) => e.isDefault);
@@ -54,9 +56,7 @@ export function extractAlternateLocales(
 
 function parseEntry(
   raw: unknown,
-):
-  | { code: string; label: string; isDefault: boolean; isRoot: boolean }
-  | null {
+): { code: string; label: string; isDefault: boolean; isRoot: boolean } | null {
   if (typeof raw !== 'object' || raw === null) return null;
   const obj = raw as Record<string, unknown>;
   const code = typeof obj.lang === 'string' ? obj.lang : null;

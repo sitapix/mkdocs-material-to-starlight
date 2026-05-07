@@ -16,14 +16,10 @@
  */
 
 import type {
-  SidebarEntry,
-  GroupEntry,
-  SlugEntry,
-} from '../../domain/starlight/sidebar.js';
-import type {
   AwesomePagesConfig,
   AwesomePagesNavEntry,
 } from '../../domain/config/awesome-pages.js';
+import type { GroupEntry, SidebarEntry, SlugEntry } from '../../domain/starlight/sidebar.js';
 
 export type AwesomePagesMap = ReadonlyMap<string, AwesomePagesConfig>;
 
@@ -41,10 +37,7 @@ export function applyPagesOverrides(
   return out;
 }
 
-function applyToEntry(
-  entry: SidebarEntry,
-  pages: AwesomePagesMap,
-): SidebarEntry | null {
+function applyToEntry(entry: SidebarEntry, pages: AwesomePagesMap): SidebarEntry | null {
   if (entry.kind !== 'group') {
     return entry;
   }

@@ -46,12 +46,7 @@ describe('preprocessMkdocsEnvTags', () => {
       '',
     ].join('\n');
     expect(preprocessMkdocsEnvTags(input)).toBe(
-      [
-        'extra:',
-        '  context: "production"',
-        '  offline: false',
-        '',
-      ].join('\n'),
+      ['extra:', '  context: "production"', '  offline: false', ''].join('\n'),
     );
   });
 

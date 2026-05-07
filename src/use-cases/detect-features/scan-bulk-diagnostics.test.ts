@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import {
-  scanTabsLinkOccurrences,
-  scanCodehiliteLinenumsOccurrences,
-  scanMetaYmlFiles,
   scanCodeBlockOptOuts,
+  scanCodehiliteLinenumsOccurrences,
   scanLatexDelimiters,
   scanMathScripts,
+  scanMetaYmlFiles,
+  scanTabsLinkOccurrences,
 } from './scan-bulk-diagnostics.js';
 
 describe('scanTabsLinkOccurrences', () => {
@@ -105,10 +105,7 @@ describe('scanCodeBlockOptOuts', () => {
 
   it('matches both markers in a single file with one diagnostic per file', () => {
     const files: ReadonlyArray<readonly [string, string]> = [
-      [
-        'docs/x.md',
-        '``` { .yaml .no-copy }\nfoo\n```\n\n``` { .js .no-select }\nbar\n```\n',
-      ],
+      ['docs/x.md', '``` { .yaml .no-copy }\nfoo\n```\n\n``` { .js .no-select }\nbar\n```\n'],
     ];
     const out = scanCodeBlockOptOuts(files);
     expect(out).toHaveLength(1);
@@ -130,17 +127,13 @@ describe('scanLatexDelimiters', () => {
   });
 
   it('emits a warning when a file uses \\[...\\] block LaTeX delimiters', () => {
-    const out = scanLatexDelimiters([
-      ['docs/page.md', 'Equation:\n\\[\nE = mc^2\n\\]\nDone.\n'],
-    ]);
+    const out = scanLatexDelimiters([['docs/page.md', 'Equation:\n\\[\nE = mc^2\n\\]\nDone.\n']]);
     expect(out).toHaveLength(1);
     expect(out[0]?.diagnostic.message).toContain('\\[');
   });
 
   it('lists both forms when both appear in the same file (one diagnostic per file)', () => {
-    const out = scanLatexDelimiters([
-      ['docs/page.md', 'Inline \\(x\\) and block:\n\\[y = 2\\]\n'],
-    ]);
+    const out = scanLatexDelimiters([['docs/page.md', 'Inline \\(x\\) and block:\n\\[y = 2\\]\n']]);
     expect(out).toHaveLength(1);
     expect(out[0]?.diagnostic.message).toContain('\\(');
     expect(out[0]?.diagnostic.message).toContain('\\[');
@@ -148,24 +141,18 @@ describe('scanLatexDelimiters', () => {
 
   it('returns empty array when source uses only $...$ / $$...$$ (remark-math defaults)', () => {
     expect(
-      scanLatexDelimiters([
-        ['docs/page.md', 'Use $x = 1$ or $$y = 2$$ — these work.\n'],
-      ]),
+      scanLatexDelimiters([['docs/page.md', 'Use $x = 1$ or $$y = 2$$ — these work.\n']]),
     ).toHaveLength(0);
   });
 
   it('does not match a literal \\\\( escape sequence (escaped backslash)', () => {
     expect(
-      scanLatexDelimiters([
-        ['docs/page.md', 'Path on Windows: C:\\\\(temp)\\\\file\n'],
-      ]),
+      scanLatexDelimiters([['docs/page.md', 'Path on Windows: C:\\\\(temp)\\\\file\n']]),
     ).toHaveLength(0);
   });
 
   it('returns empty array for files containing no math markup at all', () => {
-    expect(
-      scanLatexDelimiters([['docs/page.md', '# Just a heading\n\nProse.\n']]),
-    ).toHaveLength(0);
+    expect(scanLatexDelimiters([['docs/page.md', '# Just a heading\n\nProse.\n']])).toHaveLength(0);
   });
 });
 
@@ -187,10 +174,7 @@ describe('scanMathScripts', () => {
   });
 
   it('matches case-insensitively (MathJax.JS, KATEX-config.js)', () => {
-    const out = scanMathScripts([
-      'js/MathJax.JS',
-      'js/Katex-config.js',
-    ]);
+    const out = scanMathScripts(['js/MathJax.JS', 'js/Katex-config.js']);
     expect(out).toHaveLength(2);
   });
 
@@ -200,8 +184,6 @@ describe('scanMathScripts', () => {
 
   it('does not match unrelated paths that contain similar substrings', () => {
     // "mathjax" must be a word boundary — these should NOT match.
-    expect(
-      scanMathScripts(['js/notmathjaxx.js', 'js/katexish-tools.js']),
-    ).toHaveLength(0);
+    expect(scanMathScripts(['js/notmathjaxx.js', 'js/katexish-tools.js'])).toHaveLength(0);
   });
 });

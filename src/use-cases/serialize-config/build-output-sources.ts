@@ -9,16 +9,13 @@
  * orchestrator stays under the size budget.
  */
 
-import { serializeStyleSheet } from './styles.js';
-import { serializeRssEndpoint } from './rss-endpoint.js';
-import { serializeOgEndpoint } from './og-endpoint.js';
-import type {
-  PaletteStrategy,
-  StarlightPalette,
-} from '../../domain/starlight/palette-mapping.js';
 import type { MaterialFontConfig } from '../../domain/starlight/font-mapping.js';
-import type { DetectedFeature } from './versions.js';
+import type { PaletteStrategy, StarlightPalette } from '../../domain/starlight/palette-mapping.js';
 import type { TaggedDiagnostic } from '../convert-site/convert.js';
+import { serializeOgEndpoint } from './og-endpoint.js';
+import { serializeRssEndpoint } from './rss-endpoint.js';
+import { serializeStyleSheet } from './styles.js';
+import type { DetectedFeature } from './versions.js';
 
 const TAGS_YML_STUB =
   '# starlight-tags configuration. Each tag must declare a `label` (display\n' +

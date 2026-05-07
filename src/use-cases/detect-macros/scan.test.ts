@@ -25,11 +25,9 @@ describe('scanMacroOccurrences', () => {
   });
 
   it('does NOT flag {% include %} or {% include-markdown %} (handled by include-markdown expander)', () => {
-    const source = [
-      '{% include "shared.md" %}',
-      '{% include-markdown "snippet.md" %}',
-      '',
-    ].join('\n');
+    const source = ['{% include "shared.md" %}', '{% include-markdown "snippet.md" %}', ''].join(
+      '\n',
+    );
     expect(scanMacroOccurrences(source)).toEqual([]);
   });
 
@@ -42,9 +40,7 @@ describe('scanMacroOccurrences', () => {
     ].join('\n');
     const diagnostics = scanMacroOccurrences(source);
     expect(diagnostics.length).toBeGreaterThanOrEqual(2);
-    expect(diagnostics.map((d) => d.place?.line).sort()).toEqual(
-      expect.arrayContaining([1, 3]),
-    );
+    expect(diagnostics.map((d) => d.place?.line).sort()).toEqual(expect.arrayContaining([1, 3]));
   });
 
   it('does not flag literal $double-brace$ in code blocks (pragmatic: scanner is line-based)', () => {

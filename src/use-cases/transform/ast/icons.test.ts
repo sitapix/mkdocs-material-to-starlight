@@ -1,20 +1,25 @@
-import { describe, expect, it } from 'vitest';
-import { unified } from 'unified';
+import { mdxJsxToMarkdown } from 'mdast-util-mdx-jsx';
+import remarkDirective from 'remark-directive';
 import remarkParse from 'remark-parse';
 import remarkStringify from 'remark-stringify';
-import remarkDirective from 'remark-directive';
-import { mdxJsxToMarkdown } from 'mdast-util-mdx-jsx';
-import { transformIcons } from './icons.js';
+import { unified } from 'unified';
+import { describe, expect, it } from 'vitest';
 import type { Diagnostic } from '../../../domain/diagnostics/diagnostic.js';
+import { transformIcons } from './icons.js';
 
 interface ProcessOutput {
   readonly text: string;
   readonly diagnostics: ReadonlyArray<Diagnostic>;
 }
 
-function remarkMdxJsxStringify(this: { data: () => { toMarkdownExtensions?: unknown[] } }): undefined {
+function remarkMdxJsxStringify(this: {
+  data: () => { toMarkdownExtensions?: unknown[] };
+}): undefined {
   const data = this.data();
-  const list = data.toMarkdownExtensions ?? (data.toMarkdownExtensions = []);
+  if (data.toMarkdownExtensions === undefined) {
+    data.toMarkdownExtensions = [];
+  }
+  const list = data.toMarkdownExtensions;
   const full = mdxJsxToMarkdown() as { handlers: unknown };
   (list as unknown[]).push({ handlers: full.handlers });
   return undefined;
@@ -57,7 +62,9 @@ describe('transformIcons', () => {
 
   it('emits a `<Icon name="local:set:name" />` for unmapped Material icons', () => {
     const out = process('Use :material-totally-made-up: here.\n');
-    expect(out.text).toContain('<Icon name="local:material:totally-made-up" class="sl-inline-icon" />');
+    expect(out.text).toContain(
+      '<Icon name="local:material:totally-made-up" class="sl-inline-icon" />',
+    );
   });
 
   it('emits a placeholder and a diagnostic for unrecognized icon-set prefixes', () => {
@@ -70,9 +77,7 @@ describe('transformIcons', () => {
     const out = process('See :totally-unknown-prefix: here.\n');
     const unmapped = out.diagnostics.find((d) => d.ruleId === 'icon-unmapped');
     expect(unmapped).toBeDefined();
-    expect(unmapped?.message).toContain(
-      'https://hideoo.dev/notes/starlight-third-party-icon-sets',
-    );
+    expect(unmapped?.message).toContain('https://hideoo.dev/notes/starlight-third-party-icon-sets');
   });
 
   it('handles multiple shortcodes in one text node', () => {
@@ -131,9 +136,7 @@ describe('transformIcons', () => {
     // bare `:identifier:` is by construction not an icon attempt. The icon
     // transformer must not claim it, must not emit `icon-unmapped`, and must
     // pass the surrounding text through unchanged.
-    const out = process(
-      'Some prose with :docstring: and :members: and :smile:.\n',
-    );
+    const out = process('Some prose with :docstring: and :members: and :smile:.\n');
     const iconWarnings = out.diagnostics.filter((d) => d.ruleId === 'icon-unmapped');
     expect(iconWarnings).toEqual([]);
   });

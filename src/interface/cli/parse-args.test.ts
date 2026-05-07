@@ -122,13 +122,7 @@ describe('parseArgs', () => {
   });
 
   it('parses --check-timeout <ms>', () => {
-    const result = parseArgs([
-      './project',
-      './output',
-      '--check',
-      '--check-timeout',
-      '60000',
-    ]);
+    const result = parseArgs(['./project', './output', '--check', '--check-timeout', '60000']);
     expect(result.kind).toBe('convert');
     if (result.kind === 'convert') {
       expect(result.checkTimeoutMs).toBe(60000);
@@ -136,12 +130,7 @@ describe('parseArgs', () => {
   });
 
   it('rejects a non-numeric --check-timeout value', () => {
-    const result = parseArgs([
-      './project',
-      './output',
-      '--check-timeout',
-      'soon',
-    ]);
+    const result = parseArgs(['./project', './output', '--check-timeout', 'soon']);
     expect(result.kind).toBe('error');
   });
 
@@ -154,11 +143,7 @@ describe('parseArgs', () => {
   });
 
   it('parses compare with baseline and converted URLs', () => {
-    const result = parseArgs([
-      'compare',
-      'http://localhost:8000',
-      'http://localhost:4321',
-    ]);
+    const result = parseArgs(['compare', 'http://localhost:8000', 'http://localhost:4321']);
     expect(result.kind).toBe('compare');
     if (result.kind === 'compare') {
       expect(result.baselineUrl).toBe('http://localhost:8000');
@@ -169,13 +154,7 @@ describe('parseArgs', () => {
   });
 
   it('parses compare --pages as a comma-separated list', () => {
-    const result = parseArgs([
-      'compare',
-      'http://b',
-      'http://c',
-      '--pages',
-      '/,api/auth,about',
-    ]);
+    const result = parseArgs(['compare', 'http://b', 'http://c', '--pages', '/,api/auth,about']);
     expect(result.kind).toBe('compare');
     if (result.kind === 'compare') {
       expect(result.paths).toEqual(['/', 'api/auth', 'about']);
@@ -205,12 +184,10 @@ describe('parseArgs', () => {
   });
 
   it('rejects compare --threshold outside [0, 1]', () => {
-    expect(
-      parseArgs(['compare', 'http://b', 'http://c', '--threshold', '1.5']).kind,
-    ).toBe('error');
-    expect(
-      parseArgs(['compare', 'http://b', 'http://c', '--threshold', 'soon']).kind,
-    ).toBe('error');
+    expect(parseArgs(['compare', 'http://b', 'http://c', '--threshold', '1.5']).kind).toBe('error');
+    expect(parseArgs(['compare', 'http://b', 'http://c', '--threshold', 'soon']).kind).toBe(
+      'error',
+    );
   });
 
   it('accepts --explain BEFORE the project dir too', () => {

@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { createJsYamlDecoder } from '../../src/infrastructure/yaml/js-yaml-decoder.js';
-import { parseMkdocsConfig } from '../../src/use-cases/config/parse-mkdocs.js';
-import { parseNavTree } from '../../src/use-cases/config/nav-tree.js';
 import { buildSlugMap } from '../../src/domain/starlight/slug-map.js';
+import { createJsYamlDecoder } from '../../src/infrastructure/yaml/js-yaml-decoder.js';
 import { compileNavigation } from '../../src/use-cases/compile-navigation/compile.js';
+import { parseNavTree } from '../../src/use-cases/config/nav-tree.js';
+import { parseMkdocsConfig } from '../../src/use-cases/config/parse-mkdocs.js';
 
 /**
  * End-to-end test of the *pure* config pipeline:

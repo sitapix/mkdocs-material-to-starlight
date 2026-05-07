@@ -1,8 +1,8 @@
-import { describe, expect, it } from 'vitest';
-import { runCli } from '../../src/interface/cli/main.js';
-import { mkdtempSync, writeFileSync, mkdirSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { describe, expect, it } from 'vitest';
+import { runCli } from '../../src/interface/cli/main.js';
 
 describe('non-empty output dir', () => {
   function setup() {

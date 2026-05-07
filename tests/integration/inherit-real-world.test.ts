@@ -11,10 +11,10 @@
  * and tiangolo/sqlmodel.
  */
 
-import { describe, expect, it } from 'vitest';
-import { mkdtempSync, mkdirSync, rmSync, writeFileSync, readFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { describe, expect, it } from 'vitest';
 import { convertSiteFromDisk } from '../../src/interface/api/convert-site.js';
 
 describe('INHERIT: real-world regression (tiangolo/* crash)', () => {
@@ -62,10 +62,7 @@ describe('INHERIT: real-world regression (tiangolo/* crash)', () => {
         ].join('\n'),
       );
 
-      writeFileSync(
-        join(projectDir, 'docs', 'index.md'),
-        '# Welcome\n\nHello world.\n',
-      );
+      writeFileSync(join(projectDir, 'docs', 'index.md'), '# Welcome\n\nHello world.\n');
 
       // Act: conversion must not crash
       const result = await convertSiteFromDisk({ projectDir, outputDir });
@@ -77,10 +74,7 @@ describe('INHERIT: real-world regression (tiangolo/* crash)', () => {
       }
 
       // The output file should exist and contain the title
-      const indexOut = readFileSync(
-        join(outputDir, 'src', 'content', 'docs', 'index.md'),
-        'utf8',
-      );
+      const indexOut = readFileSync(join(outputDir, 'src', 'content', 'docs', 'index.md'), 'utf8');
       expect(indexOut).toContain('Welcome');
     } finally {
       rmSync(rootDir, { recursive: true, force: true });

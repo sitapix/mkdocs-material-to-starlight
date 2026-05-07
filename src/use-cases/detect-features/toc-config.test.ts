@@ -11,9 +11,7 @@ describe('extractTocConfig', () => {
   });
 
   it('returns config when toc has options', () => {
-    const out = extractTocConfig([
-      { name: 'toc', options: { permalink: true, toc_depth: 4 } },
-    ]);
+    const out = extractTocConfig([{ name: 'toc', options: { permalink: true, toc_depth: 4 } }]);
     expect(out).toEqual({ minHeadingLevel: 2, maxHeadingLevel: 4 });
   });
 

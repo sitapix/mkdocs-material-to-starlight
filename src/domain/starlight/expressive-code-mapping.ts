@@ -83,9 +83,7 @@ const UNSUPPORTED_KEYS: ReadonlyArray<string> = [
   'pygments_lang_class',
 ];
 
-export function mapPygmentsHighlightToExpressiveCode(
-  raw: unknown,
-): ExpressiveCodeMapping | null {
+export function mapPygmentsHighlightToExpressiveCode(raw: unknown): ExpressiveCodeMapping | null {
   const options = extractHighlightOptions(raw);
   if (options === null) return null;
 

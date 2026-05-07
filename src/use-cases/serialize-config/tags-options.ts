@@ -20,32 +20,30 @@
  * Schema: https://frostybee.github.io/starlight-tags/
  */
 
-export function translateTagsOptions(
-  options: Readonly<Record<string, unknown>>,
-): string {
+export function translateTagsOptions(options: Readonly<Record<string, unknown>>): string {
   const parts: string[] = [];
 
-  if (options['tags_hierarchy'] === true) {
+  if (options.tags_hierarchy === true) {
     parts.push('hierarchical: true');
   }
-  if (typeof options['tags_hierarchy_separator'] === 'string') {
-    parts.push(`separator: ${quote(options['tags_hierarchy_separator'])}`);
+  if (typeof options.tags_hierarchy_separator === 'string') {
+    parts.push(`separator: ${quote(options.tags_hierarchy_separator)}`);
   }
-  if (Array.isArray(options['tags_allowed']) && options['tags_allowed'].length > 0) {
-    const list = options['tags_allowed']
+  if (Array.isArray(options.tags_allowed) && options.tags_allowed.length > 0) {
+    const list = options.tags_allowed
       .filter((t): t is string => typeof t === 'string')
       .map(quote)
       .join(', ');
     parts.push(`allowedTags: [${list}]`);
   }
-  if (Array.isArray(options['shadow_tags']) && options['shadow_tags'].length > 0) {
-    const list = options['shadow_tags']
+  if (Array.isArray(options.shadow_tags) && options.shadow_tags.length > 0) {
+    const list = options.shadow_tags
       .filter((t): t is string => typeof t === 'string')
       .map(quote)
       .join(', ');
     parts.push(`hiddenTags: [${list}]`);
   }
-  const listingsLiteral = serializeListings(options['listings_map']);
+  const listingsLiteral = serializeListings(options.listings_map);
   if (listingsLiteral !== null) {
     parts.push(`listings: ${listingsLiteral}`);
   }
@@ -62,15 +60,15 @@ function serializeListings(raw: unknown): string | null {
     if (val === null || typeof val !== 'object') continue;
     const cfg = val as Record<string, unknown>;
     const fields: string[] = [];
-    if (Array.isArray(cfg['include'])) {
-      const inc = cfg['include']
+    if (Array.isArray(cfg.include)) {
+      const inc = cfg.include
         .filter((t): t is string => typeof t === 'string')
         .map(quote)
         .join(', ');
       fields.push(`include: [${inc}]`);
     }
-    if (Array.isArray(cfg['exclude'])) {
-      const exc = cfg['exclude']
+    if (Array.isArray(cfg.exclude)) {
+      const exc = cfg.exclude
         .filter((t): t is string => typeof t === 'string')
         .map(quote)
         .join(', ');

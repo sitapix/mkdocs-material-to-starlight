@@ -32,14 +32,7 @@ describe('detectFeatures', () => {
   });
 
   it('returns both features when both are present', () => {
-    const src = [
-      'Math: $x = 1$',
-      '',
-      '```mermaid',
-      'graph LR; A-->B',
-      '```',
-      '',
-    ].join('\n');
+    const src = ['Math: $x = 1$', '', '```mermaid', 'graph LR; A-->B', '```', ''].join('\n');
     const features = detectFeatures(src);
     expect(features.has('math')).toBe(true);
     expect(features.has('mermaid')).toBe(true);

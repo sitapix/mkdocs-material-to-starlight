@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { extractAutoAppend } from './auto-append.js';
 import type { MkdocsMarkdownExtension } from '../../domain/config/mkdocs-config.js';
+import { extractAutoAppend } from './auto-append.js';
 
 function ext(name: string, options: Record<string, unknown> = {}): MkdocsMarkdownExtension {
   return { name, options };

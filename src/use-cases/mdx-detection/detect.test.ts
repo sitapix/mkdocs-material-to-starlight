@@ -17,17 +17,13 @@ describe('detectMdxNeeds', () => {
   });
 
   it('contains PascalCase JSX → mdx', () => {
-    const out = detectMdxNeeds(
-      '# Title\n\n<MyHero foo="bar" />\n',
-    );
+    const out = detectMdxNeeds('# Title\n\n<MyHero foo="bar" />\n');
     expect(out.extension).toBe('mdx');
     expect(out.reasons).toContain('jsx-component');
   });
 
   it('contains Starlight Aside component → mdx with usedComponents=[Aside]', () => {
-    const out = detectMdxNeeds(
-      '# Title\n\n<Aside type="tip">Body</Aside>\n',
-    );
+    const out = detectMdxNeeds('# Title\n\n<Aside type="tip">Body</Aside>\n');
     expect(out.extension).toBe('mdx');
     expect(out.usedComponents).toContain('Aside');
   });
@@ -54,15 +50,13 @@ describe('detectMdxNeeds', () => {
   });
 
   it('does NOT promote on raw self-closing div with class attr', () => {
-    expect(
-      detectMdxNeeds('<div class="grid cards" markdown>\n- item\n</div>\n').extension,
-    ).toBe('md');
+    expect(detectMdxNeeds('<div class="grid cards" markdown>\n- item\n</div>\n').extension).toBe(
+      'md',
+    );
   });
 
   it('treats frontmatter expressions as mdx (Astro literal-only, not MD)', () => {
-    const out = detectMdxNeeds(
-      '---\ntitle: X\n---\n\n{frontmatter.title}\n',
-    );
+    const out = detectMdxNeeds('---\ntitle: X\n---\n\n{frontmatter.title}\n');
     expect(out.extension).toBe('mdx');
     expect(out.reasons).toContain('frontmatter-expression');
   });
@@ -73,9 +67,7 @@ describe('detectMdxNeeds', () => {
   });
 
   it('emits the reasons array sorted and unique', () => {
-    const out = detectMdxNeeds(
-      "import x from 'y';\n\n<Aside>a</Aside>\n",
-    );
+    const out = detectMdxNeeds("import x from 'y';\n\n<Aside>a</Aside>\n");
     expect(out.reasons).toContain('import-statement');
     expect(out.reasons).toContain('jsx-component');
     // No duplicates.

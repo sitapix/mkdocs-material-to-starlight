@@ -19,19 +19,19 @@
  */
 
 import {
-  intro as clackIntro,
-  outro as clackOutro,
+  autocompleteMultiselect as clackAutocompleteMultiselect,
   cancel as clackCancel,
-  note as clackNote,
-  text as clackText,
-  path as clackPath,
   confirm as clackConfirm,
+  intro as clackIntro,
+  log as clackLog,
+  multiselect as clackMultiselect,
+  note as clackNote,
+  outro as clackOutro,
+  path as clackPath,
   select as clackSelect,
   selectKey as clackSelectKey,
-  multiselect as clackMultiselect,
-  autocompleteMultiselect as clackAutocompleteMultiselect,
   spinner as clackSpinner,
-  log as clackLog,
+  text as clackText,
   isCancel,
   updateSettings,
 } from '@clack/prompts';
@@ -87,8 +87,7 @@ export function createClackPrompter(): Prompter {
       }
       if (o.validate !== undefined) {
         const validate = o.validate;
-        clackOptions.validate = (value: string | undefined) =>
-          validate(value ?? '');
+        clackOptions.validate = (value: string | undefined) => validate(value ?? '');
       }
       const result = await clackText(clackOptions);
       return isCancel(result) ? null : (result as string);
@@ -105,8 +104,7 @@ export function createClackPrompter(): Prompter {
       }
       if (o.validate !== undefined) {
         const validate = o.validate;
-        clackOptions.validate = (value: string | undefined) =>
-          validate(value ?? '');
+        clackOptions.validate = (value: string | undefined) => validate(value ?? '');
       }
       const result = await clackPath(clackOptions);
       return isCancel(result) ? null : (result as string);
@@ -172,9 +170,7 @@ export function createClackPrompter(): Prompter {
       const result = await clackMultiselect(clackOptions);
       return isCancel(result) ? null : (result as ReadonlyArray<V>);
     },
-    autocompleteMultiselect: async <V extends string>(
-      o: AutocompleteMultiselectOptions<V>,
-    ) => {
+    autocompleteMultiselect: async <V extends string>(o: AutocompleteMultiselectOptions<V>) => {
       const clackOptions: Parameters<typeof clackAutocompleteMultiselect>[0] = {
         message: o.message,
         options: Array.from(o.options) as Array<{ value: V; label: string; hint?: string }>,

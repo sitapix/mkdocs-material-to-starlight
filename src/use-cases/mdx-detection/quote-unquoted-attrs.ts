@@ -97,10 +97,10 @@ function rewriteSegment(segment: string): string {
   // without attributes (`<div>`, `</div>`) are skipped because their
   // body has no `=` to bother quoting.
   const TAG_RE = new RegExp(
-    String.raw`<` +                    // opener
-    String.raw`(${ATTR_NAME})` +       // tag name
-    String.raw`(\s+[^>]*?)` +          // attribute list (non-empty)
-    String.raw`(/?)>`,                 // optional self-close
+    String.raw`<` + // opener
+      String.raw`(${ATTR_NAME})` + // tag name
+      String.raw`(\s+[^>]*?)` + // attribute list (non-empty)
+      String.raw`(/?)>`, // optional self-close
     'g',
   );
   return segment.replace(TAG_RE, (match, tagName: string, attrs: string, selfClose: string) => {
@@ -124,34 +124,37 @@ function quoteAttrList(attrs: string): string {
   //   4. Boolean attributes: bare `name` (passthrough)
   // Mid-attribute whitespace is preserved.
   const TOKEN_RE = new RegExp(
-    String.raw`(\s+)` +                                           // leading whitespace
-    String.raw`(${ATTR_NAME})` +                                  // attribute name
-    String.raw`(?:` +                                              // optional value:
-      String.raw`(=)` +                                            //   `=`
+    String.raw`(\s+)` + // leading whitespace
+      String.raw`(${ATTR_NAME})` + // attribute name
+      String.raw`(?:` + // optional value:
+      String.raw`(=)` + //   `=`
       String.raw`(?:` +
-        String.raw`("[^"]*"|'[^']*')` +                            //   already-quoted
-        String.raw`|(\{[^{}]*\})` +                                //   JSX expression
-        String.raw`|([^\s"'\`<>=\/]+)` +                           //   unquoted value
+      String.raw`("[^"]*"|'[^']*')` + //   already-quoted
+      String.raw`|(\{[^{}]*\})` + //   JSX expression
+      String.raw`|([^\s"'\`<>=\/]+)` + //   unquoted value
       String.raw`)` +
-    String.raw`)?`,
+      String.raw`)?`,
     'g',
   );
-  return attrs.replace(TOKEN_RE, (
-    _full,
-    leading: string,
-    name: string,
-    eq: string | undefined,
-    quoted: string | undefined,
-    expr: string | undefined,
-    bare: string | undefined,
-  ) => {
-    if (eq === undefined) {
-      // Boolean attribute, no value.
+  return attrs.replace(
+    TOKEN_RE,
+    (
+      _full,
+      leading: string,
+      name: string,
+      eq: string | undefined,
+      quoted: string | undefined,
+      expr: string | undefined,
+      bare: string | undefined,
+    ) => {
+      if (eq === undefined) {
+        // Boolean attribute, no value.
+        return `${leading}${name}`;
+      }
+      if (quoted !== undefined) return `${leading}${name}=${quoted}`;
+      if (expr !== undefined) return `${leading}${name}=${expr}`;
+      if (bare !== undefined) return `${leading}${name}="${bare}"`;
       return `${leading}${name}`;
-    }
-    if (quoted !== undefined) return `${leading}${name}=${quoted}`;
-    if (expr !== undefined) return `${leading}${name}=${expr}`;
-    if (bare !== undefined) return `${leading}${name}="${bare}"`;
-    return `${leading}${name}`;
-  });
+    },
+  );
 }

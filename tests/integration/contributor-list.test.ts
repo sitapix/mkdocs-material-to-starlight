@@ -1,7 +1,7 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { convertSiteFromDisk } from '../../src/interface/api/convert-site.js';
 
 let project: string;
@@ -71,9 +71,7 @@ describe('starlight-contributor-list integration — git-authors / git-committer
     expect(result.ok).toBe(true);
 
     const pkg = JSON.parse(readGenerated('package.json'));
-    const matches = Object.keys(pkg.dependencies).filter((k) =>
-      k === 'starlight-contributor-list',
-    );
+    const matches = Object.keys(pkg.dependencies).filter((k) => k === 'starlight-contributor-list');
     expect(matches).toHaveLength(1);
 
     // And the integration block appears exactly once.

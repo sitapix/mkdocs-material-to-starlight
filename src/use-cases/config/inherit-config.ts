@@ -17,7 +17,7 @@
  * files for diagnostics and missing references for warnings.
  */
 
-import { load as yamlLoad, dump as yamlDump } from 'js-yaml';
+import { dump as yamlDump, load as yamlLoad } from 'js-yaml';
 import type { FileSystem } from '../../domain/ports/file-system.js';
 import { preprocessMkdocsEnvTags } from './preprocess-mkdocs-env-tags.js';
 import { preprocessMkdocsPythonTags } from './preprocess-mkdocs-python-tags.js';
@@ -62,14 +62,7 @@ async function expand(
     return remainder;
   }
   included.push(absolutePath);
-  const expandedBase = await expand(
-    read.value,
-    absolutePath,
-    fs,
-    included,
-    missing,
-    depth + 1,
-  );
+  const expandedBase = await expand(read.value, absolutePath, fs, included, missing, depth + 1);
 
   // Deep-merge: parse both YAML strings into JS objects, merge at the
   // object level, then re-encode to a clean YAML string free of duplicate keys.

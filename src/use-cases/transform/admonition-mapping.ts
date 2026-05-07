@@ -10,8 +10,8 @@
  * descriptor. This is a pure value transformation with no I/O.
  */
 
-import type { AdmonitionType } from '../../domain/syntax/admonition-type.js';
 import type { StarlightAsideType } from '../../domain/starlight/aside-type.js';
+import type { AdmonitionType } from '../../domain/syntax/admonition-type.js';
 
 export interface AsideDescriptor {
   readonly asideType: StarlightAsideType;

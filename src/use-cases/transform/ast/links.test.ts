@@ -1,10 +1,10 @@
-import { describe, expect, it } from 'vitest';
-import { unified } from 'unified';
 import remarkParse from 'remark-parse';
 import remarkStringify from 'remark-stringify';
-import { transformLinkNodes } from './links.js';
-import { buildSlugMap, type SlugMap } from '../../../domain/starlight/slug-map.js';
+import { unified } from 'unified';
+import { describe, expect, it } from 'vitest';
 import type { Diagnostic } from '../../../domain/diagnostics/diagnostic.js';
+import { buildSlugMap, type SlugMap } from '../../../domain/starlight/slug-map.js';
+import { transformLinkNodes } from './links.js';
 
 function fixtureMap(paths: ReadonlyArray<string>): SlugMap {
   const result = buildSlugMap(paths);
@@ -17,11 +17,7 @@ interface ProcessOutput {
   readonly diagnostics: ReadonlyArray<Diagnostic>;
 }
 
-function process(
-  source: string,
-  fromSourcePath: string,
-  slugMap: SlugMap,
-): ProcessOutput {
+function process(source: string, fromSourcePath: string, slugMap: SlugMap): ProcessOutput {
   const diagnostics: Diagnostic[] = [];
   const file = unified()
     .use(remarkParse)
@@ -66,11 +62,7 @@ describe('transformLinkNodes', () => {
   });
 
   it('rewrites a parent-relative asset path against the source file', () => {
-    const out = process(
-      '![Diagram](../images/diagram.png)\n',
-      'api/auth.md',
-      map,
-    );
+    const out = process('![Diagram](../images/diagram.png)\n', 'api/auth.md', map);
     expect(out.text).toContain('![Diagram](/images/diagram.png)');
   });
 

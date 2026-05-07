@@ -123,7 +123,11 @@ const COMPARE_OPTIONS = {
 
 export function parseArgs(argv: ReadonlyArray<string>): Command {
   if (argv.length === 0) {
-    return { kind: 'error', message: 'missing project directory' };
+    return {
+      kind: 'error',
+      message:
+        'missing <project-dir> argument (path to your MkDocs site root, e.g. `mkdocs-material-to-starlight ./docs ./out`). Run with --help for full usage.',
+    };
   }
   if (argv[0] === 'compare') {
     return parseCompareArgs(argv.slice(1));
@@ -150,17 +154,29 @@ function parseConvertArgs(argv: ReadonlyArray<string>): Command {
   const positionals = parsed.positionals;
   if (parsed.values.explain === true) {
     if (positionals.length < 1) {
-      return { kind: 'error', message: 'missing project directory' };
+      return {
+        kind: 'error',
+        message:
+          'missing <project-dir> argument (path to your MkDocs site root, e.g. `mkdocs-material-to-starlight ./docs ./out`). Run with --help for full usage.',
+      };
     }
     return { kind: 'explain', projectDir: positionals[0] ?? '' };
   }
 
   if (positionals.length < 1) {
-    return { kind: 'error', message: 'missing project directory' };
+    return {
+      kind: 'error',
+      message:
+        'missing <project-dir> argument (path to your MkDocs site root, e.g. `mkdocs-material-to-starlight ./docs ./out`). Run with --help for full usage.',
+    };
   }
   const hasDirOverride = (parsed.values.dir as string | undefined) !== undefined;
   if (positionals.length < 2 && !hasDirOverride) {
-    return { kind: 'error', message: 'missing output directory' };
+    return {
+      kind: 'error',
+      message:
+        'missing <output-dir> argument (where to write the converted Starlight project, e.g. `mkdocs-material-to-starlight ./docs ./out`). Run with --help for full usage.',
+    };
   }
 
   const checkTimeoutRaw = parsed.values['check-timeout'];
@@ -178,18 +194,18 @@ function parseConvertArgs(argv: ReadonlyArray<string>): Command {
 
   const snippetBasePathsRaw = parsed.values['snippet-base-path'];
   const snippetBasePaths =
-    snippetBasePathsRaw === undefined || (Array.isArray(snippetBasePathsRaw) && snippetBasePathsRaw.length === 0)
+    snippetBasePathsRaw === undefined ||
+    (Array.isArray(snippetBasePathsRaw) && snippetBasePathsRaw.length === 0)
       ? null
-      : (Array.isArray(snippetBasePathsRaw) ? (snippetBasePathsRaw as ReadonlyArray<string>) : null);
+      : Array.isArray(snippetBasePathsRaw)
+        ? (snippetBasePathsRaw as ReadonlyArray<string>)
+        : null;
 
   if (parsed.values.check === true && parsed.values['no-check'] === true) {
     return { kind: 'error', message: '--check and --no-check are mutually exclusive' };
   }
-  const check = parsed.values.check === true
-    ? true
-    : parsed.values['no-check'] === true
-      ? false
-      : false;
+  const check =
+    parsed.values.check === true ? true : parsed.values['no-check'] === true ? false : false;
 
   const dirOverride = (parsed.values.dir as string | undefined) ?? null;
 
@@ -205,7 +221,10 @@ function parseConvertArgs(argv: ReadonlyArray<string>): Command {
   if (sm !== undefined) {
     const n = Number(sm);
     if (!Number.isFinite(n) || !Number.isInteger(n) || n <= 0) {
-      return { kind: 'error', message: `--snippet-max-depth must be a positive integer (got "${sm}")` };
+      return {
+        kind: 'error',
+        message: `--snippet-max-depth must be a positive integer (got "${sm}")`,
+      };
     }
     snippetMaxDepth = n;
   }
@@ -227,9 +246,7 @@ function parseConvertArgs(argv: ReadonlyArray<string>): Command {
     force: parsed.values.force === true,
     quiet: parsed.values.quiet === true,
     json: parsed.values.json === true,
-    color:
-      parsed.values.color === true ? true :
-      parsed.values['no-color'] === true ? false : null,
+    color: parsed.values.color === true ? true : parsed.values['no-color'] === true ? false : null,
     packageManager: wizardResult.packageManager,
     tabs: wizardResult.tabs,
     sidebarTopics: resolveBoolPair(
@@ -289,21 +306,21 @@ function resolveWizardFlags(values: ParsedValues): WizardFlagsResult {
   if (!pmResult.ok) return { kind: 'error', message: pmResult.message };
 
   const tabsResult = parseEnum(
-    values['tabs'] as string | undefined,
+    values.tabs as string | undefined,
     ['mdx', 'html'] as const,
     '--tabs',
   );
   if (!tabsResult.ok) return { kind: 'error', message: tabsResult.message };
 
   const paletteResult = parseEnum(
-    values['palette'] as string | undefined,
+    values.palette as string | undefined,
     ['translate', 'skip', 'custom'] as const,
     '--palette',
   );
   if (!paletteResult.ok) return { kind: 'error', message: paletteResult.message };
 
   const cardsResult = parseEnum(
-    values['cards'] as string | undefined,
+    values.cards as string | undefined,
     ['mdx', 'html', 'skip'] as const,
     '--cards',
   );
@@ -349,10 +366,7 @@ function parseEnum<T extends string>(
   };
 }
 
-function resolveBoolPair(
-  on: boolean | undefined,
-  off: boolean | undefined,
-): boolean | null {
+function resolveBoolPair(on: boolean | undefined, off: boolean | undefined): boolean | null {
   if (on === true) return true;
   if (off === true) return false;
   return null;
@@ -375,7 +389,8 @@ function parseCompareArgs(argv: ReadonlyArray<string>): Command {
   if (positionals.length < 2) {
     return {
       kind: 'error',
-      message: 'compare requires <baseline-url> and <converted-url>',
+      message:
+        'compare requires <baseline-url> <converted-url> (e.g. `mkdocs-material-to-starlight compare https://old-docs.example.com https://new-docs.example.com`). Run with --help for full usage.',
     };
   }
 

@@ -17,14 +17,14 @@
  * whole orchestrator is therefore idempotent. Verified by test.
  */
 
-import { unified } from 'unified';
-import remarkParse from 'remark-parse';
-import remarkStringify from 'remark-stringify';
+import { mdxJsxToMarkdown } from 'mdast-util-mdx-jsx';
+import remarkDirective from 'remark-directive';
 import remarkFrontmatter from 'remark-frontmatter';
 import remarkGfm from 'remark-gfm';
 import remarkMath from 'remark-math';
-import remarkDirective from 'remark-directive';
-import { mdxJsxToMarkdown } from 'mdast-util-mdx-jsx';
+import remarkParse from 'remark-parse';
+import remarkStringify from 'remark-stringify';
+import { unified } from 'unified';
 
 /**
  * Register the toMarkdown extension for `mdxJsxFlowElement` /
@@ -45,29 +45,32 @@ function remarkMdxJsxStringify(this: {
   data: () => { toMarkdownExtensions?: unknown[] };
 }): undefined {
   const data = this.data();
-  const list = data.toMarkdownExtensions ?? (data.toMarkdownExtensions = []);
+  if (data.toMarkdownExtensions === undefined) {
+    data.toMarkdownExtensions = [];
+  }
+  const list = data.toMarkdownExtensions;
   const full = mdxJsxToMarkdown() as { handlers: unknown };
   (list as unknown[]).push({ handlers: full.handlers });
   return undefined;
 }
 
-import { normalize, type NormalizeReport } from '../normalize/normalize.js';
-import { normalizeMagicLinks } from '../normalize/magiclink.js';
 import type { RepoContext } from '../../domain/config/repo-context.js';
-import { transformAdmonitionDirectives } from '../transform/ast/admonition-directive.js';
-import { transformGridDirectives } from '../transform/ast/grid.js';
-import { transformTabDirectives } from '../transform/ast/tabs.js';
-import { transformLinkNodes } from '../transform/ast/links.js';
-import { transformIcons } from '../transform/ast/icons.js';
-import { ensureTitle } from '../transform/ast/ensure-title.js';
 import type { Diagnostic } from '../../domain/diagnostics/diagnostic.js';
+import { createDiagnostic } from '../../domain/diagnostics/diagnostic.js';
 import type { SlugMap } from '../../domain/starlight/slug-map.js';
 import { detectMdxNeeds } from '../mdx-detection/detect.js';
-import { unescapeDirectiveFences } from './unescape-directive-fences.js';
-import { injectStarlightImports } from '../mdx-detection/inject-imports.js';
 import { escapeJsxExpressionsForMdx } from '../mdx-detection/escape-jsx-expressions.js';
-import { sanitizeMdxSyntax, type SanitizeReport } from '../mdx-detection/sanitize-mdx-syntax.js';
-import { createDiagnostic } from '../../domain/diagnostics/diagnostic.js';
+import { injectStarlightImports } from '../mdx-detection/inject-imports.js';
+import { type SanitizeReport, sanitizeMdxSyntax } from '../mdx-detection/sanitize-mdx-syntax.js';
+import { normalizeMagicLinks } from '../normalize/magiclink.js';
+import { type NormalizeReport, normalize } from '../normalize/normalize.js';
+import { transformAdmonitionDirectives } from '../transform/ast/admonition-directive.js';
+import { ensureTitle } from '../transform/ast/ensure-title.js';
+import { transformGridDirectives } from '../transform/ast/grid.js';
+import { transformIcons } from '../transform/ast/icons.js';
+import { transformLinkNodes } from '../transform/ast/links.js';
+import { transformTabDirectives } from '../transform/ast/tabs.js';
+import { unescapeDirectiveFences } from './unescape-directive-fences.js';
 
 export interface ConvertFileInput {
   readonly source: string;
@@ -123,10 +126,7 @@ export function convertFile(input: ConvertFileInput): ConvertFileOutput {
     legacy: { spanAnchorsStripped: [], bareAttrLines: [] },
     attrList: { bareAttrLines: [], inlineAttrLists: [], spanAnchorsStripped: [] },
   };
-  const normalized = normalizeMagicLinks(
-    normalize(input.source, normalizeReport),
-    repoContext,
-  );
+  const normalized = normalizeMagicLinks(normalize(input.source, normalizeReport), repoContext);
   for (const promo of normalizeReport.media ?? []) {
     diagnostics.push(
       createDiagnostic({

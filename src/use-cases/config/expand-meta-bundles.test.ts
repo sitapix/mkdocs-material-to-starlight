@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { expandMetaBundles } from './expand-meta-bundles.js';
 import type { MkdocsMarkdownExtension } from '../../domain/config/mkdocs-config.js';
+import { expandMetaBundles } from './expand-meta-bundles.js';
 
 const ext = (name: string, options: Record<string, unknown> = {}): MkdocsMarkdownExtension => ({
   name,

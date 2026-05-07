@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { runWizard } from './run-wizard.js';
-import { createFakePrompter } from './fake-prompter.js';
-import { deriveDefaults } from './derive-defaults.js';
-import type { ConversionPlan } from '../../domain/wizard/plan.js';
 import type { MkdocsConfig } from '../../domain/config/mkdocs-config.js';
 import { WIZARD_CANCELLED } from '../../domain/wizard/answers.js';
+import type { ConversionPlan } from '../../domain/wizard/plan.js';
+import { deriveDefaults } from './derive-defaults.js';
+import { createFakePrompter } from './fake-prompter.js';
+import { runWizard } from './run-wizard.js';
 
 function makePlan(over: Partial<MkdocsConfig> = {}): ConversionPlan {
   const config: MkdocsConfig = {
@@ -158,9 +158,9 @@ describe('runWizard — additional Tier 1 prompts', () => {
     });
     expect(result.ok).toBe(true);
     if (result.ok) expect(result.value.sidebarTopics).toBe(true);
-    expect(
-      prompter.calls.some((c) => c.message.toLowerCase().includes('split sidebar')),
-    ).toBe(true);
+    expect(prompter.calls.some((c) => c.message.toLowerCase().includes('split sidebar'))).toBe(
+      true,
+    );
   });
 
   it('asks rss confirmation when rss plugin is present', async () => {
@@ -216,9 +216,7 @@ describe('runWizard — additional Tier 1 prompts', () => {
     const result = await runWizard({ plan: planWithLocales, projectDir: '/p', defaults, prompter });
     expect(result.ok).toBe(true);
     if (result.ok) expect(result.value.locales).toEqual(['en', 'de']);
-    expect(
-      prompter.calls.some((c) => c.kind === 'autocompleteMultiselect'),
-    ).toBe(true);
+    expect(prompter.calls.some((c) => c.kind === 'autocompleteMultiselect')).toBe(true);
   });
 });
 
@@ -251,9 +249,7 @@ describe('runWizard — Tier 2 advanced opt-in', () => {
     // Critical: the gate is asked exactly once. There must NOT be a second
     // "Convert now?" prompt after Tier 2.
     const gatePrompts = prompter.calls.filter(
-      (c) =>
-        c.kind === 'selectKey' &&
-        c.message.toLowerCase().includes('convert now'),
+      (c) => c.kind === 'selectKey' && c.message.toLowerCase().includes('convert now'),
     );
     expect(gatePrompts.length).toBe(1);
   });
@@ -365,9 +361,7 @@ describe('runWizard — every Tier 1 detection step includes a docs URL', () => 
     logs: ReadonlyArray<{ level: string; message: string }>,
     matcher: RegExp,
   ): void {
-    const step = logs.find(
-      (l) => l.level === 'step' && matcher.test(l.message),
-    );
+    const step = logs.find((l) => l.level === 'step' && matcher.test(l.message));
     expect(step, `no step matched ${String(matcher)}`).toBeDefined();
     expect(step?.message).toMatch(/https?:\/\//);
   }

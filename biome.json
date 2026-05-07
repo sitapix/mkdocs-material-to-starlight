@@ -64,7 +64,8 @@
         "noConsole": {
           "level": "warn",
           "options": { "allow": ["error", "warn"] }
-        }
+        },
+        "noControlCharactersInRegex": "off"
       },
       "style": {
         "useConst": "error",

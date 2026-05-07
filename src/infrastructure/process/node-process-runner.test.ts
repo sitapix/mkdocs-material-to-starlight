@@ -1,5 +1,5 @@
-import { describe, expect, it } from 'vitest';
 import { tmpdir } from 'node:os';
+import { describe, expect, it } from 'vitest';
 import { createNodeProcessRunner } from './node-process-runner.js';
 
 describe('createNodeProcessRunner', () => {
@@ -32,11 +32,9 @@ describe('createNodeProcessRunner', () => {
 
   it('returns spawn-failed when the binary does not exist', async () => {
     const runner = createNodeProcessRunner();
-    const result = await runner.run(
-      'this-binary-definitely-does-not-exist-xyzzy',
-      [],
-      { cwd: tmpdir() },
-    );
+    const result = await runner.run('this-binary-definitely-does-not-exist-xyzzy', [], {
+      cwd: tmpdir(),
+    });
     expect(result.ok).toBe(false);
     if (!result.ok) {
       expect(['not-found', 'spawn-failed', 'unknown']).toContain(result.error.code);
@@ -46,11 +44,10 @@ describe('createNodeProcessRunner', () => {
 
   it('reports timedOut when the timeout fires before the process exits', async () => {
     const runner = createNodeProcessRunner();
-    const result = await runner.run(
-      'node',
-      ['-e', 'setTimeout(() => {}, 5000)'],
-      { cwd: tmpdir(), timeoutMs: 100 },
-    );
+    const result = await runner.run('node', ['-e', 'setTimeout(() => {}, 5000)'], {
+      cwd: tmpdir(),
+      timeoutMs: 100,
+    });
     expect(result.ok).toBe(true);
     if (result.ok) {
       expect(result.value.timedOut).toBe(true);

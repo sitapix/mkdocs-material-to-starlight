@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { serializeVisualDiffReport } from './serialize-report.js';
 import type { VisualDiffReport } from '../../domain/visual-diff/page-diff.js';
+import { serializeVisualDiffReport } from './serialize-report.js';
 
 function reportOf(report: Partial<VisualDiffReport>): VisualDiffReport {
   return {

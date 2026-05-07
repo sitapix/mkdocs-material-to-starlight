@@ -140,7 +140,7 @@ export function createFakePrompter(script: ScriptedAnswers = {}): FakePrompter {
         options: o.options,
         initialValue: o.initialValue,
       });
-      return next<V | null>('select', o.initialValue ?? o.options[0]!.value);
+      return next<V | null>('select', o.initialValue ?? o.options[0]?.value ?? null);
     },
     selectKey: async <V extends string>(o: SelectKeyOptions<V>) => {
       calls.push({
@@ -149,7 +149,7 @@ export function createFakePrompter(script: ScriptedAnswers = {}): FakePrompter {
         options: o.options,
         initialValue: o.initialValue,
       });
-      return next<V | null>('selectKey', o.initialValue ?? o.options[0]!.value);
+      return next<V | null>('selectKey', o.initialValue ?? o.options[0]?.value ?? null);
     },
     multiselect: async <V extends string>(o: MultiselectOptions<V>) => {
       calls.push({
@@ -163,9 +163,7 @@ export function createFakePrompter(script: ScriptedAnswers = {}): FakePrompter {
         (o.initialValues ?? []) as ReadonlyArray<V>,
       );
     },
-    autocompleteMultiselect: async <V extends string>(
-      o: AutocompleteMultiselectOptions<V>,
-    ) => {
+    autocompleteMultiselect: async <V extends string>(o: AutocompleteMultiselectOptions<V>) => {
       calls.push({
         kind: 'autocompleteMultiselect',
         message: o.message,

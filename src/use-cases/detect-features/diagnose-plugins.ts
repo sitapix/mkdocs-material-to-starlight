@@ -35,7 +35,7 @@ const PLUGIN_DIAGNOSTICS: ReadonlyMap<string, PluginDiagnosticSpec> = new Map([
       ruleId: 'plugin-search-replaced',
       severity: 'info',
       message:
-        'Material/MkDocs `search` plugin detected — replaced by Starlight\'s built-in Pagefind search. Lunr-specific options (`search.lang`, `search.separator`, `search.pipeline`) are dropped; configure Pagefind via the starlight `pagefind` option for custom tokenization.',
+        "Material/MkDocs `search` plugin detected — replaced by Starlight's built-in Pagefind search. Lunr-specific options (`search.lang`, `search.separator`, `search.pipeline`) are dropped; configure Pagefind via the starlight `pagefind` option for custom tokenization.",
     },
   ],
   [
@@ -44,7 +44,7 @@ const PLUGIN_DIAGNOSTICS: ReadonlyMap<string, PluginDiagnosticSpec> = new Map([
       ruleId: 'plugin-social-mapped',
       severity: 'info',
       message:
-        'Material `social` plugin (per-page OG card PNGs) detected — auto-wired to `astro-og-canvas`. The converter installs the package and emits a stub endpoint at `src/pages/og/[...slug].png.ts` that you must customize (logo, fonts, colors). Note: distinct from Starlight\'s `social: []` config (header social-media icon links), which is wired separately from `extra.social[]` in mkdocs.yml.',
+        "Material `social` plugin (per-page OG card PNGs) detected — auto-wired to `astro-og-canvas`. The converter installs the package and emits a stub endpoint at `src/pages/og/[...slug].png.ts` that you must customize (logo, fonts, colors). Note: distinct from Starlight's `social: []` config (header social-media icon links), which is wired separately from `extra.social[]` in mkdocs.yml.",
     },
   ],
   [
@@ -80,7 +80,7 @@ const PLUGIN_DIAGNOSTICS: ReadonlyMap<string, PluginDiagnosticSpec> = new Map([
       ruleId: 'plugin-optimize-subsumed',
       severity: 'info',
       message:
-        'Material `optimize` plugin (image compression) is subsumed by Astro\'s built-in `astro:assets` / sharp pipeline. No action required.',
+        "Material `optimize` plugin (image compression) is subsumed by Astro's built-in `astro:assets` / sharp pipeline. No action required.",
     },
   ],
   [
@@ -116,7 +116,7 @@ const PLUGIN_DIAGNOSTICS: ReadonlyMap<string, PluginDiagnosticSpec> = new Map([
       ruleId: 'plugin-i18n-needs-rename',
       severity: 'info',
       message:
-        'mkdocs-static-i18n locales detected — per-locale source files (e.g. page.fr.md) have been renamed to Starlight\'s directory layout (fr/page.md) automatically. You still need to add a `locales: { … }` block to astro.config.mjs to register the locales with Starlight.',
+        "mkdocs-static-i18n locales detected — per-locale source files (e.g. page.fr.md) have been renamed to Starlight's directory layout (fr/page.md) automatically. You still need to add a `locales: { … }` block to astro.config.mjs to register the locales with Starlight.",
     },
   ],
   [
@@ -269,7 +269,7 @@ const PLUGIN_DIAGNOSTICS: ReadonlyMap<string, PluginDiagnosticSpec> = new Map([
       ruleId: 'plugin-exclude-mapped',
       severity: 'info',
       message:
-        'mkdocs-exclude detected — auto-handled: matching source files are filtered out before conversion, so they never become Starlight pages. Both `glob:` (fnmatch-style) and `regex:` (JavaScript regex) are honored. No further action required; remove the plugin block from the converted project\'s configuration.',
+        "mkdocs-exclude detected — auto-handled: matching source files are filtered out before conversion, so they never become Starlight pages. Both `glob:` (fnmatch-style) and `regex:` (JavaScript regex) are honored. No further action required; remove the plugin block from the converted project's configuration.",
     },
   ],
   [
@@ -381,7 +381,7 @@ const PLUGIN_DIAGNOSTICS: ReadonlyMap<string, PluginDiagnosticSpec> = new Map([
       ruleId: 'extension-pathconverter-subsumed',
       severity: 'info',
       message:
-        '`pymdownx.pathconverter` (relative-path rewriting) detected — subsumed by the converter\'s built-in link normalizer, which rewrites `.md` paths to Starlight slugs. No action required.',
+        "`pymdownx.pathconverter` (relative-path rewriting) detected — subsumed by the converter's built-in link normalizer, which rewrites `.md` paths to Starlight slugs. No action required.",
     },
   ],
   [
@@ -390,7 +390,7 @@ const PLUGIN_DIAGNOSTICS: ReadonlyMap<string, PluginDiagnosticSpec> = new Map([
       ruleId: 'extension-saneheaders-detected',
       severity: 'info',
       message:
-        '`pymdownx.saneheaders` detected. Remark/MDX heading parsing follows CommonMark defaults, which approximate but do not exactly match saneheaders\' stricter parsing of `#` in inline contexts. Headings that worked under saneheaders should continue to work; spot-check edge cases.',
+        "`pymdownx.saneheaders` detected. Remark/MDX heading parsing follows CommonMark defaults, which approximate but do not exactly match saneheaders' stricter parsing of `#` in inline contexts. Headings that worked under saneheaders should continue to work; spot-check edge cases.",
     },
   ],
   [
@@ -453,7 +453,7 @@ const PLUGIN_DIAGNOSTICS: ReadonlyMap<string, PluginDiagnosticSpec> = new Map([
       ruleId: 'extension-b64-subsumed',
       severity: 'info',
       message:
-        '`pymdownx.b64` (base64-inline images) detected — subsumed by Astro\'s asset pipeline (`astro:assets`), which fingerprints and serves images via the build graph. Inlining as data: URLs is not the default; if specifically required, import images via `import logo from \'./logo.png\'; <img src={logo.src}>` in MDX.',
+        "`pymdownx.b64` (base64-inline images) detected — subsumed by Astro's asset pipeline (`astro:assets`), which fingerprints and serves images via the build graph. Inlining as data: URLs is not the default; if specifically required, import images via `import logo from './logo.png'; <img src={logo.src}>` in MDX.",
     },
   ],
   [
@@ -525,7 +525,7 @@ const PLUGIN_DIAGNOSTICS: ReadonlyMap<string, PluginDiagnosticSpec> = new Map([
       ruleId: 'plugin-markdownextradata-no-equivalent',
       severity: 'warning',
       message:
-        '`mkdocs-markdownextradata-plugin` detected (`{{ var }}` Jinja-style variable interpolation from `extra.*`). The bare `{{ }}` syntax conflicts with MDX expressions. Use Astro\'s `import.meta.env.PUBLIC_*` env variables in MDX (`{import.meta.env.PUBLIC_MY_VAR}`) for the equivalent build-time interpolation.',
+        "`mkdocs-markdownextradata-plugin` detected (`{{ var }}` Jinja-style variable interpolation from `extra.*`). The bare `{{ }}` syntax conflicts with MDX expressions. Use Astro's `import.meta.env.PUBLIC_*` env variables in MDX (`{import.meta.env.PUBLIC_MY_VAR}`) for the equivalent build-time interpolation.",
     },
   ],
   [
@@ -586,9 +586,7 @@ export function diagnosePlugins(
   // plugin's own (different) configuration shape.
   const blog = plugins.find((p) => p.name === 'blog');
   if (blog !== undefined) {
-    const customKeys = Object.keys(blog.options).filter(
-      (k) => !DEFAULT_BLOG_KEYS.has(k),
-    );
+    const customKeys = Object.keys(blog.options).filter((k) => !DEFAULT_BLOG_KEYS.has(k));
     if (customKeys.length > 0) {
       out.push(
         createDiagnostic({
@@ -596,7 +594,7 @@ export function diagnosePlugins(
           ruleId: 'plugin-blog-custom-config',
           source: SOURCE,
           message:
-            `Material \`blog\` plugin has bespoke options that \`starlight-blog\` does not honor as-is: ${customKeys.map((k) => '`' + k + '`').join(', ')}. ` +
+            `Material \`blog\` plugin has bespoke options that \`starlight-blog\` does not honor as-is: ${customKeys.map((k) => `\`${k}\``).join(', ')}. ` +
             `Hand-port each one: URL formats (\`post_url_format\`, \`archive_url_format\`, \`categories_url_format\`) become Astro page route patterns under \`src/content/docs/\`; pagination settings (\`pagination_per_page\`) map to \`starlight-blog\`'s \`postsPerPage\`; ` +
             `\`authors_file\` becomes the plugin's \`authors\` config object; \`draft_if_future_date\` requires a content-collection filter; \`categories_allowed\` requires the same plus a Zod schema enum.`,
         }),
@@ -612,8 +610,4 @@ export function diagnosePlugins(
  * are no-ops because Astro/Starlight-blog handle them differently). Anything
  * outside this set fires the `plugin-blog-custom-config` diagnostic.
  */
-const DEFAULT_BLOG_KEYS: ReadonlySet<string> = new Set([
-  'enabled',
-  'blog_dir',
-  'post_dir',
-]);
+const DEFAULT_BLOG_KEYS: ReadonlySet<string> = new Set(['enabled', 'blog_dir', 'post_dir']);

@@ -15,41 +15,23 @@ describe('normalizeDefinitionLists', () => {
   });
 
   it('groups multiple sibling terms (separated by blank lines) into one <dl>', () => {
-    const src = [
-      'Apple',
-      ':   A red fruit.',
-      '',
-      'Banana',
-      ':   A yellow fruit.',
-      '',
-    ].join('\n');
+    const src = ['Apple', ':   A red fruit.', '', 'Banana', ':   A yellow fruit.', ''].join('\n');
     expect(normalizeDefinitionLists(src)).toBe(
       '<dl>\n<dt>Apple</dt>\n<dd>A red fruit.</dd>\n<dt>Banana</dt>\n<dd>A yellow fruit.</dd>\n</dl>\n',
     );
   });
 
   it('attaches multiple definitions for the same term', () => {
-    const src = [
-      'Apple',
-      ':   A red fruit.',
-      ':   A tech company.',
-      '',
-    ].join('\n');
+    const src = ['Apple', ':   A red fruit.', ':   A tech company.', ''].join('\n');
     expect(normalizeDefinitionLists(src)).toBe(
       '<dl>\n<dt>Apple</dt>\n<dd>A red fruit.</dd>\n<dd>A tech company.</dd>\n</dl>\n',
     );
   });
 
   it('preserves prose before and after the definition list', () => {
-    const src = [
-      '# Heading',
-      '',
-      'Apple',
-      ':   Red fruit.',
-      '',
-      'Trailing paragraph.',
-      '',
-    ].join('\n');
+    const src = ['# Heading', '', 'Apple', ':   Red fruit.', '', 'Trailing paragraph.', ''].join(
+      '\n',
+    );
     const out = normalizeDefinitionLists(src);
     expect(out).toContain('# Heading');
     expect(out).toContain('<dl>');
@@ -61,13 +43,7 @@ describe('normalizeDefinitionLists', () => {
   });
 
   it('does not rewrite definition markers inside fenced code', () => {
-    const src = [
-      '```',
-      'Term',
-      ':   Definition.',
-      '```',
-      '',
-    ].join('\n');
+    const src = ['```', 'Term', ':   Definition.', '```', ''].join('\n');
     expect(normalizeDefinitionLists(src)).toBe(src);
   });
 

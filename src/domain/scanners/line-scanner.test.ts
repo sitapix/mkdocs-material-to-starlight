@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { createDiagnostic, type Diagnostic } from '../diagnostics/diagnostic.js';
-import { runLineScanners, type LineScanner } from './line-scanner.js';
+import { type LineScanner, runLineScanners } from './line-scanner.js';
 
 const TODO_LINE = /^\s*TODO\b/;
 const FIXME_LINE = /^\s*FIXME\b/;

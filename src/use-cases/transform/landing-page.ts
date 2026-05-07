@@ -92,10 +92,7 @@ function isSectionHeader(text: string): boolean {
   return SECTION_HEADER_WORDS.has(lower);
 }
 
-export function detectLandingPage(
-  source: string,
-  pathRel: string,
-): LandingPageResult {
+export function detectLandingPage(source: string, pathRel: string): LandingPageResult {
   const empty: LandingPageResult = { isLanding: false, text: source, frontmatter: {} };
 
   // Guard 1: must be root index.md.
@@ -189,8 +186,8 @@ function buildSplashPage(
   // Extract CTA buttons (only explicit .md-button ones).
   const actions: Array<{ text: string; link: string; variant: 'primary' | 'secondary' }> = [];
   const ctaRe = /\[([^\]]+)\]\(([^)]+)\)\{[^}]*\.md-button[^}]*\}/g;
-  let ctaMatch: RegExpExecArray | null;
-  while ((ctaMatch = ctaRe.exec(body)) !== null) {
+  let ctaMatch: RegExpExecArray | null = ctaRe.exec(body);
+  while (ctaMatch !== null) {
     const label = ctaMatch[1] ?? '';
     const link = ctaMatch[2] ?? '';
     // Skip image-like labels (contain exclamation) or empty labels.
@@ -200,6 +197,7 @@ function buildSplashPage(
       link,
       variant: actions.length === 0 ? 'primary' : 'secondary',
     });
+    ctaMatch = ctaRe.exec(body);
   }
 
   // Decide which hero image schema fits: `image.file` (Astro-bundled,
@@ -208,8 +206,7 @@ function buildSplashPage(
   // `image.html`; only src-relative paths survive into `image.file`.
   const heroImageHtml =
     heroImagePath !== null &&
-    (heroImagePath.startsWith('/') ||
-      /^[a-z][a-z0-9+\-.]*:\/\//i.test(heroImagePath))
+    (heroImagePath.startsWith('/') || /^[a-z][a-z0-9+\-.]*:\/\//i.test(heroImagePath))
       ? `<img src="${heroImagePath}" alt="" />`
       : null;
 
@@ -217,9 +214,7 @@ function buildSplashPage(
   const hero: HeroFrontmatter = {
     ...(heroTitle !== null ? { title: heroTitle } : {}),
     ...(heroTagline !== null ? { tagline: heroTagline } : {}),
-    ...(heroImagePath !== null && heroImageHtml === null
-      ? { image: { file: heroImagePath } }
-      : {}),
+    ...(heroImagePath !== null && heroImageHtml === null ? { image: { file: heroImagePath } } : {}),
     ...(actions.length > 0 ? { actions } : {}),
   };
 
@@ -230,10 +225,7 @@ function buildSplashPage(
   // in HTML/Material idioms our extractor can't dissect, so every field
   // comes back null.
   const hasAnyHero =
-    heroTitle !== null ||
-    heroTagline !== null ||
-    heroImagePath !== null ||
-    actions.length > 0;
+    heroTitle !== null || heroTagline !== null || heroImagePath !== null || actions.length > 0;
   const heroLines: string[] = ['hero:'];
   if (heroTitle !== null) heroLines.push(`  title: ${quoteYamlScalar(heroTitle)}`);
   if (heroTagline !== null) heroLines.push(`  tagline: ${quoteYamlScalar(heroTagline)}`);
@@ -265,9 +257,10 @@ function buildSplashPage(
     .split('\n')
     .filter((line) => !/^template\s*:/.test(line))
     .join('\n');
-  const baseFm = existingFm.trimEnd().length > 0
-    ? `${existingFm.trimEnd()}\ntemplate: splash`
-    : `template: splash`;
+  const baseFm =
+    existingFm.trimEnd().length > 0
+      ? `${existingFm.trimEnd()}\ntemplate: splash`
+      : `template: splash`;
   const newFm = heroBlock.length > 0 ? `${baseFm}\n${heroBlock}` : baseFm;
   const fmBlock = `---\n${newFm}\n---\n`;
 

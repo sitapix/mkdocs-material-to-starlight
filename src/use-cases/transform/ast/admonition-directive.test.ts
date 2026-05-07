@@ -1,8 +1,8 @@
-import { describe, expect, it } from 'vitest';
-import { unified } from 'unified';
+import remarkDirective from 'remark-directive';
 import remarkParse from 'remark-parse';
 import remarkStringify from 'remark-stringify';
-import remarkDirective from 'remark-directive';
+import { unified } from 'unified';
+import { describe, expect, it } from 'vitest';
 import { transformAdmonitionDirectives } from './admonition-directive.js';
 
 function process(source: string): string {
@@ -85,9 +85,7 @@ describe('transformAdmonitionDirectives', () => {
   });
 
   it('preserves the title as a <summary> element on collapsible admonitions', () => {
-    const out = process(
-      ':::warning[Heads up]{collapsible="closed"}\nBe careful.\n:::\n',
-    );
+    const out = process(':::warning[Heads up]{collapsible="closed"}\nBe careful.\n:::\n');
     expect(out).toMatch(/<details>/);
     expect(out).toContain('<summary>Heads up</summary>');
     expect(out).toContain('Be careful.');

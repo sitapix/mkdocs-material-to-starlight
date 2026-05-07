@@ -1,13 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { runAstroCheck } from './run-astro-check.js';
-import { ok, err } from '../../domain/result.js';
 import type {
   ProcessOutput,
-  ProcessRunOptions,
   ProcessRunner,
   ProcessRunnerError,
+  ProcessRunOptions,
 } from '../../domain/ports/process-runner.js';
 import type { Result } from '../../domain/result.js';
+import { err, ok } from '../../domain/result.js';
+import { runAstroCheck } from './run-astro-check.js';
 
 interface FakeOptions {
   readonly result?: Result<ProcessOutput, ProcessRunnerError>;

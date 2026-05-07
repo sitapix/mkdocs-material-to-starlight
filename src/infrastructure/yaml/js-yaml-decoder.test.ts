@@ -25,10 +25,7 @@ describe('createJsYamlDecoder', () => {
     expect(result.ok).toBe(true);
     if (result.ok) {
       expect(result.value).toEqual({
-        nav: [
-          'index.md',
-          { Guide: ['guide/intro.md', 'guide/setup.md'] },
-        ],
+        nav: ['index.md', { Guide: ['guide/intro.md', 'guide/setup.md'] }],
       });
     }
   });
@@ -81,9 +78,7 @@ describe('createJsYamlDecoder', () => {
     // reference a Python callable. Without tolerance, the entire conversion
     // aborts. The marker doesn't need to be the actual callable — it's only
     // used at MkDocs runtime, not during conversion.
-    const result = decoder.decode(
-      'format: !!python/name:pymdownx.superfences.fence_code_format\n',
-    );
+    const result = decoder.decode('format: !!python/name:pymdownx.superfences.fence_code_format\n');
     expect(result.ok).toBe(true);
     if (result.ok) {
       expect(result.value).toEqual({
@@ -94,9 +89,7 @@ describe('createJsYamlDecoder', () => {
 
   it('tolerates !!python/object/apply tags by decoding them as opaque markers', () => {
     // Used by pymdownx.arithmatex with mhchem and similar plugins.
-    const result = decoder.decode(
-      'fn: !!python/object/apply:foo.bar.make_thing\n  - 42\n',
-    );
+    const result = decoder.decode('fn: !!python/object/apply:foo.bar.make_thing\n  - 42\n');
     expect(result.ok).toBe(true);
     if (result.ok) {
       // The opaque marker preserves the dotted name; arguments are dropped.
@@ -108,9 +101,7 @@ describe('createJsYamlDecoder', () => {
   it('still rejects !!js/function even when python tags are tolerated', () => {
     // Security regression guard: opening up python/* must not also open up
     // js/function (which can execute arbitrary JavaScript via js-yaml).
-    const result = decoder.decode(
-      'value: !!js/function "function () { return 1; }"\n',
-    );
+    const result = decoder.decode('value: !!js/function "function () { return 1; }"\n');
     expect(result.ok).toBe(false);
   });
 

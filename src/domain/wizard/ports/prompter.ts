@@ -137,9 +137,7 @@ export interface Prompter {
   select<V extends string>(options: SelectOptions<V>): Promise<V | null>;
   /** Single-keystroke select — the value is a one-character key the user presses. */
   selectKey<V extends string>(options: SelectKeyOptions<V>): Promise<V | null>;
-  multiselect<V extends string>(
-    options: MultiselectOptions<V>,
-  ): Promise<ReadonlyArray<V> | null>;
+  multiselect<V extends string>(options: MultiselectOptions<V>): Promise<ReadonlyArray<V> | null>;
   /** Type-ahead multiselect for long option lists. */
   autocompleteMultiselect<V extends string>(
     options: AutocompleteMultiselectOptions<V>,

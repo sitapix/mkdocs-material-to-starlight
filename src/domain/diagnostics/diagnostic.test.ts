@@ -1,10 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import {
-  createDiagnostic,
-  isFatal,
-  type Diagnostic,
-  type Severity,
-} from './diagnostic.js';
+import { createDiagnostic, type Diagnostic, isFatal, type Severity } from './diagnostic.js';
 
 describe('createDiagnostic', () => {
   it('builds a diagnostic with the required fields', () => {

@@ -19,39 +19,40 @@
  * remark-directive containers; downstream stages do not see MkDocs.
  */
 
-import { normalizeAbbreviations } from './abbreviations.js';
-import { normalizeAttrList } from './attr-list.js';
 import type { SanitizeReport } from '../mdx-detection/sanitize-mdx-syntax.js';
+import { normalizeAbbreviations } from './abbreviations.js';
+import { normalizeAdmonitions } from './admonitions.js';
+import { normalizeAnnotations } from './annotations.js';
+import { normalizeAttrList } from './attr-list.js';
+import { normalizeBlocks } from './blocks.js';
+import { normalizeButtons } from './buttons.js';
+import { normalizeCodeAnnotations } from './code-annotations.js';
 import { normalizeCodeBlockMeta } from './code-block-meta.js';
-import { normalizeInlineHilite } from './inlinehilite.js';
-import { normalizeMaterialShortcodes } from './material-shortcodes.js';
-import { normalizeMedia, type MediaPromotion } from './media.js';
-import { normalizeOnlyMkdocs } from './only-mkdocs.js';
+import { normalizeContentTabs } from './content-tabs.js';
+import { normalizeCriticMarkup } from './critic.js';
+import { normalizeDefinitionLists } from './deflists.js';
+import { normalizeStandardEmoji } from './emoji.js';
+import { normalizeFancylists } from './fancylists.js';
 import { normalizeFrontmatterCommentsStrip } from './frontmatter-comments-strip.js';
 import { normalizeFrontmatterHide } from './frontmatter-hide.js';
 import { normalizeFrontmatterTemplate } from './frontmatter-template.js';
 import { normalizeFrontmatterTitleCoercion } from './frontmatter-title-coerce.js';
-import { normalizeStandardEmoji } from './emoji.js';
-import { normalizeAdmonitions } from './admonitions.js';
-import { normalizeAnnotations } from './annotations.js';
-import { normalizeBlocks } from './blocks.js';
-import { normalizeButtons } from './buttons.js';
-import { normalizeCodeAnnotations } from './code-annotations.js';
-import { normalizeContentTabs } from './content-tabs.js';
-import { normalizeCriticMarkup } from './critic.js';
-import { normalizeDefinitionLists } from './deflists.js';
 import { normalizeCardGrids } from './grids.js';
-import { normalizeFastapiIncludes } from './fastapi-includes.js';
 import { normalizeHeadingAttrList } from './heading-attr-list.js';
+import { normalizeHtmlBlockSpacing } from './html-block-spacing.js';
 import { normalizeImages } from './images.js';
 import { normalizeInlineMarks } from './inline-marks.js';
-import { normalizeLegacySyntax, type LegacySyntaxReport } from './legacy-syntax.js';
-import { normalizeHtmlBlockSpacing } from './html-block-spacing.js';
+import { normalizeInlineHilite } from './inlinehilite.js';
+import { normalizeJinjaInLinkUrls } from './jinja-in-urls.js';
+import { type LegacySyntaxReport, normalizeLegacySyntax } from './legacy-syntax.js';
+import { normalizeMaterialShortcodes } from './material-shortcodes.js';
+import { type MediaPromotion, normalizeMedia } from './media.js';
 import { normalizeMkautodocBlocks } from './mkautodoc.js';
-import { normalizeSmartSymbols } from './smartsymbols.js';
-import { normalizeFancylists } from './fancylists.js';
-import { normalizeWikilinks } from './wikilinks.js';
+import { normalizeOnlyMkdocs } from './only-mkdocs.js';
 import { normalizeProgressBar } from './progressbar.js';
+import { normalizeSmartSymbols } from './smartsymbols.js';
+import { normalizeSourceIncludeFence } from './source-include-fence.js';
+import { normalizeWikilinks } from './wikilinks.js';
 
 /**
  * Optional report channel for `normalize`. When provided, sub-normalizers
@@ -68,6 +69,12 @@ export interface NormalizeReport {
 
 export function normalize(source: string, report?: NormalizeReport): string {
   let current = source;
+  // Run BEFORE everything else: remark-parse rejects link targets that
+  // contain `{{` (treats the whole `[text](url)` as plain text), so any
+  // Jinja-in-URL braces must be entity-escaped before parsing or the
+  // link is irretrievably mangled by stringify (real-world: cv4x/
+  // svstudio-manual). Pure text-level rewrite, no AST involvement.
+  current = normalizeJinjaInLinkUrls(current);
   current = normalizeCodeAnnotations(current);
   current = normalizeAnnotations(current);
   current = normalizeAbbreviations(current);
@@ -92,7 +99,7 @@ export function normalize(source: string, report?: NormalizeReport): string {
   }
   current = normalizeInlineMarks(current);
   current = normalizeMkautodocBlocks(current);
-  current = normalizeFastapiIncludes(current);
+  current = normalizeSourceIncludeFence(current);
   current = normalizeSmartSymbols(current);
   // Long-tail PyMdown extensions. Each is a disjoint marker set:
   //   fancylists: `[a-zA-Z]+\. ` markers at line-start (Roman / alpha)

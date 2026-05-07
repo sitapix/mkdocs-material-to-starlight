@@ -15,11 +15,9 @@
  */
 
 import { join } from 'node:path';
+import type { MkdocsMarkdownExtension, MkdocsPlugin } from '../../domain/config/mkdocs-config.js';
 import type { FileSystem } from '../../domain/ports/file-system.js';
-import type {
-  MkdocsPlugin,
-  MkdocsMarkdownExtension,
-} from '../../domain/config/mkdocs-config.js';
+import type { TaggedDiagnostic } from '../convert-site/convert.js';
 import {
   scanCodeBlockOptOuts,
   scanCodehiliteLinenumsOccurrences,
@@ -29,14 +27,15 @@ import {
   scanTabsLinkOccurrences,
 } from '../detect-features/scan-bulk-diagnostics.js';
 import { scanMaterialCodeCssVars } from '../detect-features/scan-code-css-vars.js';
-import type { TaggedDiagnostic } from '../convert-site/convert.js';
 
 /** A directory reader that lists files in a docs tree, filtered by extension. */
 export interface DirectoryReaderLike {
   list(
     dir: string,
     extensions: ReadonlyArray<string>,
-  ): Promise<{ ok: true; value: ReadonlyArray<string> } | { ok: false; error: { message: string } }>;
+  ): Promise<
+    { ok: true; value: ReadonlyArray<string> } | { ok: false; error: { message: string } }
+  >;
 }
 
 export interface RunBulkScansInput {

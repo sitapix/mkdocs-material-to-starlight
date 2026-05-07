@@ -27,15 +27,13 @@ export interface ExcludePatterns {
   readonly regex: ReadonlyArray<string>;
 }
 
-export function extractExcludePatterns(
-  plugins: ReadonlyArray<MkdocsPlugin>,
-): ExcludePatterns {
+export function extractExcludePatterns(plugins: ReadonlyArray<MkdocsPlugin>): ExcludePatterns {
   const exclude = plugins.find((p) => p.name === 'exclude');
   if (exclude === undefined) return { glob: [], regex: [] };
   const opts = exclude.options as Record<string, unknown> | undefined;
   return {
-    glob: stringArray(opts?.['glob']),
-    regex: stringArray(opts?.['regex']),
+    glob: stringArray(opts?.glob),
+    regex: stringArray(opts?.regex),
   };
 }
 
@@ -80,7 +78,7 @@ function globToRegex(glob: string): RegExp {
   for (const ch of glob) {
     if (ch === '*') out += '.*';
     else if (ch === '?') out += '.';
-    else if (/[.+^${}()|[\]\\]/.test(ch)) out += '\\' + ch;
+    else if (/[.+^${}()|[\]\\]/.test(ch)) out += `\\${ch}`;
     else out += ch;
   }
   out += '$';

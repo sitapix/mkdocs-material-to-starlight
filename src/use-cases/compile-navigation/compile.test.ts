@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { compileNavigation } from './compile.js';
-import { buildSlugMap } from '../../domain/starlight/slug-map.js';
 import type { MkdocsNavEntry } from '../../domain/config/mkdocs-config.js';
 import type { SlugMap } from '../../domain/starlight/slug-map.js';
+import { buildSlugMap } from '../../domain/starlight/slug-map.js';
+import { compileNavigation } from './compile.js';
 
 function slugMapOrThrow(paths: ReadonlyArray<string>): SlugMap {
   const result = buildSlugMap(paths);
@@ -57,9 +57,7 @@ describe('compileNavigation', () => {
           {
             kind: 'section',
             title: 'Advanced',
-            children: [
-              { kind: 'file', title: null, path: 'guide/advanced/setup.md' },
-            ],
+            children: [{ kind: 'file', title: null, path: 'guide/advanced/setup.md' }],
           },
         ],
       },

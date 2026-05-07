@@ -4,16 +4,12 @@ import { extractExpressiveCodeConfig } from './expressive-code-config.js';
 describe('extractExpressiveCodeConfig', () => {
   it('returns undefined when pymdownx.highlight is absent', () => {
     expect(extractExpressiveCodeConfig([])).toBeUndefined();
-    expect(
-      extractExpressiveCodeConfig([{ name: 'admonition', options: {} }]),
-    ).toBeUndefined();
+    expect(extractExpressiveCodeConfig([{ name: 'admonition', options: {} }])).toBeUndefined();
   });
 
   it('returns undefined when pymdownx.highlight is present but pygments_style is not set', () => {
     expect(
-      extractExpressiveCodeConfig([
-        { name: 'pymdownx.highlight', options: { linenums: true } },
-      ]),
+      extractExpressiveCodeConfig([{ name: 'pymdownx.highlight', options: { linenums: true } }]),
     ).toBeUndefined();
   });
 

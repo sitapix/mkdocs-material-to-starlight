@@ -12,10 +12,10 @@
  * Reproduces the pydantic/pydantic `concepts/validators.md` silent-drop.
  */
 
-import { describe, expect, it } from 'vitest';
-import { mkdtempSync, mkdirSync, rmSync, writeFileSync, readFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { describe, expect, it } from 'vitest';
 import { convertSiteFromDisk } from '../../src/interface/api/convert-site.js';
 
 describe('grid-cards inside admonition (pydantic regression)', () => {
@@ -24,10 +24,7 @@ describe('grid-cards inside admonition (pydantic regression)', () => {
     const outputDir = mkdtempSync(join(tmpdir(), 'mts-grid-admon-out-'));
     try {
       mkdirSync(join(projectDir, 'docs'), { recursive: true });
-      writeFileSync(
-        join(projectDir, 'mkdocs.yml'),
-        'site_name: Test\ndocs_dir: docs\n',
-      );
+      writeFileSync(join(projectDir, 'mkdocs.yml'), 'site_name: Test\ndocs_dir: docs\n');
       writeFileSync(
         join(projectDir, 'docs', 'index.md'),
         [
@@ -51,10 +48,7 @@ describe('grid-cards inside admonition (pydantic regression)', () => {
         throw new Error(`Conversion failed: ${JSON.stringify(result.error)}`);
       }
 
-      const indexOut = readFileSync(
-        join(outputDir, 'src', 'content', 'docs', 'index.md'),
-        'utf8',
-      );
+      const indexOut = readFileSync(join(outputDir, 'src', 'content', 'docs', 'index.md'), 'utf8');
 
       // Both card items must survive in the output and the output must not
       // contain spurious escaped directive markers (visible garbage).

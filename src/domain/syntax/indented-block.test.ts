@@ -3,13 +3,7 @@ import { readIndentedBlock } from './indented-block.js';
 
 describe('readIndentedBlock', () => {
   it('reads contiguous body lines and leaves trailing blanks for the outer parser', () => {
-    const lines = [
-      '!!! note',
-      '    line one',
-      '    line two',
-      '',
-      'next paragraph',
-    ];
+    const lines = ['!!! note', '    line one', '    line two', '', 'next paragraph'];
     const block = readIndentedBlock(lines, 1, 4);
     expect(block).toEqual({
       bodyLines: ['line one', 'line two'],
@@ -18,13 +12,7 @@ describe('readIndentedBlock', () => {
   });
 
   it('preserves blank lines inside the block (Material allows this)', () => {
-    const lines = [
-      '!!! note',
-      '    paragraph one',
-      '',
-      '    paragraph two',
-      'outside',
-    ];
+    const lines = ['!!! note', '    paragraph one', '', '    paragraph two', 'outside'];
     const block = readIndentedBlock(lines, 1, 4);
     expect(block.bodyLines).toEqual(['paragraph one', '', 'paragraph two']);
     expect(block.nextIndex).toBe(4);
@@ -38,18 +26,9 @@ describe('readIndentedBlock', () => {
   });
 
   it('preserves additional indentation beyond the threshold', () => {
-    const lines = [
-      '!!! note',
-      '    outer',
-      '        nested under outer',
-      '    back to outer',
-    ];
+    const lines = ['!!! note', '    outer', '        nested under outer', '    back to outer'];
     const block = readIndentedBlock(lines, 1, 4);
-    expect(block.bodyLines).toEqual([
-      'outer',
-      '    nested under outer',
-      'back to outer',
-    ]);
+    expect(block.bodyLines).toEqual(['outer', '    nested under outer', 'back to outer']);
     expect(block.nextIndex).toBe(4);
   });
 
@@ -68,13 +47,7 @@ describe('readIndentedBlock', () => {
   });
 
   it('drops trailing blanks from bodyLines and leaves them for the outer parser', () => {
-    const lines = [
-      '!!! note',
-      '    body',
-      '',
-      '',
-      'paragraph after',
-    ];
+    const lines = ['!!! note', '    body', '', '', 'paragraph after'];
     const block = readIndentedBlock(lines, 1, 4);
     expect(block.bodyLines).toEqual(['body']);
     expect(block.nextIndex).toBe(2);

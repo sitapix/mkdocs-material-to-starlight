@@ -18,9 +18,10 @@
  * is flagged.
  */
 
-import { resolveIcon } from '../transform/resolve-icon.js';
 import { createDiagnostic, type Diagnostic } from '../../domain/diagnostics/diagnostic.js';
 import { isFenceLine } from '../../domain/syntax/fence.js';
+import { resolveIcon } from '../transform/resolve-icon.js';
+
 const BUTTON_LINE_RE =
   /\[(?<label>[^\]\n]+)\]\([^)\n]+\)\{ *\.md-button(?: +\.md-button--[a-z0-9-]+)* *\}/g;
 const SHORTCODE_RE = /:([a-z][a-z0-9-]*[a-z0-9]):/g;
@@ -38,13 +39,13 @@ export function scanButtonIcons(source: string): ReadonlyArray<Diagnostic> {
     }
     if (inFence) continue;
     for (const match of line.matchAll(BUTTON_LINE_RE)) {
-      const label = match.groups?.['label'] ?? '';
+      const label = match.groups?.label ?? '';
       for (const iconMatch of label.matchAll(SHORTCODE_RE)) {
         const shortcode = `:${iconMatch[1]}:`;
         const descriptor = resolveIcon({ shortcode });
         if (descriptor === null) continue;
         if (descriptor.kind === 'starlight-builtin') continue;
-        const name = (iconMatch[1] ?? '');
+        const name = iconMatch[1] ?? '';
         if (!seen.has(name)) {
           seen.add(name);
           stripped.push(name);
@@ -60,8 +61,7 @@ export function scanButtonIcons(source: string): ReadonlyArray<Diagnostic> {
       severity: 'info',
       ruleId: 'button-icon-stripped',
       source: 'normalize/scan-button-icons',
-      message:
-        `One or more icon shortcodes inside Material \`.md-button\` link labels were stripped because they have no curated Starlight built-in equivalent: ${list}. The buttons render with clean text but no icon glyph. To restore icons: (1) pass an \`iconOverrides\` map to the converter mapping each shortcode to a Starlight icon name; (2) edit the emitted \`<LinkButton>\` to use \`<Icon name="…" slot="icon" />\` with a custom Iconify setup; or (3) accept the loss if the icon was decorative.`,
+      message: `One or more icon shortcodes inside Material \`.md-button\` link labels were stripped because they have no curated Starlight built-in equivalent: ${list}. The buttons render with clean text but no icon glyph. To restore icons: (1) pass an \`iconOverrides\` map to the converter mapping each shortcode to a Starlight icon name; (2) edit the emitted \`<LinkButton>\` to use \`<Icon name="…" slot="icon" />\` with a custom Iconify setup; or (3) accept the loss if the icon was decorative.`,
     }),
   ];
 }

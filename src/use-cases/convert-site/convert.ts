@@ -19,6 +19,7 @@ import type { RepoContext } from '../../domain/config/repo-context.js';
 import { createDiagnostic, type Diagnostic } from '../../domain/diagnostics/diagnostic.js';
 import type { FileSystem } from '../../domain/ports/file-system.js';
 import { err, ok, type Result } from '../../domain/result.js';
+import { runWholeSourceScanners } from '../../domain/scanners/whole-source-scanner.js';
 import { findSlugIncompatibleSegments } from '../../domain/starlight/slug-compat.js';
 import { buildSlugMap, type SlugMap } from '../../domain/starlight/slug-map.js';
 // renameI18nPath is now consumed inside rewriteReadmePaths.
@@ -33,7 +34,6 @@ import { normalizeFileTrees } from '../normalize/file-tree.js';
 import { normalizeLinkAttrLists } from '../normalize/link-attr-list.js';
 import { normalizeMkdocstringsCrossRefs } from '../normalize/mkdocstrings-crossref.js';
 import { normalizePackageManagerTabs } from '../normalize/package-manager-tabs.js';
-import { runWholeSourceScanners } from '../../domain/scanners/whole-source-scanner.js';
 import { scanButtonIcons } from '../normalize/scan-button-icons.js';
 import { scanCodeFenceFlags } from '../normalize/scan-code-fence-flags.js';
 import { scanFrontmatterFields } from '../normalize/scan-frontmatter-fields.js';
@@ -44,7 +44,7 @@ import { scanInlineAdmonitions } from '../normalize/scan-inline-admonitions.js';
 import { scanMaterialMarkers } from '../normalize/scan-material-markers.js';
 import { scanPlaceholderPage } from '../normalize/scan-placeholder-pages.js';
 import { scanTabAnchors } from '../normalize/scan-tab-anchors.js';
-import { normalizeTyperSnippetDirectives } from '../normalize/typer-snippet-directives.js';
+import { normalizeSourceIncludeDirectives } from '../normalize/source-include-directive.js';
 import type { DetectedFeature } from '../serialize-config/package-json.js';
 import { promoteSteps } from '../transform/ast/steps.js';
 import { detectLandingPage } from '../transform/landing-page.js';
@@ -272,7 +272,7 @@ export async function convertSite(
     // Normalize typer-style {* path *} snippet directives before any other
     // processing. This must run on the original source so line numbers match
     // the user's file, and before the mkautodoc normalizer fences them.
-    const snippetResult = normalizeTyperSnippetDirectives(source);
+    const snippetResult = normalizeSourceIncludeDirectives(source);
     source = snippetResult.text;
     for (const diagnostic of snippetResult.diagnostics) {
       diagnostics.push({ sourcePath, diagnostic });
@@ -380,7 +380,7 @@ export async function convertSite(
       // Material's site-wide glossary pattern: append shared content (often
       // a list of `*[ABBR]: definition` entries) to every page so the
       // abbreviation expander has a global definition pool.
-      source = source + '\n\n' + input.autoAppendContent;
+      source = `${source}\n\n${input.autoAppendContent}`;
     }
     if (input.snippetBasePaths !== undefined) {
       const expansion = await expandSnippets({

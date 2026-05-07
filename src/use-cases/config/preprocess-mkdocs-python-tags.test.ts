@@ -38,8 +38,7 @@ describe('preprocessMkdocsPythonTags', () => {
   });
 
   it('idempotent: re-running on output is a no-op', () => {
-    const src =
-      'emoji_index: !!python/name:material.extensions.emoji.twemoji\n';
+    const src = 'emoji_index: !!python/name:material.extensions.emoji.twemoji\n';
     const first = preprocessMkdocsPythonTags(src);
     const second = preprocessMkdocsPythonTags(first.source);
     expect(second.source).toBe(first.source);
@@ -57,7 +56,7 @@ describe('preprocessMkdocsPythonTags', () => {
     expect(stripped).toContain('material.extensions.emoji.to_svg');
   });
 
-  it("strips !!python/name: with trailing empty-string YAML marker (fastapi regression)", () => {
+  it('strips !!python/name: with trailing empty-string YAML marker (fastapi regression)', () => {
     // MkDocs Material commonly emits this form, where the trailing `''` is the
     // YAML scalar-presence marker. The regex must match it, otherwise the tag
     // leaks through and downstream YAML parsing fails on the inherited config.

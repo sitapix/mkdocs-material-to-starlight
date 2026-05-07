@@ -7,23 +7,17 @@ describe('normalizeCodeBlockMeta', () => {
   });
 
   it('translates linenums="N" to showLineNumbers + startLineNumber', () => {
-    const out = normalizeCodeBlockMeta(
-      '```python linenums="3"\nx = 1\n```\n',
-    );
+    const out = normalizeCodeBlockMeta('```python linenums="3"\nx = 1\n```\n');
     expect(out).toContain('```python showLineNumbers startLineNumber=3');
   });
 
   it('translates hl_lines="2 4-6" to {2,4-6}', () => {
-    const out = normalizeCodeBlockMeta(
-      '```python hl_lines="2 4-6"\nx = 1\ny = 2\n```\n',
-    );
+    const out = normalizeCodeBlockMeta('```python hl_lines="2 4-6"\nx = 1\ny = 2\n```\n');
     expect(out).toContain('{2,4-6}');
   });
 
   it('preserves title= attribute as-is', () => {
-    const out = normalizeCodeBlockMeta(
-      '```python title="example.py"\nx = 1\n```\n',
-    );
+    const out = normalizeCodeBlockMeta('```python title="example.py"\nx = 1\n```\n');
     expect(out).toContain('title="example.py"');
   });
 
@@ -37,9 +31,7 @@ describe('normalizeCodeBlockMeta', () => {
   });
 
   it('drops attr-list `{ .python .copy }` form into Expressive Code metadata', () => {
-    const out = normalizeCodeBlockMeta(
-      '```python { .python .copy }\nx = 1\n```\n',
-    );
+    const out = normalizeCodeBlockMeta('```python { .python .copy }\nx = 1\n```\n');
     // The .python class should resolve to language; .copy is implicit in EC.
     expect(out).toContain('```python');
   });
@@ -52,15 +44,11 @@ describe('normalizeCodeBlockMeta', () => {
   });
 
   it('does not modify code blocks without Material-form attrs', () => {
-    expect(normalizeCodeBlockMeta('```ts\nfoo()\n```\n')).toBe(
-      '```ts\nfoo()\n```\n',
-    );
+    expect(normalizeCodeBlockMeta('```ts\nfoo()\n```\n')).toBe('```ts\nfoo()\n```\n');
   });
 
   it('handles single-number hl_lines', () => {
-    const out = normalizeCodeBlockMeta(
-      '```\ntext\n```\n```ts hl_lines="3"\nfoo\n```\n',
-    );
+    const out = normalizeCodeBlockMeta('```\ntext\n```\n```ts hl_lines="3"\nfoo\n```\n');
     expect(out).toContain('{3}');
   });
 
@@ -88,9 +76,7 @@ describe('normalizeCodeBlockMeta', () => {
     });
 
     it('lifts title with single-quote variant', () => {
-      const out = normalizeCodeBlockMeta(
-        "```python {title='example.py'}\nx = 1\n```\n",
-      );
+      const out = normalizeCodeBlockMeta("```python {title='example.py'}\nx = 1\n```\n");
       expect(out).toMatch(/title=("example\.py"|'example\.py')/);
     });
 
@@ -106,9 +92,7 @@ describe('normalizeCodeBlockMeta', () => {
     });
 
     it('preserves brace block when no title is present (current behavior — strips Material-only attrs)', () => {
-      const out = normalizeCodeBlockMeta(
-        '```python {upgrade="skip"}\nx = 1\n```\n',
-      );
+      const out = normalizeCodeBlockMeta('```python {upgrade="skip"}\nx = 1\n```\n');
       const fenceLine = out.split('\n')[0] ?? '';
       // No title to lift; Material-only attrs are dropped just like before.
       expect(fenceLine).not.toContain('upgrade');

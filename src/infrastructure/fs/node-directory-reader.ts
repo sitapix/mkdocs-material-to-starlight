@@ -11,11 +11,8 @@
 
 import { readdir } from 'node:fs/promises';
 import { join } from 'node:path';
-import { ok, err } from '../../domain/result.js';
-import type {
-  DirectoryReadError,
-  DirectoryReader,
-} from '../../domain/ports/directory-reader.js';
+import type { DirectoryReadError, DirectoryReader } from '../../domain/ports/directory-reader.js';
+import { err, ok } from '../../domain/result.js';
 
 export function createNodeDirectoryReader(): DirectoryReader {
   return {

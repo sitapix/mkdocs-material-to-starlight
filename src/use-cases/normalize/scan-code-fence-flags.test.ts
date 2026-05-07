@@ -28,15 +28,9 @@ describe('scanCodeFenceFlags', () => {
   });
 
   it('reports each occurrence separately with line numbers', () => {
-    const src = [
-      '```python { .copy }',
-      'a',
-      '```',
-      '',
-      '```js { .no-copy }',
-      'b',
-      '```',
-    ].join('\n');
+    const src = ['```python { .copy }', 'a', '```', '', '```js { .no-copy }', 'b', '```'].join(
+      '\n',
+    );
     const out = scanCodeFenceFlags(src);
     expect(out).toHaveLength(2);
     expect(out[0]?.place?.line).toBe(1);

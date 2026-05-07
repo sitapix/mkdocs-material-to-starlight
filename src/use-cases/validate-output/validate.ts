@@ -32,17 +32,14 @@ export async function validateOutput(
         severity: 'info',
         ruleId: 'output-validator-unavailable',
         source: SOURCE,
-        message:
-          `Output syntax validation skipped (@mdx-js/mdx not installed). ${result.hint}`,
+        message: `Output syntax validation skipped (@mdx-js/mdx not installed). ${result.hint}`,
       }),
     ];
   }
 
   return result.errors.map((e) => {
     const place =
-      e.line !== null && e.column !== null
-        ? { place: { line: e.line, column: e.column } }
-        : {};
+      e.line !== null && e.column !== null ? { place: { line: e.line, column: e.column } } : {};
     return createDiagnostic({
       severity: 'error',
       ruleId: 'output-syntax-error',

@@ -16,16 +16,16 @@
  */
 
 import { posix } from 'node:path';
-import { serializeAstroConfig, type AstroConfigInput } from './astro-config.js';
-import { serializePackageJson } from './package-json.js';
-import { serializeMigrationNotes } from './migration-notes.js';
-import { inferFrontmatterTypes } from '../validate-output/infer-frontmatter-types.js';
-import { collectUnknownFrontmatterFieldNames } from '../convert-site/diagnostic-enrichment.js';
-import type { SidebarEntry } from '../../domain/starlight/sidebar.js';
-import type { DetectedFeature } from './versions.js';
-import type { TaggedDiagnostic } from '../convert-site/convert.js';
 import type { MaterialFontConfig } from '../../domain/starlight/font-mapping.js';
+import type { SidebarEntry } from '../../domain/starlight/sidebar.js';
+import type { TaggedDiagnostic } from '../convert-site/convert.js';
+import { collectUnknownFrontmatterFieldNames } from '../convert-site/diagnostic-enrichment.js';
 import type { extractExpressiveCodeConfig } from '../detect-features/expressive-code-config.js';
+import { inferFrontmatterTypes } from '../validate-output/infer-frontmatter-types.js';
+import { type AstroConfigInput, serializeAstroConfig } from './astro-config.js';
+import { serializeMigrationNotes } from './migration-notes.js';
+import { serializePackageJson } from './package-json.js';
+import type { DetectedFeature } from './versions.js';
 
 const ABSOLUTE_URL = /^[a-z][a-z0-9+\-.]*:\/\//i;
 
@@ -42,7 +42,12 @@ interface AnalyticsHeadEntries {
 
 interface ExtraAssets {
   readonly css: ReadonlyArray<string>;
-  readonly js: ReadonlyArray<{ readonly src: string; readonly type?: 'module'; readonly async?: boolean; readonly defer?: boolean }>;
+  readonly js: ReadonlyArray<{
+    readonly src: string;
+    readonly type?: 'module';
+    readonly async?: boolean;
+    readonly defer?: boolean;
+  }>;
 }
 
 export interface AssembleConfigOutputsInput {
@@ -103,10 +108,12 @@ export function assembleConfigOutputs(
     (p) => [p, 'latest'] as const,
   );
 
-  const extraJsEntries: NonNullable<AstroConfigInput['extraJsEntries']> = input.extraAssets.js.map((js) => ({
-    ...js,
-    src: ABSOLUTE_URL.test(js.src) ? js.src : `/${js.src.replace(/^\/+/, '')}`,
-  }));
+  const extraJsEntries: NonNullable<AstroConfigInput['extraJsEntries']> = input.extraAssets.js.map(
+    (js) => ({
+      ...js,
+      src: ABSOLUTE_URL.test(js.src) ? js.src : `/${js.src.replace(/^\/+/, '')}`,
+    }),
+  );
 
   const logoEntry =
     input.logoSrc === null
@@ -134,9 +141,7 @@ export function assembleConfigOutputs(
     ...(input.editLinkBaseUrl === null ? {} : { editLinkBaseUrl: input.editLinkBaseUrl }),
     ...(input.tableOfContents === undefined ? {} : { tableOfContents: input.tableOfContents }),
     ...logoEntry,
-    ...(input.faviconRaw === null
-      ? {}
-      : { favicon: `/${posix.basename(input.faviconRaw)}` }),
+    ...(input.faviconRaw === null ? {} : { favicon: `/${posix.basename(input.faviconRaw)}` }),
     ...(input.expressiveCodeConfig === undefined
       ? {}
       : { expressiveCode: { themes: input.expressiveCodeConfig.themes } }),

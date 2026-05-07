@@ -5,9 +5,9 @@
  * @mdx-js/mdx installed.
  */
 import { describe, expect, it } from 'vitest';
-import { convertSite } from '../../src/use-cases/convert-site/convert.js';
-import type { OutputValidator } from '../../src/domain/ports/output-validator.js';
 import type { FileSystem } from '../../src/domain/ports/file-system.js';
+import type { OutputValidator } from '../../src/domain/ports/output-validator.js';
+import { convertSite } from '../../src/use-cases/convert-site/convert.js';
 
 function inMemoryFs(files: Readonly<Record<string, string>>): FileSystem {
   return {
@@ -37,9 +37,7 @@ const FAILING_VALIDATOR: OutputValidator = {
   async validate(_text, ext) {
     return {
       kind: 'failure',
-      errors: [
-        { line: 5, column: 3, message: `synthetic ${ext} parse failure` },
-      ],
+      errors: [{ line: 5, column: 3, message: `synthetic ${ext} parse failure` }],
     };
   },
 };

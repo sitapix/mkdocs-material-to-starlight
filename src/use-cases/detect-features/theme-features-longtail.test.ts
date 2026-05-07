@@ -14,10 +14,7 @@ import { detectLongtailFeatures } from './theme-features-longtail.js';
 
 describe('detectLongtailFeatures', () => {
   it('returns entries for flags that are in LONGTAIL but NOT in the primary catalog', () => {
-    const flags = [
-      'navigation.instant.preview',
-      'navigation.sections.expand',
-    ];
+    const flags = ['navigation.instant.preview', 'navigation.sections.expand'];
     const entries = detectLongtailFeatures(flags);
     const flagNames = entries.map((e) => e.flag);
     expect(flagNames).toContain('navigation.instant.preview');
@@ -28,16 +25,16 @@ describe('detectLongtailFeatures', () => {
     // All of these are in the primary catalog (handled-elsewhere, replaced-by-default,
     // or unsupported) and must NOT produce longtail entries.
     const flags = [
-      'navigation.tabs',       // handled-elsewhere
-      'content.code.copy',     // replaced-by-default
-      'navigation.top',        // unsupported
-      'toc.integrate',         // unsupported
-      'navigation.instant',    // replaced-by-default
-      'announce.dismiss',      // unsupported
-      'header.autohide',       // unsupported
-      'content.action.view',   // unsupported
-      'content.tooltips',      // unsupported
-      'content.code.select',   // replaced-by-default
+      'navigation.tabs', // handled-elsewhere
+      'content.code.copy', // replaced-by-default
+      'navigation.top', // unsupported
+      'toc.integrate', // unsupported
+      'navigation.instant', // replaced-by-default
+      'announce.dismiss', // unsupported
+      'header.autohide', // unsupported
+      'content.action.view', // unsupported
+      'content.tooltips', // unsupported
+      'content.code.select', // replaced-by-default
     ];
     const entries = detectLongtailFeatures(flags);
     expect(entries).toHaveLength(0);
@@ -76,14 +73,14 @@ describe('detectLongtailFeatures', () => {
 
   it('returns only longtail flags when mixed with primary-catalog and unknown flags', () => {
     const flags = [
-      'navigation.instant.preview',   // longtail — not in primary catalog
-      'navigation.sections.expand',   // longtail — not in primary catalog
-      'navigation.tabs',              // handled-elsewhere → excluded
-      'content.code.copy',            // replaced-by-default → excluded
-      'navigation.top',               // unsupported in primary catalog → excluded
-      'totally.unknown.flag',         // not in any catalog → excluded
-      'content.footnote.tooltips',    // primary catalog (rich note) → excluded
-      'navigation.instant',           // replaced-by-default in primary → excluded
+      'navigation.instant.preview', // longtail — not in primary catalog
+      'navigation.sections.expand', // longtail — not in primary catalog
+      'navigation.tabs', // handled-elsewhere → excluded
+      'content.code.copy', // replaced-by-default → excluded
+      'navigation.top', // unsupported in primary catalog → excluded
+      'totally.unknown.flag', // not in any catalog → excluded
+      'content.footnote.tooltips', // primary catalog (rich note) → excluded
+      'navigation.instant', // replaced-by-default in primary → excluded
     ];
     const entries = detectLongtailFeatures(flags);
     const flagNames = entries.map((e) => e.flag);

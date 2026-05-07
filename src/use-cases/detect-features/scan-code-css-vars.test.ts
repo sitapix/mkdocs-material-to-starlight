@@ -4,10 +4,7 @@ import { scanMaterialCodeCssVars } from './scan-code-css-vars.js';
 describe('scanMaterialCodeCssVars', () => {
   it('emits a diagnostic for files using --md-code-hl-string-color', () => {
     const out = scanMaterialCodeCssVars([
-      [
-        'docs/stylesheets/extra.css',
-        ':root > * {\n  --md-code-hl-string-color: #0FF1CE;\n}\n',
-      ],
+      ['docs/stylesheets/extra.css', ':root > * {\n  --md-code-hl-string-color: #0FF1CE;\n}\n'],
     ]);
     expect(out).toHaveLength(1);
     expect(out[0]?.sourcePath).toBe('docs/stylesheets/extra.css');
@@ -19,10 +16,7 @@ describe('scanMaterialCodeCssVars', () => {
 
   it('emits a diagnostic for files using --md-code-fg-color or --md-code-bg-color', () => {
     const out = scanMaterialCodeCssVars([
-      [
-        'docs/extra.css',
-        ':root { --md-code-fg-color: white; --md-code-bg-color: black; }\n',
-      ],
+      ['docs/extra.css', ':root { --md-code-fg-color: white; --md-code-bg-color: black; }\n'],
     ]);
     expect(out).toHaveLength(1);
     expect(out[0]?.diagnostic.message).toContain('--md-code-fg-color');
@@ -50,9 +44,7 @@ describe('scanMaterialCodeCssVars', () => {
   });
 
   it('returns an empty array when no Material code customization is present', () => {
-    const out = scanMaterialCodeCssVars([
-      ['docs/extra.css', 'body { color: red; }\n'],
-    ]);
+    const out = scanMaterialCodeCssVars([['docs/extra.css', 'body { color: red; }\n']]);
     expect(out).toHaveLength(0);
   });
 

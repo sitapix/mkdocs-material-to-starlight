@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { ok, err } from '../../domain/result.js';
-import type { FileSystem } from '../../domain/ports/file-system.js';
 import type { ConfigDiscoverer } from '../../domain/ports/config-discoverer.js';
+import type { FileSystem } from '../../domain/ports/file-system.js';
+import { err, ok } from '../../domain/result.js';
 import { resolveProjectDir } from './resolve-project-dir.js';
 
 function makeFs(presentPaths: ReadonlyArray<string>): FileSystem {
@@ -78,6 +78,22 @@ describe('resolveProjectDir', () => {
     expect(result.ok).toBe(false);
     if (result.ok) return;
     expect(result.error.kind).toBe('no-config-anywhere');
+  });
+
+  it('returns the input dir untouched when its mkdocs.yaml (alternate extension) exists', async () => {
+    // Real-world (lawmurray/doxide): MkDocs accepts both `.yml` and `.yaml`
+    // — the resolver must too. Without this, root-level `mkdocs.yaml`
+    // falls through to the discoverer (which finds it but reports a
+    // sibling-dir redirect path that doesn't actually exist on disk),
+    // and the downstream loader hardcoded to read `mkdocs.yml` then
+    // errors with `config-not-found`.
+    const fs = makeFs(['/proj/mkdocs.yaml']);
+    const discoverer = makeDiscoverer(['mkdocs.yaml']);
+    const result = await resolveProjectDir('/proj', fs, discoverer);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.projectDir).toBe('/proj');
+    expect(result.value.autoDiscovery).toBeNull();
   });
 
   it('uses POSIX joining so the discovered relPath stays portable', async () => {

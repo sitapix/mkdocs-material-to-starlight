@@ -28,8 +28,7 @@ import { isFenceLine } from '../../domain/syntax/fence.js';
 // when absent, the trailing `{...}` group is skipped. alt cannot contain `]`,
 // url cannot contain `)`. URL color-scheme markers (`#only-light`,
 // `#only-dark`) are kept as part of the url group and stripped below.
-const IMAGE_WITH_ATTRS =
-  /^!\[(?<alt>[^\]]*)\]\((?<url>[^)\s]+)\)(?:\{\s*(?<attrs>[^}]*)\})?\s*$/;
+const IMAGE_WITH_ATTRS = /^!\[(?<alt>[^\]]*)\]\((?<url>[^)\s]+)\)(?:\{\s*(?<attrs>[^}]*)\})?\s*$/;
 
 const COLOR_SCHEME_HASH = /#only-(?<scheme>light|dark)$/;
 
@@ -73,7 +72,7 @@ function rewriteLine(line: string): string {
     return line;
   }
 
-  const colorClass = colorMatch?.groups?.['scheme'];
+  const colorClass = colorMatch?.groups?.scheme;
   const allClasses = [
     ...parsed.classes,
     ...(colorClass !== undefined ? [`only-${colorClass}`] : []),
@@ -106,7 +105,6 @@ function parseAttrs(blob: string): ParsedAttrs {
     if (KNOWN_HTML_ATTRS.has(key)) {
       htmlAttrs.push([key, value]);
       recognized = true;
-      continue;
     }
   }
 

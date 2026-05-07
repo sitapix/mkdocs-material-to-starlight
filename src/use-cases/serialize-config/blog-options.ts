@@ -24,9 +24,7 @@
  * Schema: https://starlight-blog.vercel.app/getting-started/
  */
 
-export function translateBlogOptions(
-  options: Readonly<Record<string, unknown>>,
-): string {
+export function translateBlogOptions(options: Readonly<Record<string, unknown>>): string {
   const parts: string[] = [];
 
   // Material's blog plugin treats `<blog_dir>/posts/*` as the actual
@@ -43,30 +41,29 @@ export function translateBlogOptions(
   // even when the option is omitted from mkdocs.yml — the plugin being
   // enabled is enough signal. starlight-blog's own default `'blog'` is
   // wrong for every Material site that has any non-post under blog/.
-  const blogDirRaw = typeof options['blog_dir'] === 'string' && options['blog_dir'].length > 0
-    ? options['blog_dir']
-    : 'blog';
+  const blogDirRaw =
+    typeof options.blog_dir === 'string' && options.blog_dir.length > 0 ? options.blog_dir : 'blog';
   const blogDir = blogDirRaw.replace(/\/+$/, '');
   parts.push(`prefix: ${quote(`${blogDir}/posts`)}`);
-  if (typeof options['pagination_per_page'] === 'number') {
-    parts.push(`postsPerPage: ${String(options['pagination_per_page'])}`);
+  if (typeof options.pagination_per_page === 'number') {
+    parts.push(`postsPerPage: ${String(options.pagination_per_page)}`);
   }
-  if (options['draft'] === true || options['draft_on_serve'] === true) {
+  if (options.draft === true || options.draft_on_serve === true) {
     parts.push('recoverDrafts: true');
   }
-  const authorsLiteral = serializeAuthors(options['authors']);
+  const authorsLiteral = serializeAuthors(options.authors);
   if (authorsLiteral !== null) {
     parts.push(`authors: ${authorsLiteral}`);
   }
-  if (Array.isArray(options['categories_allowed']) && options['categories_allowed'].length > 0) {
-    const list = options['categories_allowed']
+  if (Array.isArray(options.categories_allowed) && options.categories_allowed.length > 0) {
+    const list = options.categories_allowed
       .filter((c): c is string => typeof c === 'string')
       .map(quote)
       .join(', ');
     parts.push(`categories: [${list}]`);
   }
-  if (typeof options['post_excerpt_separator'] === 'string') {
-    parts.push(`excerpt: { separator: ${quote(options['post_excerpt_separator'])} }`);
+  if (typeof options.post_excerpt_separator === 'string') {
+    parts.push(`excerpt: { separator: ${quote(options.post_excerpt_separator)} }`);
   }
 
   if (parts.length === 0) return '';
@@ -81,10 +78,10 @@ function serializeAuthors(raw: unknown): string | null {
     if (val === null || typeof val !== 'object') continue;
     const author = val as Record<string, unknown>;
     const fields: string[] = [];
-    if (typeof author['name'] === 'string') fields.push(`name: ${quote(author['name'])}`);
-    if (typeof author['url'] === 'string') fields.push(`url: ${quote(author['url'])}`);
+    if (typeof author.name === 'string') fields.push(`name: ${quote(author.name)}`);
+    if (typeof author.url === 'string') fields.push(`url: ${quote(author.url)}`);
     // Material uses `avatar`; starlight-blog uses `picture`.
-    if (typeof author['avatar'] === 'string') fields.push(`picture: ${quote(author['avatar'])}`);
+    if (typeof author.avatar === 'string') fields.push(`picture: ${quote(author.avatar)}`);
     if (fields.length > 0) entries.push(`${quoteKey(id)}: { ${fields.join(', ')} }`);
   }
   return entries.length > 0 ? `{ ${entries.join(', ')} }` : null;

@@ -14,14 +14,14 @@ trees in `<name>/`) paired with the converter's expected output (the
 > **No byte-equality assertion runs on these trees today.** They are not
 > snapshots in the test-runner sense. Adding wholesale equality would
 > turn every cosmetic change (bullet style, blank-line collapse) into a
-> red diff and force a regen on every PR — too brittle for the value.
+> red diff and force a regen on every PR; too brittle for the value.
 > If you need a regression locked in, write a targeted test instead.
 
 ## Regenerating
 
 ```bash
 npm run regen-fixtures             # rebuild every <name>-out
-npm run regen-fixtures -- httpx    # rebuild a single fixture
+npm run regen-fixtures -- <name>   # rebuild a single fixture
 ```
 
 The script reads each `<name>/mkdocs.yml`, runs `convertSiteFromDisk`
@@ -41,6 +41,6 @@ intentionally.
 ## Excluded artefacts
 
 `.astro/` (Astro's build cache) and `node_modules/` are
-git-ignored under every `<name>-out/` tree. They are produced by Astro
-itself when a user runs `npm install && npm run build` against the
-output — they're not converter output and shouldn't be tracked here.
+git-ignored under every `<name>-out/` tree. Astro produces them when a
+user runs `npm install && npm run build` against the output. They are
+not converter output and should not be tracked here.

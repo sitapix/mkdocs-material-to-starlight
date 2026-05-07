@@ -51,3 +51,15 @@ desktop.ini
 # Optional adapter artifacts (Playwright is a lazy import; not committed)
 /playwright-report/
 /test-results/
+
+# Stray converter artifacts (when the CLI is accidentally run against this
+# repo: README.md → index.md, etc.). Keep the layer READMEs canonical.
+/index.md
+/src/domain/index.md
+/src/use-cases/index.md
+/src/infrastructure/index.md
+/src/interface/index.md
+
+# Agent / planning scratch (not user-facing docs)
+/docs/superpowers/
+CLAUDE.md

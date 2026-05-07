@@ -13,10 +13,10 @@
  * malformed YAML or invalid `.pages` shape produces a typed error.
  */
 
-import { ok, err, type Result } from '../../domain/result.js';
+import type { AwesomePagesConfig } from '../../domain/config/awesome-pages.js';
 import type { FileSystem } from '../../domain/ports/file-system.js';
 import type { YamlDecoder } from '../../domain/ports/yaml-decoder.js';
-import type { AwesomePagesConfig } from '../../domain/config/awesome-pages.js';
+import { err, ok, type Result } from '../../domain/result.js';
 import { parseAwesomePages } from './parse-awesome-pages.js';
 
 export interface LoadAwesomePagesInput {

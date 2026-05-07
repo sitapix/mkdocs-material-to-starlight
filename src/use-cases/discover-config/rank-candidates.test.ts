@@ -7,17 +7,13 @@ describe('rankCandidates', () => {
   });
 
   it('returns kind:none when no path matches mkdocs.yml or mkdocs.yaml', () => {
-    expect(
-      rankCandidates(['site_template/config.yml', 'README.md', 'docs/index.md']),
-    ).toEqual({ kind: 'none' });
+    expect(rankCandidates(['site_template/config.yml', 'README.md', 'docs/index.md'])).toEqual({
+      kind: 'none',
+    });
   });
 
   it('promotes a root-level mkdocs.yml ahead of any subdir match', () => {
-    const result = rankCandidates([
-      'website/mkdocs.yml',
-      'mkdocs.yml',
-      'examples/foo/mkdocs.yml',
-    ]);
+    const result = rankCandidates(['website/mkdocs.yml', 'mkdocs.yml', 'examples/foo/mkdocs.yml']);
     expect(result.kind).toBe('found');
     if (result.kind !== 'found') return;
     expect(result.primary.relPath).toBe('mkdocs.yml');
@@ -49,11 +45,7 @@ describe('rankCandidates', () => {
   });
 
   it('prefers a doc-like containing dir at the same depth', () => {
-    const result = rankCandidates([
-      'tools/mkdocs.yml',
-      'docs/mkdocs.yml',
-      'website/mkdocs.yml',
-    ]);
+    const result = rankCandidates(['tools/mkdocs.yml', 'docs/mkdocs.yml', 'website/mkdocs.yml']);
     expect(result.kind).toBe('found');
     if (result.kind !== 'found') return;
     expect(result.primary.relPath).toBe('docs/mkdocs.yml');
@@ -81,10 +73,7 @@ describe('rankCandidates', () => {
   });
 
   it('caps alternatives so the UX list stays scannable', () => {
-    const many = Array.from(
-      { length: 20 },
-      (_, i) => `examples/p${String(i)}/mkdocs.yml`,
-    );
+    const many = Array.from({ length: 20 }, (_, i) => `examples/p${String(i)}/mkdocs.yml`);
     const result = rankCandidates(['mkdocs.yml', ...many]);
     expect(result.kind).toBe('found');
     if (result.kind !== 'found') return;

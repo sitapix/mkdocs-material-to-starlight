@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { needsAttentionPreview } from './needs-attention-preview.js';
 import type { MkdocsConfig } from '../../domain/config/mkdocs-config.js';
+import { needsAttentionPreview } from './needs-attention-preview.js';
 
 function makeConfig(over: Partial<MkdocsConfig> = {}): MkdocsConfig {
   return {

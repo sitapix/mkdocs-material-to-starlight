@@ -19,20 +19,13 @@
  */
 
 import type { MkdocsNavEntry } from '../../domain/config/mkdocs-config.js';
-import {
-  createDiagnostic,
-  type Diagnostic,
-} from '../../domain/diagnostics/diagnostic.js';
+import { createDiagnostic, type Diagnostic } from '../../domain/diagnostics/diagnostic.js';
 
-export function scanNavTopics(
-  nav: ReadonlyArray<MkdocsNavEntry>,
-): ReadonlyArray<Diagnostic> {
-  const sections = nav.filter(
-    (entry) => entry.kind === 'section' && entry.children.length > 0,
-  );
+export function scanNavTopics(nav: ReadonlyArray<MkdocsNavEntry>): ReadonlyArray<Diagnostic> {
+  const sections = nav.filter((entry) => entry.kind === 'section' && entry.children.length > 0);
   if (sections.length < 2) return [];
 
-  const titles = sections.map((entry) => entry.kind === 'section' ? entry.title : '');
+  const titles = sections.map((entry) => (entry.kind === 'section' ? entry.title : ''));
   return [
     createDiagnostic({
       severity: 'info',

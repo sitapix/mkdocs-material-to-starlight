@@ -1,9 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import {
-  WIZARD_CANCELLED,
-  type DefaultAnswers,
-  type WizardAnswers,
-} from './answers.js';
+import { type DefaultAnswers, WIZARD_CANCELLED, type WizardAnswers } from './answers.js';
 
 describe('WizardAnswers', () => {
   it('accepts a fully-specified value', () => {

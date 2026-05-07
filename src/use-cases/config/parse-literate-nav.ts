@@ -22,15 +22,12 @@
  * Pure. Returns diagnostics for unparseable items. Never throws.
  */
 
-import { unified } from 'unified';
+import type { Link, List, ListItem, Paragraph, Root, Text } from 'mdast';
 import remarkParse from 'remark-parse';
-import type { Root, List, ListItem, Paragraph, Link, Text } from 'mdast';
+import { unified } from 'unified';
 
 import type { MkdocsNavEntry } from '../../domain/config/mkdocs-config.js';
-import {
-  createDiagnostic,
-  type Diagnostic,
-} from '../../domain/diagnostics/diagnostic.js';
+import { createDiagnostic, type Diagnostic } from '../../domain/diagnostics/diagnostic.js';
 
 const SOURCE = 'config/parse-literate-nav';
 const EXTERNAL_RE = /^[a-z][a-z0-9+\-.]*:\/\//i;
@@ -67,13 +64,8 @@ function parseList(list: List, diagnostics: Diagnostic[]): MkdocsNavEntry[] {
   return out;
 }
 
-function parseListItem(
-  item: ListItem,
-  diagnostics: Diagnostic[],
-): MkdocsNavEntry | null {
-  const paragraph = item.children.find(
-    (c): c is Paragraph => c.type === 'paragraph',
-  );
+function parseListItem(item: ListItem, diagnostics: Diagnostic[]): MkdocsNavEntry | null {
+  const paragraph = item.children.find((c): c is Paragraph => c.type === 'paragraph');
   const nestedList = item.children.find((c): c is List => c.type === 'list');
   const link = paragraph === undefined ? undefined : firstLink(paragraph);
   const labelText =

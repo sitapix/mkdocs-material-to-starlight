@@ -29,12 +29,12 @@ export function parseTabLine(line: string): TabOpening | null {
   }
 
   const groups = match.groups;
-  const marker = groups['marker'] as TabMarker;
+  const marker = groups.marker as TabMarker;
 
   return {
     marker,
-    title: groups['title'] ?? '',
+    title: groups.title ?? '',
     exclusive: marker === '===!',
-    indent: (groups['indent'] ?? '').length,
+    indent: (groups.indent ?? '').length,
   };
 }

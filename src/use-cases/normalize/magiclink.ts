@@ -30,16 +30,14 @@ const ISSUE_PATH: Readonly<Record<string, string>> = {
 const SLUG_RE = /[A-Za-z0-9_.-]+/.source;
 const ISSUE_NUM = /(?<![A-Za-z0-9_/&[])#(\d+)\b/g;
 const PR_NUM = /(?<![A-Za-z0-9_/&[])!(\d+)\b/g;
-const CROSS_REPO = new RegExp(
-  `(?<![A-Za-z0-9_/[])(${SLUG_RE})/(${SLUG_RE})#(\\d+)\\b`,
-  'g',
-);
+const CROSS_REPO = new RegExp(`(?<![A-Za-z0-9_/[])(${SLUG_RE})/(${SLUG_RE})#(\\d+)\\b`, 'g');
 const MENTION_RE = /(?<![A-Za-z0-9_/[])@([A-Za-z0-9][A-Za-z0-9-]*)\b/g;
 // Social shorthand: `@user@provider` for cross-provider mentions
 // (`@alice@gitlab`, `@bob@mastodon.social`). Provider segment matches
 // dot-separated host-like tokens. Must run BEFORE MENTION_RE because
 // MENTION_RE would otherwise consume the leading `@user` and break the link.
-const SOCIAL_MENTION_RE = /(?<![A-Za-z0-9_/[])@([A-Za-z0-9][A-Za-z0-9-]*)@([A-Za-z][A-Za-z0-9.-]*[A-Za-z0-9])\b/g;
+const SOCIAL_MENTION_RE =
+  /(?<![A-Za-z0-9_/[])@([A-Za-z0-9][A-Za-z0-9-]*)@([A-Za-z][A-Za-z0-9.-]*[A-Za-z0-9])\b/g;
 const SOCIAL_HOSTS: Readonly<Record<string, string>> = {
   github: 'github.com',
   gitlab: 'gitlab.com',
@@ -48,10 +46,7 @@ const SOCIAL_HOSTS: Readonly<Record<string, string>> = {
   x: 'x.com',
 };
 
-export function normalizeMagicLinks(
-  source: string,
-  context: RepoContext | null,
-): string {
+export function normalizeMagicLinks(source: string, context: RepoContext | null): string {
   if (context === null) {
     return source;
   }

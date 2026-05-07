@@ -9,12 +9,12 @@
  */
 
 import {
-  mapMaterialFontsToFontsource,
   type MaterialFontConfig,
+  mapMaterialFontsToFontsource,
 } from '../../domain/starlight/font-mapping.js';
 
 export function extractThemeFonts(
   themeOptions: Readonly<Record<string, unknown>>,
 ): MaterialFontConfig | undefined {
-  return mapMaterialFontsToFontsource(themeOptions['font']) ?? undefined;
+  return mapMaterialFontsToFontsource(themeOptions.font) ?? undefined;
 }

@@ -17,8 +17,8 @@
  * or balanced `$x$` with non-space adjacents.
  */
 
-import type { DetectedFeature } from '../serialize-config/package-json.js';
 import { sourceContainsGithubAlerts } from '../normalize/scan-github-alerts.js';
+import type { DetectedFeature } from '../serialize-config/package-json.js';
 
 const MERMAID_FENCE = /^ {0,3}```\s*mermaid\b/m;
 const MATH_BLOCK = /\$\$[\s\S]+?\$\$/;

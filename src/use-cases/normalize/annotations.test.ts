@@ -71,25 +71,13 @@ describe('normalizeAnnotations', () => {
   });
 
   it('is idempotent — running twice equals running once', () => {
-    const src = [
-      'Marker (1) here.',
-      '{ .annotate }',
-      '',
-      '1.  Body.',
-      '',
-    ].join('\n');
+    const src = ['Marker (1) here.', '{ .annotate }', '', '1.  Body.', ''].join('\n');
     const once = normalizeAnnotations(src);
     expect(normalizeAnnotations(once)).toBe(once);
   });
 
   it('leaves a paragraph alone if the trailing list is missing', () => {
-    const src = [
-      'Marker (1) here.',
-      '{ .annotate }',
-      '',
-      'Just prose, no list.',
-      '',
-    ].join('\n');
+    const src = ['Marker (1) here.', '{ .annotate }', '', 'Just prose, no list.', ''].join('\n');
     expect(normalizeAnnotations(src)).toBe(src);
   });
 

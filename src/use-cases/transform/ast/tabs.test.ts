@@ -1,14 +1,19 @@
-import { describe, expect, it } from 'vitest';
-import { unified } from 'unified';
+import { mdxJsxToMarkdown } from 'mdast-util-mdx-jsx';
+import remarkDirective from 'remark-directive';
 import remarkParse from 'remark-parse';
 import remarkStringify from 'remark-stringify';
-import remarkDirective from 'remark-directive';
-import { mdxJsxToMarkdown } from 'mdast-util-mdx-jsx';
-import { transformTabDirectives, type TabTransformOptions } from './tabs.js';
+import { unified } from 'unified';
+import { describe, expect, it } from 'vitest';
+import { type TabTransformOptions, transformTabDirectives } from './tabs.js';
 
-function remarkMdxJsxStringify(this: { data: () => { toMarkdownExtensions?: unknown[] } }): undefined {
+function remarkMdxJsxStringify(this: {
+  data: () => { toMarkdownExtensions?: unknown[] };
+}): undefined {
   const data = this.data();
-  const list = data.toMarkdownExtensions ?? (data.toMarkdownExtensions = []);
+  if (data.toMarkdownExtensions === undefined) {
+    data.toMarkdownExtensions = [];
+  }
+  const list = data.toMarkdownExtensions;
   const full = mdxJsxToMarkdown() as { handlers: unknown };
   (list as unknown[]).push({ handlers: full.handlers });
   return undefined;
@@ -42,7 +47,9 @@ describe('transformTabDirectives', () => {
     });
 
     it('rewrites :::tab directives into <TabItem label="…"> blocks', () => {
-      const out = process('::::tabs\n:::tab[macOS]\nbrew install\n:::\n:::tab[Linux]\napt install\n:::\n::::\n');
+      const out = process(
+        '::::tabs\n:::tab[macOS]\nbrew install\n:::\n:::tab[Linux]\napt install\n:::\n::::\n',
+      );
       expect(out).toContain('<TabItem label="macOS">');
       expect(out).toContain('<TabItem label="Linux">');
       expect(out).toContain('brew install');
@@ -58,10 +65,9 @@ describe('transformTabDirectives', () => {
     });
 
     it('emits syncKey on <Tabs> when tabsLinked is set', () => {
-      const out = process(
-        '::::tabs\n:::tab[Bash]\nx\n:::\n:::tab[Python]\ny\n:::\n::::\n',
-        { tabsLinked: true },
-      );
+      const out = process('::::tabs\n:::tab[Bash]\nx\n:::\n:::tab[Python]\ny\n:::\n::::\n', {
+        tabsLinked: true,
+      });
       expect(out).toMatch(/syncKey="bash-python"/);
     });
 
@@ -95,7 +101,9 @@ describe('transformTabDirectives', () => {
     });
 
     it('extracts a Material/FontAwesome icon shortcode into the TabItem icon prop', () => {
-      const out = process('::::tabs\n:::tab[:fontawesome-brands-python: Python]\ncode\n:::\n::::\n');
+      const out = process(
+        '::::tabs\n:::tab[:fontawesome-brands-python: Python]\ncode\n:::\n::::\n',
+      );
       expect(out).toContain('icon="seti:python"');
       expect(out).toContain('label="Python"');
       expect(out).not.toContain(':fontawesome-brands-python:');
@@ -130,7 +138,9 @@ describe('transformTabDirectives', () => {
     });
 
     it('rewrites :::tab directives into div.sl-tab blocks with data-label', () => {
-      const out = legacy('::::tabs\n:::tab[macOS]\nbrew install\n:::\n:::tab[Linux]\napt install\n:::\n::::\n');
+      const out = legacy(
+        '::::tabs\n:::tab[macOS]\nbrew install\n:::\n:::tab[Linux]\napt install\n:::\n::::\n',
+      );
       expect(out).toContain('<div class="sl-tab" data-label="macOS">');
       expect(out).toContain('<div class="sl-tab" data-label="Linux">');
     });

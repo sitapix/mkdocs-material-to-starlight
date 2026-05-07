@@ -1,14 +1,7 @@
-import { describe, expect, it, beforeEach, afterEach } from 'vitest';
-import {
-  mkdtempSync,
-  mkdirSync,
-  rmSync,
-  writeFileSync,
-  readFileSync,
-  existsSync,
-} from 'node:fs';
-import { join } from 'node:path';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { convertSiteFromDisk } from '../../src/interface/api/convert-site.js';
 
 /**
@@ -61,10 +54,7 @@ describe('comprehensive end-to-end conversion', () => {
       throw new Error(`${result.error.code}: ${result.error.message}`);
     }
 
-    const indexOut = readFileSync(
-      join(outputDir, 'src', 'content', 'docs', 'index.mdx'),
-      'utf8',
-    );
+    const indexOut = readFileSync(join(outputDir, 'src', 'content', 'docs', 'index.mdx'), 'utf8');
 
     // Frontmatter title synthesized (source had none)
     expect(indexOut).toContain('title: Home');
@@ -112,9 +102,7 @@ describe('comprehensive end-to-end conversion', () => {
     expect(indexOut).toContain('Block snippet beta.');
 
     // Nested directory output
-    expect(
-      existsSync(join(outputDir, 'src', 'content', 'docs', 'api', 'auth.md')),
-    ).toBe(true);
+    expect(existsSync(join(outputDir, 'src', 'content', 'docs', 'api', 'auth.md'))).toBe(true);
 
     // Asset copy
     expect(existsSync(join(outputDir, 'public', 'images', 'logo.png'))).toBe(true);
@@ -128,14 +116,11 @@ describe('comprehensive end-to-end conversion', () => {
     expect(existsSync(join(outputDir, 'package.json'))).toBe(true);
     expect(existsSync(join(outputDir, 'astro.config.mjs'))).toBe(true);
     expect(existsSync(join(outputDir, 'MIGRATION_NOTES.md'))).toBe(true);
-    expect(existsSync(join(outputDir, 'src', 'styles', 'mkdocs-migration.css'))).toBe(
-      true,
-    );
+    expect(existsSync(join(outputDir, 'src', 'styles', 'mkdocs-migration.css'))).toBe(true);
 
     // No diagnostics on the happy path
     const unexpectedDiags = result.value.diagnostics.filter(
-      (d) =>
-        d.diagnostic.severity === 'error' || d.diagnostic.ruleId === 'broken-link',
+      (d) => d.diagnostic.severity === 'error' || d.diagnostic.ruleId === 'broken-link',
     );
     expect(unexpectedDiags).toEqual([]);
   });

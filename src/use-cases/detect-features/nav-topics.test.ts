@@ -8,10 +8,11 @@ const file = (path: string, title: string | null = null): MkdocsNavEntry => ({
   title,
 });
 
-const section = (
-  title: string,
-  children: ReadonlyArray<MkdocsNavEntry>,
-): MkdocsNavEntry => ({ kind: 'section', title, children });
+const section = (title: string, children: ReadonlyArray<MkdocsNavEntry>): MkdocsNavEntry => ({
+  kind: 'section',
+  title,
+  children,
+});
 
 describe('scanNavTopics', () => {
   it('returns no diagnostic for an empty nav', () => {
@@ -19,9 +20,7 @@ describe('scanNavTopics', () => {
   });
 
   it('returns no diagnostic when there is only a single top-level section', () => {
-    const nav: ReadonlyArray<MkdocsNavEntry> = [
-      section('Guide', [file('a.md'), file('b.md')]),
-    ];
+    const nav: ReadonlyArray<MkdocsNavEntry> = [section('Guide', [file('a.md'), file('b.md')])];
     expect(scanNavTopics(nav)).toHaveLength(0);
   });
 
@@ -58,19 +57,13 @@ describe('scanNavTopics', () => {
 
   it('does not emit when sections are nested inside a single top-level section', () => {
     const nav: ReadonlyArray<MkdocsNavEntry> = [
-      section('Docs', [
-        section('Guide', [file('g/a.md')]),
-        section('API', [file('a/a.md')]),
-      ]),
+      section('Docs', [section('Guide', [file('g/a.md')]), section('API', [file('a/a.md')])]),
     ];
     expect(scanNavTopics(nav)).toHaveLength(0);
   });
 
   it('does not emit when both top-level sections are empty (no children)', () => {
-    const nav: ReadonlyArray<MkdocsNavEntry> = [
-      section('Empty One', []),
-      section('Empty Two', []),
-    ];
+    const nav: ReadonlyArray<MkdocsNavEntry> = [section('Empty One', []), section('Empty Two', [])];
     // Empty sections don't represent a real "topic" worth recommending the plugin for.
     expect(scanNavTopics(nav)).toHaveLength(0);
   });

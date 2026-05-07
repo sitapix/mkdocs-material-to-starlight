@@ -49,5 +49,7 @@ export function stripTerminalEscapes(str: string): string {
  * should fit on a single output line.
  */
 export function sanitizeForSingleLine(str: string): string {
-  return stripTerminalEscapes(str).replace(/[\r\n]+/g, ' ').trim();
+  return stripTerminalEscapes(str)
+    .replace(/[\r\n]+/g, ' ')
+    .trim();
 }

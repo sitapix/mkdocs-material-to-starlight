@@ -20,12 +20,9 @@
  * Idempotent (only `///`-prefixed lines are recognized) and fence-safe.
  */
 
-import {
-  parseBlocksLine,
-  type BlocksOpening,
-} from '../../domain/syntax/blocks-line.js';
-import { ADMONITION_FENCE_DEPTH } from './admonitions.js';
+import { type BlocksOpening, parseBlocksLine } from '../../domain/syntax/blocks-line.js';
 import { isFenceLine } from '../../domain/syntax/fence.js';
+import { ADMONITION_FENCE_DEPTH } from './admonitions.js';
 
 const TAB_NAME = 'tab';
 const DETAILS_NAME = 'details';
@@ -122,7 +119,7 @@ function normalizeBlocksRec(lines: ReadonlyArray<string>): NormalizedBlocks {
       const rendered = renderTabGroup(lines, group);
       output.push(...rendered.output);
       track(rendered.maxFenceDepth);
-      i = group[group.length - 1]!.closeIndex + 1;
+      i = (group[group.length - 1]?.closeIndex ?? i) + 1;
       continue;
     }
 
@@ -197,11 +194,7 @@ interface ParsedOptions {
   readonly bodyStart: number;
 }
 
-function parseOptions(
-  lines: readonly string[],
-  start: number,
-  closeIndex: number,
-): ParsedOptions {
+function parseOptions(lines: readonly string[], start: number, closeIndex: number): ParsedOptions {
   let typeOverride: string | null = null;
   let cursor = start;
 
@@ -301,7 +294,7 @@ function renderTabGroup(
   lines: readonly string[],
   tabs: ReadonlyArray<CollectedBlock>,
 ): RenderedTabGroup {
-  const indent = ' '.repeat(tabs[0]!.opening.indent);
+  const indent = ' '.repeat(tabs[0]?.opening.indent ?? 0);
   const out: string[] = [];
 
   // Compute each tab's body-derived fence depth first so we can size the
@@ -352,17 +345,13 @@ function renderHtmlBlock(title: string | null, body: string): ReadonlyArray<stri
     // Unparseable element spec — fall back to bare-body emission.
     return body.length > 0 ? [body] : [];
   }
-  const tag = match.groups['tag'] ?? '';
-  const cls = match.groups['cls'];
+  const tag = match.groups.tag ?? '';
+  const cls = match.groups.cls;
   const openTag = cls === undefined ? `<${tag}>` : `<${tag} class="${cls}">`;
   return [openTag, body, `</${tag}>`];
 }
 
-function renderOpening(
-  opening: BlocksOpening,
-  effectiveName: string,
-  fenceDepth: number,
-): string {
+function renderOpening(opening: BlocksOpening, effectiveName: string, fenceDepth: number): string {
   const indent = ' '.repeat(opening.indent);
   const label = opening.title === null ? '' : `[${opening.title}]`;
   const fence = ':'.repeat(fenceDepth);

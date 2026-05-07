@@ -58,9 +58,7 @@ export function rewriteReadmePaths(
   // mismatches.
   const namedSiblingStems = new Set<string>();
   const namedSiblingStemsLower = new Set<string>();
-  const existingLower = new Set<string>(
-    sourcePaths.map((p) => p.toLowerCase()),
-  );
+  const existingLower = new Set<string>(sourcePaths.map((p) => p.toLowerCase()));
   for (const p of sourcePaths) {
     const ext = /\.(mdx?)$/.exec(p);
     if (ext === null) continue;
@@ -98,13 +96,11 @@ export function rewriteReadmePaths(
       // variation (Astro lowercases slugs, so `Dataset.md` collides with
       // `dataset/index.md`). Check exact-case first, then case-folded.
       const exactMatch =
-        namedSiblingStems.has(stem) &&
-        (existing.has(`${stem}.md`) || existing.has(`${stem}.mdx`));
+        namedSiblingStems.has(stem) && (existing.has(`${stem}.md`) || existing.has(`${stem}.mdx`));
       const caseFoldedMatch =
         !exactMatch &&
         namedSiblingStemsLower.has(stemLower) &&
-        (existingLower.has(`${stemLower}.md`) ||
-          existingLower.has(`${stemLower}.mdx`));
+        (existingLower.has(`${stemLower}.md`) || existingLower.has(`${stemLower}.mdx`));
       if (exactMatch || caseFoldedMatch) {
         dropped.push(sourcePath);
         continue;

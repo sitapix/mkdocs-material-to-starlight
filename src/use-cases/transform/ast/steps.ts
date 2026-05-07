@@ -22,11 +22,9 @@ export interface StepsResult {
   readonly diagnostics: ReadonlyArray<Diagnostic>;
 }
 
-const TUTORIAL_KEYWORDS_RE =
-  /\b(step|steps|tutorial|getting\s+started|guide)\b/i;
+const TUTORIAL_KEYWORDS_RE = /\b(step|steps|tutorial|getting\s+started|guide)\b/i;
 
-const TUTORIAL_VERB_RE =
-  /^(?:setup|install|create|build|configure|add|deploy|run)\b/i;
+const TUTORIAL_VERB_RE = /^(?:setup|install|create|build|configure|add|deploy|run)\b/i;
 
 function isTutorialHeading(headingText: string): boolean {
   if (TUTORIAL_KEYWORDS_RE.test(headingText)) return true;
@@ -45,10 +43,7 @@ interface OrderedListSpan {
   readonly items: ReadonlyArray<ReadonlyArray<string>>;
 }
 
-function readOrderedList(
-  lines: ReadonlyArray<string>,
-  startIdx: number,
-): OrderedListSpan | null {
+function readOrderedList(lines: ReadonlyArray<string>, startIdx: number): OrderedListSpan | null {
   if (!OL_ITEM_RE.test(lines[startIdx] ?? '')) return null;
 
   const items: string[][] = [];
@@ -80,11 +75,7 @@ function readOrderedList(
 
     if (line.trim().length === 0) {
       const next = lines[i + 1] ?? '';
-      if (
-        next.trim().length === 0 ||
-        OL_ITEM_RE.test(next) ||
-        /^ {3,}/.test(next)
-      ) {
+      if (next.trim().length === 0 || OL_ITEM_RE.test(next) || /^ {3,}/.test(next)) {
         current.push(line);
         i += 1;
         continue;
@@ -112,10 +103,7 @@ function isMultiLineItem(item: ReadonlyArray<string>): boolean {
   return nonBlank.length >= 2;
 }
 
-function precedingTutorialHeading(
-  lines: ReadonlyArray<string>,
-  listStart: number,
-): boolean {
+function precedingTutorialHeading(lines: ReadonlyArray<string>, listStart: number): boolean {
   const lookBack = Math.max(0, listStart - 5);
   for (let i = lookBack; i < listStart; i += 1) {
     const line = lines[i] ?? '';

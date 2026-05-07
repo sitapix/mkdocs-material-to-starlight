@@ -12,11 +12,7 @@
  * the moment they `npm install`.
  */
 
-import {
-  CORE_VERSIONS,
-  FEATURE_DEPENDENCIES,
-  type DetectedFeature,
-} from './versions.js';
+import { CORE_VERSIONS, type DetectedFeature, FEATURE_DEPENDENCIES } from './versions.js';
 
 export type { DetectedFeature };
 

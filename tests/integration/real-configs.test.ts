@@ -13,16 +13,16 @@
  * (which requires real content) is in `real-projects-e2e.test.ts`.
  */
 
-import { describe, expect, it } from 'vitest';
-import { readFileSync, readdirSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { describe, expect, it } from 'vitest';
+import type { FileSystem } from '../../src/domain/ports/file-system.js';
+import { err, ok } from '../../src/domain/result.js';
+import { createJsYamlDecoder } from '../../src/infrastructure/yaml/js-yaml-decoder.js';
+import { resolveInherits } from '../../src/use-cases/config/inherit-config.js';
+import { parseMkdocsConfig } from '../../src/use-cases/config/parse-mkdocs.js';
 import { preprocessMkdocsEnvTags } from '../../src/use-cases/config/preprocess-mkdocs-env-tags.js';
 import { preprocessMkdocsPythonTags } from '../../src/use-cases/config/preprocess-mkdocs-python-tags.js';
-import { resolveInherits } from '../../src/use-cases/config/inherit-config.js';
-import { createJsYamlDecoder } from '../../src/infrastructure/yaml/js-yaml-decoder.js';
-import { parseMkdocsConfig } from '../../src/use-cases/config/parse-mkdocs.js';
-import type { FileSystem } from '../../src/domain/ports/file-system.js';
-import { ok, err } from '../../src/domain/result.js';
 
 const FIXTURES = join(__dirname, '..', 'fixtures', 'real-configs');
 
@@ -56,9 +56,7 @@ async function pipeline(filePath: string): Promise<{
   const raw = readFileSync(filePath, 'utf8');
   const fs = fixtureFs();
   const inherited = await resolveInherits(raw, filePath, fs);
-  const pythonStripped = preprocessMkdocsPythonTags(
-    preprocessMkdocsEnvTags(inherited.source),
-  );
+  const pythonStripped = preprocessMkdocsPythonTags(preprocessMkdocsEnvTags(inherited.source));
   const decoder = createJsYamlDecoder();
   const decoded = decoder.decode(pythonStripped.source);
   if (!decoded.ok) {
@@ -74,7 +72,7 @@ async function pipeline(filePath: string): Promise<{
 describe('real-world mkdocs.yml smoke test', () => {
   // Skip configs that are INHERIT bases (no site_name on their own; loaded
   // as a parent by another config). They're not entry-point configs.
-  const INHERIT_BASES = new Set(['hatch-insiders.yml', 'typer-env.yml']);
+  const INHERIT_BASES = new Set(['corpus-07-base.yml', 'corpus-19-base.yml']);
   const files = readdirSync(FIXTURES)
     .filter((f) => f.endsWith('.yml'))
     .filter((f) => !INHERIT_BASES.has(f))
@@ -89,9 +87,7 @@ describe('real-world mkdocs.yml smoke test', () => {
       const result = await pipeline(join(FIXTURES, filename));
       if (!result.ok) {
         // Surface the failure with the filename so we know which to fix.
-        throw new Error(
-          `${filename}: ${result.errorCode}: ${result.errorMessage}`,
-        );
+        throw new Error(`${filename}: ${result.errorCode}: ${result.errorMessage}`);
       }
       expect(result.ok).toBe(true);
     });

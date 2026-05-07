@@ -38,9 +38,7 @@ describe('extractAlternateLocales', () => {
   });
 
   it('returns null when no alternate entry has lang', () => {
-    expect(
-      extractAlternateLocales({ alternate: [{ name: 'X', link: '/' }] }),
-    ).toBeNull();
+    expect(extractAlternateLocales({ alternate: [{ name: 'X', link: '/' }] })).toBeNull();
   });
 
   it('uses link "/" presence as default-locale signal when explicit default missing', () => {

@@ -30,9 +30,7 @@ export interface AssetCopy {
   readonly destRelative: string;
 }
 
-export function planAssetCopies(
-  input: AssetCopyPlanInput,
-): ReadonlyArray<AssetCopy> {
+export function planAssetCopies(input: AssetCopyPlanInput): ReadonlyArray<AssetCopy> {
   const lowercased = input.markdownExtensions.map((ext) => ext.toLowerCase());
   const excluded = new Set(input.excludePaths ?? []);
   const out: AssetCopy[] = [];

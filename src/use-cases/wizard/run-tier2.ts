@@ -1,11 +1,11 @@
-import type { Prompter } from '../../domain/wizard/ports/prompter.js';
+import { err, ok, type Result } from '../../domain/result.js';
 import {
   type DefaultAnswers,
+  WIZARD_CANCELLED,
   type WizardAnswers,
   type WizardCancelled,
-  WIZARD_CANCELLED,
 } from '../../domain/wizard/answers.js';
-import { type Result, err, ok } from '../../domain/result.js';
+import type { Prompter } from '../../domain/wizard/ports/prompter.js';
 
 /**
  * Tier 2: advanced settings the wizard exposes interactively. The remainder

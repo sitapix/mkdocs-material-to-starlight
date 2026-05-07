@@ -29,7 +29,7 @@ export function extractAutoAppend(
     if (ext.name !== SNIPPETS_NAME) {
       continue;
     }
-    const raw = ext.options['auto_append'];
+    const raw = ext.options.auto_append;
     if (!Array.isArray(raw)) {
       continue;
     }

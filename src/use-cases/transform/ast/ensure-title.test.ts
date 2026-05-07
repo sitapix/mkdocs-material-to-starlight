@@ -1,8 +1,8 @@
-import { describe, expect, it } from 'vitest';
-import { unified } from 'unified';
+import remarkFrontmatter from 'remark-frontmatter';
 import remarkParse from 'remark-parse';
 import remarkStringify from 'remark-stringify';
-import remarkFrontmatter from 'remark-frontmatter';
+import { unified } from 'unified';
+import { describe, expect, it } from 'vitest';
 import { ensureTitle } from './ensure-title.js';
 
 function process(source: string, sourcePath: string): string {

@@ -44,7 +44,9 @@ export function scanMaterialCodeCssVars(
       parts.push(`CSS variables: ${vars.join(', ')}`);
     }
     if (tokens.length > 0) {
-      parts.push(`Pygments token selectors: ${tokens.slice(0, 8).join(', ')}${tokens.length > 8 ? ', …' : ''}`);
+      parts.push(
+        `Pygments token selectors: ${tokens.slice(0, 8).join(', ')}${tokens.length > 8 ? ', …' : ''}`,
+      );
     }
     out.push({
       sourcePath,
@@ -52,8 +54,7 @@ export function scanMaterialCodeCssVars(
         severity: 'warning',
         ruleId: 'extra-css-code-customization-dropped',
         source: SOURCE,
-        message:
-          `Custom CSS at "${sourcePath}" customizes Material's Pygments-based code-block rendering (${parts.join('; ')}). ExpressiveCode (Starlight's code renderer) uses Shiki inline-style colors, not Pygments classes or Material CSS variables, so these rules will have no effect on code blocks. To recolor syntax tokens, author a custom Shiki theme JSON and pass it to \`expressiveCode: { themes: [...] }\` in astro.config.mjs. To recolor the code-block frame (background, foreground), use ExpressiveCode's styleOverrides option.`,
+        message: `Custom CSS at "${sourcePath}" customizes Material's Pygments-based code-block rendering (${parts.join('; ')}). ExpressiveCode (Starlight's code renderer) uses Shiki inline-style colors, not Pygments classes or Material CSS variables, so these rules will have no effect on code blocks. To recolor syntax tokens, author a custom Shiki theme JSON and pass it to \`expressiveCode: { themes: [...] }\` in astro.config.mjs. To recolor the code-block frame (background, foreground), use ExpressiveCode's styleOverrides option.`,
       }),
     });
   }

@@ -13,7 +13,7 @@
  * with a typed error rather than silently masking one entry.
  */
 
-import { ok, err, type Result } from '../result.js';
+import { err, ok, type Result } from '../result.js';
 import { deriveSlug } from './slug.js';
 
 interface SlugRecord {
@@ -77,9 +77,7 @@ export function buildSlugMap(
   });
 }
 
-function resolveTransform(
-  options: BuildSlugMapOptions,
-): (sourcePath: string) => string | null {
+function resolveTransform(options: BuildSlugMapOptions): (sourcePath: string) => string | null {
   if (options.pathTransform !== undefined) {
     return options.pathTransform;
   }
@@ -92,10 +90,7 @@ function resolveTransform(
 
 // Inline copy of the i18n rename rule. Kept here (rather than imported from a
 // use-case) so the domain layer has no dependency on `use-cases/`.
-function i18nRenameInline(
-  sourcePath: string,
-  locales: ReadonlyArray<string>,
-): string | null {
+function i18nRenameInline(sourcePath: string, locales: ReadonlyArray<string>): string | null {
   if (!sourcePath.endsWith('.md') || locales.length === 0) {
     return null;
   }

@@ -31,9 +31,7 @@ describe('normalizeStandardEmoji', () => {
   });
 
   it('leaves unknown shortcodes alone', () => {
-    expect(normalizeStandardEmoji(':nonexistent_emoji_xyz:')).toBe(
-      ':nonexistent_emoji_xyz:',
-    );
+    expect(normalizeStandardEmoji(':nonexistent_emoji_xyz:')).toBe(':nonexistent_emoji_xyz:');
   });
 
   it('does not match across whitespace', () => {
@@ -51,15 +49,11 @@ describe('normalizeStandardEmoji', () => {
   });
 
   it('does not replace inside inline code spans', () => {
-    expect(normalizeStandardEmoji('Use `:smile:` here.')).toBe(
-      'Use `:smile:` here.',
-    );
+    expect(normalizeStandardEmoji('Use `:smile:` here.')).toBe('Use `:smile:` here.');
   });
 
   it('replaces :red_circle:, :green_circle:, :yellow_circle: status markers', () => {
-    expect(normalizeStandardEmoji(':red_circle: :green_circle: :yellow_circle:')).toBe(
-      '🔴 🟢 🟡',
-    );
+    expect(normalizeStandardEmoji(':red_circle: :green_circle: :yellow_circle:')).toBe('🔴 🟢 🟡');
   });
 
   it('tolerates backslash-escaped underscores from remark-stringify (`:red\\_circle:`)', () => {

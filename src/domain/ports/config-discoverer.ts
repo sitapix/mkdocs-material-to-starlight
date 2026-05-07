@@ -17,7 +17,5 @@ export interface ConfigDiscoverer {
    * List every `mkdocs.yml` / `mkdocs.yaml` under `root`. Paths are
    * returned relative to `root` and use POSIX separators.
    */
-  findMkdocsConfigs(
-    root: string,
-  ): Promise<Result<ReadonlyArray<string>, DirectoryReadError>>;
+  findMkdocsConfigs(root: string): Promise<Result<ReadonlyArray<string>, DirectoryReadError>>;
 }
