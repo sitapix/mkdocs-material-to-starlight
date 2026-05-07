@@ -112,16 +112,16 @@ function buildI18nConfig(languages: ReadonlyArray<unknown>): I18nConfig | null {
       isDefault: lang.default === true,
     });
   }
-  if (entries.length === 0) {
+  const first = entries[0];
+  if (first === undefined) {
     return null;
   }
   // If no entry was marked default, promote the first one — matching
   // mkdocs-static-i18n's documented behavior.
   if (!entries.some((e) => e.isDefault)) {
-    const first = entries[0]!;
     entries[0] = { ...first, isDefault: true };
   }
-  const defaultEntry = entries.find((e) => e.isDefault) ?? entries[0]!;
+  const defaultEntry = entries.find((e) => e.isDefault) ?? first;
   return {
     defaultLocale: defaultEntry.code,
     locales: entries,

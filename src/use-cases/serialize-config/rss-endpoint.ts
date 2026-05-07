@@ -38,6 +38,7 @@ export function serializeRssEndpoint(input: RssEndpointInput): string {
     '    items: docs.map((entry) => ({',
     '      title: entry.data.title,',
     '      description: entry.data.description ?? "",',
+    // biome-ignore lint/suspicious/noTemplateCurlyInString: emitted as literal Astro source code
     '      link: `/${entry.id}/`,',
     '      pubDate: entry.data.lastUpdated instanceof Date',
     '        ? entry.data.lastUpdated',

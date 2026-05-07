@@ -63,3 +63,8 @@ desktop.ini
 # Agent / planning scratch (not user-facing docs)
 /docs/superpowers/
 CLAUDE.md
+
+# Real-world fixture corpus is local-only. Both source clones and
+# converter outputs stay out of git. See tests/fixtures/real-world/README.md.
+/tests/fixtures/real-world/*/
+!/tests/fixtures/real-world/README.md

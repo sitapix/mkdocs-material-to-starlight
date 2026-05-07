@@ -54,7 +54,7 @@
     "lint": "biome lint src tests",
     "format": "biome format --write src tests",
     "check": "biome check --write src tests",
-    "check:ci": "biome ci src tests",
+    "check:ci": "biome ci --diagnostic-level=error src tests",
     "knip": "knip",
     "audit:release": "npm audit --omit=dev --audit-level=moderate",
     "regen-fixtures": "npm run build && node scripts/regen-fixtures.mjs",

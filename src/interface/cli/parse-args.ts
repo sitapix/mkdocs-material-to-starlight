@@ -204,8 +204,7 @@ function parseConvertArgs(argv: ReadonlyArray<string>): Command {
   if (parsed.values.check === true && parsed.values['no-check'] === true) {
     return { kind: 'error', message: '--check and --no-check are mutually exclusive' };
   }
-  const check =
-    parsed.values.check === true ? true : parsed.values['no-check'] === true ? false : false;
+  const check = parsed.values.check === true;
 
   const dirOverride = (parsed.values.dir as string | undefined) ?? null;
 
