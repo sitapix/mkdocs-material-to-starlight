@@ -66,6 +66,7 @@ import { diagnoseExpressiveCode } from '../../use-cases/detect-features/diagnose
 import { diagnoseThemeLanguage } from '../../use-cases/detect-features/diagnose-theme-language.js';
 import { diagnoseAnalytics } from '../../use-cases/detect-features/diagnose-analytics.js';
 import { diagnoseThemeFonts } from '../../use-cases/detect-features/diagnose-theme-fonts.js';
+import { resolveThemeAssets } from '../../use-cases/detect-features/resolve-theme-assets.js';
 import {
   extractI18nConfig,
   extractI18nLocales,
@@ -718,44 +719,12 @@ export async function convertSiteFromDisk(
     ...js,
     src: /^[a-z][a-z0-9+\-.]*:\/\//i.test(js.src) ? js.src : `/${js.src.replace(/^\/+/, '')}`,
   }));
-  const themeOptions = config.value.theme?.options ?? {};
-  // Starlight's `logo.src` and `favicon` accept ONLY local file paths
-  // (resolved relative to the project root or under `src/assets/`). External
-  // URLs (`https://…/logo.svg`) are not allowed — Astro/Vite resolves the
-  // value as a Vite module and `Rollup failed to resolve import "…"` at
-  // build time. Real-world break (DarrenOfficial, Enveloppe, shenweiyan):
-  // the source `theme.logo` is a CDN URL we have no way to download. Drop
-  // the emission entirely when the value is an absolute URL — Starlight
-  // falls back to its default chrome and the build succeeds.
-  const isLocalAssetPath = (v: unknown): v is string =>
-    typeof v === 'string' && !/^[a-z][a-z0-9+\-.]*:\/\//i.test(v);
-  const logoSrcCandidate = isLocalAssetPath(themeOptions.logo) ? themeOptions.logo : null;
-  const faviconRawCandidate = isLocalAssetPath(themeOptions.favicon) ? themeOptions.favicon : null;
-  // Pre-check: a logo/favicon path that doesn't resolve to an existing
-  // file would otherwise produce a config that emits `logo: { src: … }`
-  // referencing a missing import, and Rollup fails the build with
-  // "Rollup failed to resolve import". Real-world break (Enveloppe):
-  // the source declares `theme.favicon: assets/meta/favicons.png` but
-  // the file isn't in the repo. We `await fs.exists` here (well, attempt
-  // a stat) so the config is built only for paths we can actually copy.
-  const checkLocalAssetExists = async (rel: string | null): Promise<boolean> => {
-    if (rel === null) return false;
-    return fs.exists(join(docsDir, rel));
-  };
-  const logoSrc = (await checkLocalAssetExists(logoSrcCandidate)) ? logoSrcCandidate : null;
-  // Starlight's `favicon` field accepts only .ico, .gif, .jpg/.jpeg, .png,
-  // and .svg. Material sites occasionally use other formats (e.g. .webp,
-  // .avif) — emitting those would crash `astro:config:setup` with
-  // "favicon must be a .ico, .gif, .jpg, .png, or .svg file". Drop the
-  // emission when the extension isn't accepted; Starlight falls back to
-  // its default favicon and the build succeeds. Real-world break:
-  // demosense/tidylake's source declared `favicon: img/favicon.webp`.
-  const FAVICON_ACCEPTED_EXT = /\.(ico|gif|jpe?g|png|svg)$/i;
-  const faviconExtensionRejected =
-    faviconRawCandidate !== null && !FAVICON_ACCEPTED_EXT.test(faviconRawCandidate);
-  const faviconRawAccepted =
-    faviconRawCandidate !== null && !faviconExtensionRejected ? faviconRawCandidate : null;
-  const faviconRaw = (await checkLocalAssetExists(faviconRawAccepted)) ? faviconRawAccepted : null;
+  const { logoSrc, faviconRaw, faviconRawCandidate, faviconExtensionRejected } =
+    await resolveThemeAssets({
+      themeOptions: config.value.theme?.options ?? {},
+      fs,
+      docsDir,
+    });
   // starlight-links-validator: opt-in (default OFF) since 2026-05-05.
   //
   // Real-world Material sites routinely link to non-content paths (`/LICENSE`,
