@@ -99,7 +99,10 @@ export async function runWizardFlow(
         'Re-running with your saved answers',
       );
       // Same spinner-then-print pattern as the full wizard path below.
-      const spin = prompter.spinner({ initialMessage: 'Converting…', indicator: 'timer' });
+      const spin = prompter.spinner({
+        initialMessage: 'Converting your site… this might take a minute',
+        indicator: 'timer',
+      });
       const converted = await converter(reparsedRestored);
       if (converted.kind === 'fatal') {
         spin.error(converted.message);
@@ -262,7 +265,10 @@ export async function runWizardFlow(
   // it directly: we stop the spinner FIRST (so the rail terminates cleanly),
   // outro, THEN print the report — that way stdout text never collides with
   // the spinner's single-line animation.
-  const spin = prompter.spinner({ initialMessage: 'Converting…', indicator: 'timer' });
+  const spin = prompter.spinner({
+    initialMessage: 'Converting your site… this might take a minute',
+    indicator: 'timer',
+  });
   const converted = await converter(reparsed);
   if (converted.kind === 'fatal') {
     spin.error(converted.message);
