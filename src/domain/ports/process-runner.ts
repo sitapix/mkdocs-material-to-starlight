@@ -42,9 +42,9 @@ export interface ProcessOutput {
    * Milliseconds between the child's last stdout/stderr emission and the
    * process exit (or kill). Undefined when the runner did not track it.
    *
-   * Generic timing signal: callers can use it to distinguish "still emitting
-   * output at exit" from "went silent before exit". Interpretation (what
-   * counts as long, what action to recommend) is the caller's responsibility.
+   * Callers use this to tell "still emitting output at exit" from "went
+   * silent before exit". The caller decides what counts as long and what
+   * action to recommend.
    */
   readonly silenceMs?: number;
 }

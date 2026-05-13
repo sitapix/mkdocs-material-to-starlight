@@ -36,12 +36,10 @@ const SHOW_FIRST = 3;
 
 export interface FormatReportOptions {
   /**
-   * Expand info-severity groups (show example rows + collapse summary like
-   * warnings and errors). Default false: info groups render as header-only
-   * because info is background context, not a punch list, and showing every
-   * row inflates the report on info-heavy sites without changing what the
-   * user has to do. Errors and warnings ignore this flag — both are always
-   * fully rendered.
+   * Expand info-severity groups so they render rows + collapse summary like
+   * warnings and errors. Defaults to false. Info diagnostics are background
+   * context; rendering every row inflates the report without surfacing new
+   * actions. Errors and warnings ignore this flag and always render rows.
    */
   readonly verbose?: boolean;
 }
@@ -206,10 +204,10 @@ function formatGroupHeader(ruleId: string, items: ReadonlyArray<TaggedDiagnostic
 }
 
 /**
- * One-line teaser for a folded info group: first sentence of the first
- * message, dim and indented. Carries the actionable punchline ("Install
- * starlight-openapi") without re-expanding every row. Returns null if the
- * group is empty.
+ * Build a one-line teaser for a folded info group: the first sentence of
+ * the group's first message, dim and indented. The user still sees the
+ * action signal ("Install starlight-openapi") without --verbose. Returns
+ * null if the group is empty.
  */
 function formatTeaser(first: TaggedDiagnostic | undefined): string | null {
   if (first === undefined) return null;

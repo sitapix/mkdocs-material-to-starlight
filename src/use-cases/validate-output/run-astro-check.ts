@@ -92,10 +92,9 @@ function looksLikeNotInstalled(stdout: string, stderr: string): boolean {
 }
 
 /**
- * Threshold past which stdout silence before kill is interpreted as "hung",
- * not "slow". 30s is conservative: astro check on a 2k-page site still emits
- * progress more often than that, so longer gaps signal a tight loop in the
- * language server rather than honest forward progress.
+ * Threshold past which we call a silent gap a hang instead of slow progress.
+ * 30s is conservative: astro check on a 2k-page site emits progress more
+ * often than that. Longer gaps point at a tight loop in the language server.
  */
 const HANG_SILENCE_MS = 30_000;
 
