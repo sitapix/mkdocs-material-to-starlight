@@ -1,6 +1,6 @@
 {
   "name": "mkdocs-material-to-starlight",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "description": "Migrate MkDocs Material sites to Astro Starlight in one command. Maps pages, plugins, sidebar, redirects, and i18n; reports anything left over with file:line diagnostics.",
   "type": "module",
   "license": "MIT",
