@@ -108,16 +108,16 @@ interface TimeoutMessageInput {
 function buildTimeoutMessage(input: TimeoutMessageInput): string {
   const head = `\`astro check\` exceeded ${formatTimeout(input.timeoutMs)} and was killed`;
   const reproducer = `reproduce manually with \`cd ${input.outputDir} && npm install && npx astro check\``;
-  const baseline = `The check is a one-shot type/validation pass and can be slow on large sites — it does not build or serve.`;
+  const baseline = `The check is a one-shot type/validation pass and can be slow on large sites. It does not build or serve.`;
   if (input.silenceMs === undefined) {
-    return `${head}; raise with \`--check-timeout ${input.timeoutMs * 2}\` or ${reproducer}. ${baseline}`;
+    return `${head}. Raise with \`--check-timeout ${input.timeoutMs * 2}\` or ${reproducer}. ${baseline}`;
   }
   if (input.silenceMs >= HANG_SILENCE_MS) {
     const silenceLabel = formatSilence(input.silenceMs);
-    return `${head}; stdout was silent for ${silenceLabel} (${input.silenceMs}ms) before the kill. That gap usually means a hang in the language server rather than honest slow progress — though a single very slow file can also do it. Raising \`--check-timeout\` may just delay the same kill; ${reproducer} and watch whether output continues to flow before deciding. ${baseline}`;
+    return `${head}. stdout was silent for ${silenceLabel} (${input.silenceMs}ms) before the kill. That gap usually points at a hang in the language server, though one very slow file can also cause it. Raising \`--check-timeout\` will likely hit the same kill; ${reproducer} and watch the output instead. ${baseline}`;
   }
   const flowingLabel = formatSilence(input.silenceMs);
-  return `${head}; the child was still producing output ${flowingLabel} (${input.silenceMs}ms) before the kill — the run was slow but progressing, so raising \`--check-timeout ${input.timeoutMs * 2}\` is the right next step, or ${reproducer}. ${baseline}`;
+  return `${head}. The child was still producing output ${flowingLabel} (${input.silenceMs}ms) before the kill, which means the run was slow but progressing. Raise \`--check-timeout ${input.timeoutMs * 2}\` or ${reproducer}. ${baseline}`;
 }
 
 function formatSilence(ms: number): string {
