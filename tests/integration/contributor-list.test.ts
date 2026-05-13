@@ -41,6 +41,16 @@ describe('starlight-contributor-list integration — git-authors / git-committer
     expect(pkg.dependencies).toHaveProperty('starlight-contributor-list');
   });
 
+  it('pins starlight-contributor-list to ^0.4.0 (0.5.0 was never published; 0.4.0 is the last release on npm)', async () => {
+    writeMkdocs('  - git-authors');
+
+    const result = await convertSiteFromDisk({ projectDir: project, outputDir: out });
+    expect(result.ok).toBe(true);
+
+    const pkg = JSON.parse(readGenerated('package.json'));
+    expect(pkg.dependencies['starlight-contributor-list']).toBe('^0.4.0');
+  });
+
   it('git-committers triggers the dependency in package.json', async () => {
     writeMkdocs('  - git-committers');
 

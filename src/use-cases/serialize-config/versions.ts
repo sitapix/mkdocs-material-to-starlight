@@ -141,5 +141,16 @@ export const FEATURE_DEPENDENCIES: Readonly<
   // a project-wide footer list. The converter cannot auto-extract git
   // log contributors here (no git port), so the integration emits a
   // placeholder `list: []` the user fills in.
-  'contributor-list': [['starlight-contributor-list', '^0.5.0']],
+  //
+  // Pinned at `^0.4.0` (last release on npm, 2026-03-16). The package has
+  // since been deprecated in favor of `astro-contributors`, but that
+  // successor is GitHub-only (hardcodes api.github.com, requires
+  // PUBLIC_GITHUB_TOKEN, resolves avatars from github.com/{login}.png)
+  // and ships components instead of a Starlight plugin — a behaviorally
+  // breaking swap for GitLab / self-hosted / non-GitHub users. There
+  // is no `0.5.0` on npm; bumping to a non-existent range raises
+  // ERESOLVE on install. Hold at `^0.4.0` until we either ship a
+  // first-party port (`starlight-git-contributors`) or get a
+  // remote-agnostic upstream.
+  'contributor-list': [['starlight-contributor-list', '^0.4.0']],
 };
