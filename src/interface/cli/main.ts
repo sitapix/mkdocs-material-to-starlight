@@ -79,7 +79,7 @@ General:
 Convert:
   --check                  Run \`astro check\` after conversion
   --no-check               Skip astro check
-  --check-timeout <ms>     Override astro-check timeout (default 5min)
+  --check-timeout <ms>     Override astro-check timeout (default 10min)
   --dry-run                In-memory only; no files written
   --snippet-base-path <p>  Resolve PyMdown snippets here (repeatable)
   --package-manager <pm>   npm | pnpm | yarn | bun (next-steps hint only)

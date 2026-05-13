@@ -295,6 +295,51 @@ describe('formatReport', () => {
     expect(out).not.toContain('…');
   });
 
+  it('shows the next-step command when there are warnings but no errors', () => {
+    // When astro check (and the converter) report only warnings/info, the
+    // build will still work — surface the preview command so the user does
+    // not have to reconstruct it from the help text.
+    const out = formatReport(
+      [
+        {
+          sourcePath: 'a.md',
+          diagnostic: createDiagnostic({
+            severity: 'warning',
+            ruleId: 'r',
+            message: 'm',
+            source: 'mkdocs-material-to-starlight',
+          }),
+        },
+      ],
+      '/converted/site',
+    );
+    expect(out).toContain('Next:');
+    expect(out).toContain('cd /converted/site');
+    expect(out).toContain('npm run dev');
+    // The dev server prints its own URL (and the user may have configured a
+    // non-default port) — naming one here risks being wrong.
+    expect(out).not.toContain('localhost:4321');
+  });
+
+  it('omits the next-step command when there are errors (build would fail)', () => {
+    const out = formatReport(
+      [
+        {
+          sourcePath: 'a.md',
+          diagnostic: createDiagnostic({
+            severity: 'error',
+            ruleId: 'r',
+            message: 'm',
+            source: 'mkdocs-material-to-starlight',
+          }),
+        },
+      ],
+      '/converted/site',
+    );
+    expect(out).not.toContain('Next:');
+    expect(out).not.toContain('npm run dev');
+  });
+
   it('summarizes counts by severity at the end', () => {
     const out = formatReport([
       {

@@ -149,8 +149,49 @@ describe('runAstroCheck', () => {
         timedOut: true,
       }),
     });
-    const diagnostics = await runAstroCheck({ runner, outputDir: '/out' });
+    const diagnostics = await runAstroCheck({
+      runner,
+      outputDir: '/converted/site',
+      timeoutMs: 600_000,
+    });
     expect(diagnostics).toHaveLength(1);
-    expect(diagnostics[0]?.ruleId).toBe('astro-check-timeout');
+    const diag = diagnostics[0];
+    expect(diag?.ruleId).toBe('astro-check-timeout');
+    // The message names the configured timeout and the override flag so the
+    // user can act without consulting --explain.
+    expect(diag?.message).toContain('10 minutes');
+    expect(diag?.message).toContain('--check-timeout');
+    // The message includes a copy-pasteable command rooted at the actual
+    // output directory so the user does not have to reconstruct it.
+    expect(diag?.message).toContain('cd /converted/site');
+    expect(diag?.message).toContain('npx astro check');
+    // The hint mentions that astro check itself is the slow step on large
+    // sites (not the network), and includes `npm install` in the reproducer
+    // so a user without astro installed locally can still copy-paste it.
+    expect(diag?.message).toContain('large');
+    expect(diag?.message).toContain('npm install');
+  });
+
+  it('humanizes sub-minute timeouts in seconds', async () => {
+    const runner = fakeRunner({
+      result: ok({ exitCode: null, stdout: '', stderr: '', timedOut: true }),
+    });
+    const diagnostics = await runAstroCheck({ runner, outputDir: '/out', timeoutMs: 30_000 });
+    expect(diagnostics[0]?.message).toContain('30 seconds');
+  });
+
+  it('falls back to milliseconds for non-round timeouts', async () => {
+    const runner = fakeRunner({
+      result: ok({ exitCode: null, stdout: '', stderr: '', timedOut: true }),
+    });
+    const diagnostics = await runAstroCheck({ runner, outputDir: '/out', timeoutMs: 1500 });
+    expect(diagnostics[0]?.message).toContain('1500ms');
+  });
+
+  it('defaults to a 10-minute timeout when none is supplied', async () => {
+    const capture: { command?: string; args?: string[]; options?: ProcessRunOptions } = {};
+    const runner = fakeRunner({ capture });
+    await runAstroCheck({ runner, outputDir: '/out' });
+    expect(capture.options?.timeoutMs).toBe(10 * 60_000);
   });
 });

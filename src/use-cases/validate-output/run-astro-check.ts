@@ -18,7 +18,7 @@ import type { Diagnostic } from '../../domain/diagnostics/diagnostic.js';
 import type { ProcessRunner } from '../../domain/ports/process-runner.js';
 import { parseAstroCheckOutput } from './astro-check-parser.js';
 
-const DEFAULT_TIMEOUT_MS = 5 * 60_000;
+const DEFAULT_TIMEOUT_MS = 10 * 60_000;
 const SOURCE = 'validate-output/run-astro-check';
 
 const NOT_INSTALLED_SIGNATURES: ReadonlyArray<string> = [
@@ -38,9 +38,10 @@ export interface RunAstroCheckOptions {
 export async function runAstroCheck(
   options: RunAstroCheckOptions,
 ): Promise<ReadonlyArray<Diagnostic>> {
+  const timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
   const result = await options.runner.run('npx', ['--yes', 'astro', 'check'], {
     cwd: options.outputDir,
-    timeoutMs: options.timeoutMs ?? DEFAULT_TIMEOUT_MS,
+    timeoutMs,
   });
 
   if (!result.ok) {
@@ -55,6 +56,17 @@ export async function runAstroCheck(
   }
 
   const output = result.value;
+  if (output.timedOut) {
+    return [
+      {
+        ruleId: 'astro-check-timeout',
+        severity: 'error',
+        message: `\`astro check\` exceeded ${formatTimeout(timeoutMs)} and was killed; raise with \`--check-timeout ${timeoutMs * 2}\` or reproduce manually with \`cd ${options.outputDir} && npm install && npx astro check\`. The check is a one-shot type/validation pass and can be slow on large sites — it does not build or serve.`,
+        source: SOURCE,
+      },
+    ];
+  }
+
   if (looksLikeNotInstalled(output.stdout, output.stderr)) {
     return [
       {
@@ -73,4 +85,16 @@ export async function runAstroCheck(
 function looksLikeNotInstalled(stdout: string, stderr: string): boolean {
   const haystack = `${stdout}\n${stderr}`;
   return NOT_INSTALLED_SIGNATURES.some((s) => haystack.includes(s));
+}
+
+function formatTimeout(ms: number): string {
+  if (ms % 60_000 === 0) {
+    const minutes = ms / 60_000;
+    return `${minutes} ${minutes === 1 ? 'minute' : 'minutes'}`;
+  }
+  if (ms % 1_000 === 0) {
+    const seconds = ms / 1_000;
+    return `${seconds} ${seconds === 1 ? 'second' : 'seconds'}`;
+  }
+  return `${ms}ms`;
 }

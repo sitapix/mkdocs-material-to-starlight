@@ -124,14 +124,6 @@ describe('parseAstroCheckOutput', () => {
     expect(diags[0]?.message).toContain('unrecognized failure spew');
   });
 
-  it('emits astro-check-timeout when the runner reports a timeout', () => {
-    const out = output({ exitCode: null, timedOut: true });
-    const diags = parseAstroCheckOutput(out);
-    expect(diags).toHaveLength(1);
-    expect(diags[0]?.ruleId).toBe('astro-check-timeout');
-    expect(diags[0]?.severity).toBe('error');
-  });
-
   it('ignores summary lines like "Result (N files): X errors"', () => {
     const out = output({
       exitCode: 1,

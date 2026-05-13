@@ -25,15 +25,7 @@ export interface Diagnostic {
   readonly place?: SourcePlace;
 }
 
-export interface DiagnosticInput {
-  readonly severity: Severity;
-  readonly ruleId: string;
-  readonly message: string;
-  readonly source: string;
-  readonly place?: SourcePlace;
-}
-
-export function createDiagnostic(input: DiagnosticInput): Diagnostic {
+export function createDiagnostic(input: Diagnostic): Diagnostic {
   if (input.ruleId.length === 0) {
     throw new Error('Diagnostic.ruleId must be non-empty');
   }

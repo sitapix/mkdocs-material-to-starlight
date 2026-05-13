@@ -22,6 +22,7 @@
  */
 
 import pc from 'picocolors';
+import type { Severity } from '../../domain/diagnostics/diagnostic.js';
 import { sanitizeForSingleLine } from '../../infrastructure/terminal/sanitize-terminal-output.js';
 import type { TaggedDiagnostic } from '../../use-cases/convert-site/convert.js';
 
@@ -37,19 +38,14 @@ export function formatReport(
   diagnostics: ReadonlyArray<TaggedDiagnostic>,
   outputDir?: string,
 ): string {
-  const notesPath =
-    outputDir !== undefined && outputDir.length > 0
-      ? `${sanitizeForSingleLine(outputDir).replace(/\/$/, '')}/MIGRATION_NOTES.md`
-      : 'MIGRATION_NOTES.md';
+  const where = resolveOutputDir(outputDir);
+  const notesPath = where === '<output-dir>' ? 'MIGRATION_NOTES.md' : `${where}/MIGRATION_NOTES.md`;
+  const nextLine = `Next: ${pc.cyan(`cd ${where} && npm install && npm run dev`)}`;
 
   if (diagnostics.length === 0) {
-    const where =
-      outputDir !== undefined && outputDir.length > 0
-        ? sanitizeForSingleLine(outputDir).replace(/\/$/, '')
-        : '<output-dir>';
     return (
       `${pc.green(pc.bold('OK'))} — 0 issues found. Site converted cleanly.\n` +
-      `Next: ${pc.cyan(`cd ${where} && npm install && npm run dev`)}\n` +
+      `${nextLine}\n` +
       `Docs: ${pc.cyan(pc.underline('https://starlight.astro.build/'))}\n`
     );
   }
@@ -86,7 +82,16 @@ export function formatReport(
   if (diagnostics.length > 0) {
     lines.push(`Full report with descriptions and fixes: ${pc.cyan(pc.underline(notesPath))}`);
   }
+  // Skip the next-step hint when any error fires — `npm run dev` would fail.
+  if (!diagnostics.some((t) => t.diagnostic.severity === 'error')) {
+    lines.push(nextLine);
+  }
   return `${lines.join('\n')}\n`;
+}
+
+function resolveOutputDir(outputDir: string | undefined): string {
+  if (outputDir === undefined || outputDir.length === 0) return '<output-dir>';
+  return sanitizeForSingleLine(outputDir).replace(/\/$/, '');
 }
 
 /**
@@ -95,7 +100,7 @@ export function formatReport(
  * `tsc`, and most linters' conventions so the eye already knows what to
  * scan for.
  */
-function colorSeverity(severity: 'info' | 'warning' | 'error', text: string): string {
+function colorSeverity(severity: Severity, text: string): string {
   if (severity === 'error') return pc.red(pc.bold(text));
   if (severity === 'warning') return pc.yellow(text);
   return pc.blue(text);

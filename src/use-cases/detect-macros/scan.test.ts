@@ -43,14 +43,38 @@ describe('scanMacroOccurrences', () => {
     expect(diagnostics.map((d) => d.place?.line).sort()).toEqual(expect.arrayContaining([1, 3]));
   });
 
-  it('does not flag literal $double-brace$ in code blocks (pragmatic: scanner is line-based)', () => {
-    // We intentionally do not parse markdown. Code fences with macro syntax
-    // ARE flagged — users may want to know about them anyway. Document
-    // current behavior.
-    const source = '```\n{{ inside_code }}\n```\n';
-    // Current behavior: flagged. If we ever change it, this test will fail
-    // and force a conscious decision.
-    expect(scanMacroOccurrences(source).length).toBeGreaterThan(0);
+  it('does NOT flag macro syntax inside fenced code blocks (documentation examples)', () => {
+    // Docs that teach Jinja2 by example show `{{ var }}` in code fences. Those
+    // are not live macros and must not surface as warnings. Conscious reversal
+    // of the prior "flag everything, the user might want to know" policy.
+    const source = '```\n{{ inside_code }}\n{% if x %}body{% endif %}\n```\n';
+    expect(scanMacroOccurrences(source)).toEqual([]);
+  });
+
+  it('does NOT flag macro syntax inside tilde-fenced code blocks', () => {
+    const source = '~~~\n{{ inside_code }}\n~~~\n';
+    expect(scanMacroOccurrences(source)).toEqual([]);
+  });
+
+  it('still flags macros outside fences when a fenced block sits elsewhere in the file', () => {
+    const source = [
+      'Live: {{ live_var }}',
+      '',
+      '```',
+      '{{ example_only }}',
+      '```',
+      '',
+      'Also live: {{ another }}',
+      '',
+    ].join('\n');
+    const diagnostics = scanMacroOccurrences(source);
+    expect(diagnostics).toHaveLength(2);
+    expect(diagnostics.map((d) => d.place?.line)).toEqual([1, 7]);
+  });
+
+  it('does NOT flag macro syntax inside inline code spans', () => {
+    const source = 'Inline example: `{{ var }}` should not flag.\n';
+    expect(scanMacroOccurrences(source)).toEqual([]);
   });
 
   it('captures the matched expression in the diagnostic message', () => {

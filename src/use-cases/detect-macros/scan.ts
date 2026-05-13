@@ -11,44 +11,47 @@
  * and are handled by `expandIncludeMarkdown`. Reporting them as macros would
  * be noise.
  *
+ * Fenced code blocks and inline code spans are also skipped: documentation
+ * commonly demonstrates Jinja2 syntax inside code examples, and flagging
+ * those as macros generates false positives the user cannot act on. Fence
+ * tracking is handled universally by `runLineScanners`; inline-code spans
+ * are tested per-line here.
+ *
  * Pure: takes a source string, returns an immutable array of diagnostics.
- * The scanner is line-based and does not parse Markdown — macros inside
- * fenced code blocks are also reported, on the assumption that users may want
- * to know about them anyway. The behavior is locked in by test.
  */
 
 import { createDiagnostic, type Diagnostic } from '../../domain/diagnostics/diagnostic.js';
+import { type LineScanner, runLineScanners } from '../../domain/scanners/line-scanner.js';
 
 const SOURCE = 'detect-macros/scan';
-const VARIABLE_RE = /\{\{[^}]+\}\}/g;
-const STATEMENT_RE = /\{%[\s\S]+?%\}/g;
+const MACRO_RE = /\{\{[^}]+\}\}|\{%[\s\S]*?%\}/g;
 const INCLUDE_TAG_RE = /^\{%\s*(include-markdown|include)\b/;
 
+const macroScanner: LineScanner = {
+  ruleId: 'plugin-macros-occurrence',
+  scan: (line, lineNumber) => {
+    const out: Diagnostic[] = [];
+    for (const match of line.matchAll(MACRO_RE)) {
+      const text = match[0];
+      if (text.startsWith('{%') && INCLUDE_TAG_RE.test(text)) continue;
+      const column = (match.index ?? 0) + 1;
+      if (isInsideInlineCode(column - 1, line)) continue;
+      out.push(buildDiagnostic(text, { line: lineNumber, column }));
+    }
+    return out;
+  },
+};
+
 export function scanMacroOccurrences(source: string): ReadonlyArray<Diagnostic> {
-  const diagnostics: Diagnostic[] = [];
-  collectMatches(source, VARIABLE_RE, diagnostics);
-  collectStatements(source, diagnostics);
-  // Sort by (line, column) so output is deterministic regardless of which
-  // regex finished first.
-  return [...diagnostics].sort(byPlace);
+  return runLineScanners(source, [macroScanner]);
 }
 
-function collectMatches(source: string, re: RegExp, out: Diagnostic[]): void {
-  for (const match of source.matchAll(re)) {
-    const index = match.index ?? 0;
-    const place = lineColumnAt(source, index);
-    out.push(buildDiagnostic(match[0], place));
+function isInsideInlineCode(charIndex: number, line: string): boolean {
+  let ticks = 0;
+  for (let i = 0; i < charIndex; i += 1) {
+    if (line[i] === '`') ticks += 1;
   }
-}
-
-function collectStatements(source: string, out: Diagnostic[]): void {
-  for (const match of source.matchAll(STATEMENT_RE)) {
-    const text = match[0];
-    if (INCLUDE_TAG_RE.test(text)) continue;
-    const index = match.index ?? 0;
-    const place = lineColumnAt(source, index);
-    out.push(buildDiagnostic(text, place));
-  }
+  return ticks % 2 === 1;
 }
 
 function buildDiagnostic(expression: string, place: { line: number; column: number }): Diagnostic {
@@ -61,26 +64,7 @@ function buildDiagnostic(expression: string, place: { line: number; column: numb
   });
 }
 
-function lineColumnAt(source: string, index: number): { line: number; column: number } {
-  let line = 1;
-  let lastNewline = -1;
-  for (let i = 0; i < index; i += 1) {
-    if (source.charCodeAt(i) === 10) {
-      line += 1;
-      lastNewline = i;
-    }
-  }
-  return { line, column: index - lastNewline };
-}
-
 function truncate(text: string): string {
   if (text.length <= 80) return text.trim();
   return `${text.slice(0, 77).trim()}...`;
-}
-
-function byPlace(a: Diagnostic, b: Diagnostic): number {
-  const aLine = a.place?.line ?? 0;
-  const bLine = b.place?.line ?? 0;
-  if (aLine !== bLine) return aLine - bLine;
-  return (a.place?.column ?? 0) - (b.place?.column ?? 0);
 }

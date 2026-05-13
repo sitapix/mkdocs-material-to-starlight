@@ -19,11 +19,11 @@ export function err<E>(error: E): Result<never, E> {
   return { ok: false, error };
 }
 
-export function isOk<T, E>(r: Result<T, E>): r is { ok: true; value: T } {
+export function isOk<T, E>(r: Result<T, E>): r is Extract<Result<T, E>, { ok: true }> {
   return r.ok;
 }
 
-export function isErr<T, E>(r: Result<T, E>): r is { ok: false; error: E } {
+export function isErr<T, E>(r: Result<T, E>): r is Extract<Result<T, E>, { ok: false }> {
   return !r.ok;
 }
 

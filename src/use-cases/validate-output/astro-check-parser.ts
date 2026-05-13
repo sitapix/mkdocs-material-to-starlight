@@ -10,8 +10,10 @@
  * Severity tokens are `Error`, `Warning`, and `Hint`. ANSI color escapes are
  * stripped before matching so coloured terminal output parses cleanly.
  *
- * Failure modes are surfaced as their own diagnostics (`astro-check-timeout`,
- * `astro-check-unparsed-output`); the caller never sees a thrown exception.
+ * Failure modes are surfaced as their own diagnostics
+ * (`astro-check-unparsed-output`); the caller never sees a thrown exception.
+ * Timeout handling lives in the caller (`run-astro-check.ts`) because the
+ * configured timeout value is only known there.
  */
 
 import type { Diagnostic, Severity } from '../../domain/diagnostics/diagnostic.js';
@@ -32,17 +34,6 @@ const SEVERITY_TO_RULE: Readonly<Record<string, { ruleId: string; severity: Seve
 const SOURCE = 'validate-output/astro-check';
 
 export function parseAstroCheckOutput(output: ProcessOutput): ReadonlyArray<Diagnostic> {
-  if (output.timedOut) {
-    return [
-      {
-        ruleId: 'astro-check-timeout',
-        severity: 'error',
-        message: '`astro check` exceeded the configured timeout and was killed.',
-        source: SOURCE,
-      },
-    ];
-  }
-
   const combined = stripAnsi(`${output.stdout}\n${output.stderr}`);
   const lines = combined.split('\n');
   const diagnostics: Diagnostic[] = [];
