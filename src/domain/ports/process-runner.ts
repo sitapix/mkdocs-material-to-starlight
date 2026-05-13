@@ -38,6 +38,15 @@ export interface ProcessOutput {
   readonly stderr: string;
   /** True when the runner aborted the process for exceeding `timeoutMs`. */
   readonly timedOut: boolean;
+  /**
+   * Milliseconds between the child's last stdout/stderr emission and the
+   * process exit (or kill). Undefined when the runner did not track it.
+   *
+   * Generic timing signal: callers can use it to distinguish "still emitting
+   * output at exit" from "went silent before exit". Interpretation (what
+   * counts as long, what action to recommend) is the caller's responsibility.
+   */
+  readonly silenceMs?: number;
 }
 
 export interface ProcessRunnerError {

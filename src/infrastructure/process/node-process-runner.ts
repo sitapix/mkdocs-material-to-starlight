@@ -36,6 +36,7 @@ export function createNodeProcessRunner(): ProcessRunner {
         let stderr = '';
         let timedOut = false;
         let timer: NodeJS.Timeout | null = null;
+        let lastOutputAt = Date.now();
 
         if (options.timeoutMs !== undefined) {
           timer = setTimeout(() => {
@@ -48,9 +49,11 @@ export function createNodeProcessRunner(): ProcessRunner {
         child.stderr?.setEncoding('utf8');
         child.stdout?.on('data', (chunk: string) => {
           stdout += chunk;
+          lastOutputAt = Date.now();
         });
         child.stderr?.on('data', (chunk: string) => {
           stderr += chunk;
+          lastOutputAt = Date.now();
         });
 
         child.on('error', (cause: Error) => {
@@ -66,6 +69,7 @@ export function createNodeProcessRunner(): ProcessRunner {
               stdout,
               stderr,
               timedOut,
+              silenceMs: Date.now() - lastOutputAt,
             }),
           );
         });

@@ -61,7 +61,11 @@ export async function runAstroCheck(
       {
         ruleId: 'astro-check-timeout',
         severity: 'error',
-        message: `\`astro check\` exceeded ${formatTimeout(timeoutMs)} and was killed; raise with \`--check-timeout ${timeoutMs * 2}\` or reproduce manually with \`cd ${options.outputDir} && npm install && npx astro check\`. The check is a one-shot type/validation pass and can be slow on large sites — it does not build or serve.`,
+        message: buildTimeoutMessage({
+          timeoutMs,
+          outputDir: options.outputDir,
+          silenceMs: output.silenceMs,
+        }),
         source: SOURCE,
       },
     ];
@@ -85,6 +89,44 @@ export async function runAstroCheck(
 function looksLikeNotInstalled(stdout: string, stderr: string): boolean {
   const haystack = `${stdout}\n${stderr}`;
   return NOT_INSTALLED_SIGNATURES.some((s) => haystack.includes(s));
+}
+
+/**
+ * Threshold past which stdout silence before kill is interpreted as "hung",
+ * not "slow". 30s is conservative: astro check on a 2k-page site still emits
+ * progress more often than that, so longer gaps signal a tight loop in the
+ * language server rather than honest forward progress.
+ */
+const HANG_SILENCE_MS = 30_000;
+
+interface TimeoutMessageInput {
+  readonly timeoutMs: number;
+  readonly outputDir: string;
+  readonly silenceMs: number | undefined;
+}
+
+function buildTimeoutMessage(input: TimeoutMessageInput): string {
+  const head = `\`astro check\` exceeded ${formatTimeout(input.timeoutMs)} and was killed`;
+  const reproducer = `reproduce manually with \`cd ${input.outputDir} && npm install && npx astro check\``;
+  const baseline = `The check is a one-shot type/validation pass and can be slow on large sites — it does not build or serve.`;
+  if (input.silenceMs === undefined) {
+    return `${head}; raise with \`--check-timeout ${input.timeoutMs * 2}\` or ${reproducer}. ${baseline}`;
+  }
+  if (input.silenceMs >= HANG_SILENCE_MS) {
+    const silenceLabel = formatSilence(input.silenceMs);
+    return `${head}; stdout was silent for ${silenceLabel} (${input.silenceMs}ms) before the kill. That gap usually means a hang in the language server rather than honest slow progress — though a single very slow file can also do it. Raising \`--check-timeout\` may just delay the same kill; ${reproducer} and watch whether output continues to flow before deciding. ${baseline}`;
+  }
+  const flowingLabel = formatSilence(input.silenceMs);
+  return `${head}; the child was still producing output ${flowingLabel} (${input.silenceMs}ms) before the kill — the run was slow but progressing, so raising \`--check-timeout ${input.timeoutMs * 2}\` is the right next step, or ${reproducer}. ${baseline}`;
+}
+
+function formatSilence(ms: number): string {
+  if (ms >= 60_000) {
+    const minutes = Math.round(ms / 60_000);
+    return `${minutes} ${minutes === 1 ? 'minute' : 'minutes'}`;
+  }
+  const seconds = Math.round(ms / 1_000);
+  return `${seconds}s`;
 }
 
 function formatTimeout(ms: number): string {

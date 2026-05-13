@@ -194,4 +194,50 @@ describe('runAstroCheck', () => {
     await runAstroCheck({ runner, outputDir: '/out' });
     expect(capture.options?.timeoutMs).toBe(10 * 60_000);
   });
+
+  it('flags a likely hang when stdout went silent for tens of seconds before the kill', async () => {
+    // Distinguish hang-in-a-loop from "just slow on a huge site": when the
+    // child stopped producing output well before the kill, that's the
+    // signature of a tight loop in the language server, not honest progress
+    // on a 2k-page conversion. The diagnostic must say so concretely so the
+    // user can decide between raising --check-timeout and filing a bug.
+    const runner = fakeRunner({
+      result: ok({
+        exitCode: null,
+        stdout: 'Getting diagnostics for Astro files...\n',
+        stderr: '',
+        timedOut: true,
+        silenceMs: 120_000,
+      }),
+    });
+    const diagnostics = await runAstroCheck({
+      runner,
+      outputDir: '/out',
+      timeoutMs: 600_000,
+    });
+    const diag = diagnostics[0];
+    expect(diag?.ruleId).toBe('astro-check-timeout');
+    expect(diag?.message).toMatch(/silent|no output|hung|loop/i);
+    expect(diag?.message).toContain('120');
+  });
+
+  it('flags slow-but-progressing when output was still flowing right before the kill', async () => {
+    const runner = fakeRunner({
+      result: ok({
+        exitCode: null,
+        stdout: 'Getting diagnostics for Astro files...\n',
+        stderr: '',
+        timedOut: true,
+        silenceMs: 1_500,
+      }),
+    });
+    const diagnostics = await runAstroCheck({
+      runner,
+      outputDir: '/out',
+      timeoutMs: 600_000,
+    });
+    const diag = diagnostics[0];
+    expect(diag?.ruleId).toBe('astro-check-timeout');
+    expect(diag?.message).toMatch(/still producing|still emitting|output.*flowing/i);
+  });
 });
