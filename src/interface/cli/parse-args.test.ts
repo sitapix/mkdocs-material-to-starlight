@@ -30,6 +30,7 @@ describe('parseArgs', () => {
       ci: false,
       force: false,
       quiet: false,
+      verbose: false,
       json: false,
       color: null,
       packageManager: null,

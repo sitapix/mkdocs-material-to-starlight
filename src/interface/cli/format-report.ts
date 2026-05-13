@@ -34,10 +34,24 @@ import type { TaggedDiagnostic } from '../../use-cases/convert-site/convert.js';
 const COLLAPSE_AT = 5;
 const SHOW_FIRST = 3;
 
+export interface FormatReportOptions {
+  /**
+   * Expand info-severity groups (show example rows + collapse summary like
+   * warnings and errors). Default false: info groups render as header-only
+   * because info is background context, not a punch list, and showing every
+   * row inflates the report on info-heavy sites without changing what the
+   * user has to do. Errors and warnings ignore this flag — both are always
+   * fully rendered.
+   */
+  readonly verbose?: boolean;
+}
+
 export function formatReport(
   diagnostics: ReadonlyArray<TaggedDiagnostic>,
   outputDir?: string,
+  options: FormatReportOptions = {},
 ): string {
+  const verbose = options.verbose === true;
   const where = resolveOutputDir(outputDir);
   const notesPath = where === '<output-dir>' ? 'MIGRATION_NOTES.md' : `${where}/MIGRATION_NOTES.md`;
   const nextLine = `Next: ${pc.cyan(`cd ${where} && npm install && npm run dev`)}`;
@@ -52,6 +66,7 @@ export function formatReport(
 
   const groups = groupByRuleId(diagnostics);
   const lines: string[] = [];
+  let foldedInfoGroupCount = 0;
   for (let g = 0; g < groups.length; g += 1) {
     const group = groups[g];
     if (group === undefined) continue;
@@ -60,11 +75,17 @@ export function formatReport(
     // the gap before the summary.
     if (g > 0) lines.push('');
     const { ruleId, items } = group;
+    const severity = items[0]?.diagnostic.severity ?? 'info';
+    const foldRows = severity === 'info' && !verbose;
+    lines.push(formatGroupHeader(ruleId, items));
+    if (foldRows) {
+      foldedInfoGroupCount += 1;
+      const teaser = formatTeaser(items[0]);
+      if (teaser !== null) lines.push(teaser);
+      continue;
+    }
     const collapse = items.length > COLLAPSE_AT;
     const visible = collapse ? items.slice(0, SHOW_FIRST) : items;
-    // Group header pulls the ruleId out of each row so the rows can be tighter
-    // and ruleId/severity/count are stated once for the chunk.
-    lines.push(formatGroupHeader(ruleId, items));
     // Pad locators within the group so message text starts at the same
     // column on every line of the group.
     const pathPad = Math.max(...visible.map((t) => locatorWidth(t)));
@@ -81,6 +102,13 @@ export function formatReport(
   lines.push('', summarize(diagnostics));
   if (diagnostics.length > 0) {
     lines.push(`Full report with descriptions and fixes: ${pc.cyan(pc.underline(notesPath))}`);
+  }
+  if (foldedInfoGroupCount > 0) {
+    lines.push(
+      pc.dim(
+        `Info detail folded (${String(foldedInfoGroupCount)} ${foldedInfoGroupCount === 1 ? 'group' : 'groups'}); re-run with --verbose to expand, or read ${notesPath}.`,
+      ),
+    );
   }
   // Skip the next-step hint when any error fires — `npm run dev` would fail.
   if (!diagnostics.some((t) => t.diagnostic.severity === 'error')) {
@@ -175,6 +203,18 @@ function formatGroupHeader(ruleId: string, items: ReadonlyArray<TaggedDiagnostic
   // dimly so the eye reads the ruleId first and uses the meta as a sub-cue.
   const meta = `${pc.dim('(')}${severityTag}${pc.dim(`, ${String(items.length)})`)}`;
   return `${pc.bold(pc.cyan(safeRuleId))}  ${meta}`;
+}
+
+/**
+ * One-line teaser for a folded info group: first sentence of the first
+ * message, dim and indented. Carries the actionable punchline ("Install
+ * starlight-openapi") without re-expanding every row. Returns null if the
+ * group is empty.
+ */
+function formatTeaser(first: TaggedDiagnostic | undefined): string | null {
+  if (first === undefined) return null;
+  const safe = truncateMessage(sanitizeForSingleLine(first.diagnostic.message));
+  return `  ${pc.dim(safe)}`;
 }
 
 function formatOne(tagged: TaggedDiagnostic, pathPad: number): string {

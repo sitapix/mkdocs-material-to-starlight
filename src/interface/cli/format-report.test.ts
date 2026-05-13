@@ -245,7 +245,7 @@ describe('formatReport', () => {
       {
         sourcePath: 'elements/codehilite.md',
         diagnostic: createDiagnostic({
-          severity: 'info',
+          severity: 'warning',
           ruleId: 'tab-anchors-not-preserved',
           message:
             "Content tabs detected. Material auto-generates an anchor link for each tab (e.g. `#linux`) so external pages can deep-link to a specific tab. Starlight's `<TabItem>` has no `id`/anchor prop, so any in-page or cross-page links targeting a tab anchor will resolve to nothing after migration.",
@@ -267,7 +267,7 @@ describe('formatReport', () => {
       {
         sourcePath: 'architecture/decisions/0001.md',
         diagnostic: createDiagnostic({
-          severity: 'info',
+          severity: 'warning',
           ruleId: 'duplicate-h1-stripped',
           message:
             'Body H1 "1. Record architecture decisions" was stripped because it duplicates the frontmatter title ("1. Record architecture decisions"). Starlight auto-renders the frontmatter title.',
@@ -338,6 +338,156 @@ describe('formatReport', () => {
     );
     expect(out).not.toContain('Next:');
     expect(out).not.toContain('npm run dev');
+  });
+
+  it('shows a one-line teaser under folded info groups so actionable info (install X, see Y) is not hidden', () => {
+    // Folding raw rows is what cuts the report length, but a bare header
+    // (`plugin-foo-mapped (info, 3)`) tells the user nothing about whether
+    // to act. Surface the first sentence of the first message as a teaser
+    // — one dim indented line per group — so the punchline ("Install
+    // starlight-openapi") is visible without --verbose.
+    const out = formatReport([
+      {
+        sourcePath: 'mkdocs.yml',
+        diagnostic: createDiagnostic({
+          severity: 'info',
+          ruleId: 'plugin-swagger-ui-mapped',
+          message:
+            'mkdocs-swagger-ui-tag plugin detected. Install `starlight-openapi` and add it to your Astro integration.',
+          source: 'mkdocs-material-to-starlight',
+        }),
+      },
+      {
+        sourcePath: 'mkdocs.yml',
+        diagnostic: createDiagnostic({
+          severity: 'info',
+          ruleId: 'plugin-swagger-ui-mapped',
+          message: 'another instance',
+          source: 'mkdocs-material-to-starlight',
+        }),
+      },
+    ]);
+    expect(out).toMatch(/plugin-swagger-ui-mapped\s+\(info,\s*2\)/);
+    expect(out).toContain('mkdocs-swagger-ui-tag plugin detected.');
+    // The locator (`mkdocs.yml`) must not appear — the teaser is content,
+    // not a row. Rows are still folded.
+    const teaserLines = out.split('\n').filter((l) => l.includes('mkdocs-swagger-ui-tag'));
+    expect(teaserLines).toHaveLength(1);
+    expect(teaserLines[0]).not.toContain('mkdocs.yml:');
+  });
+
+  it('renders info groups as header-only by default (rows folded; cuts report length on info-heavy sites)', () => {
+    // The default report is the user's first signal — info groups are
+    // background context, not actionable items. Surfacing every row inflates
+    // the wall-of-text without changing what the user has to do. The header
+    // (ruleId + count) stays so the user can see what fired; the full row
+    // detail is one click away in MIGRATION_NOTES.md or behind --verbose.
+    const diags = Array.from({ length: 4 }, (_, i) => ({
+      sourcePath: `file${i}.md`,
+      diagnostic: createDiagnostic({
+        severity: 'info' as const,
+        ruleId: 'plugin-search-replaced',
+        message: `details ${i}`,
+        source: 'mkdocs-material-to-starlight',
+      }),
+    }));
+    const out = formatReport(diags);
+    // Header stays.
+    expect(out).toMatch(/plugin-search-replaced\s+\(info,\s*4\)/);
+    // Rows are folded — no per-file locator leaks into the default report.
+    // (The first message survives as a teaser line; that's the actionability
+    // safety net, covered by its own test above.)
+    for (let i = 0; i < 4; i += 1) {
+      expect(out).not.toContain(`file${i}.md`);
+    }
+    for (let i = 1; i < 4; i += 1) {
+      expect(out).not.toContain(`details ${i}`);
+    }
+    // Summary still reflects the actual count.
+    expect(out).toMatch(/4 info/);
+  });
+
+  it('expands info group rows when verbose is true', () => {
+    const diags = Array.from({ length: 4 }, (_, i) => ({
+      sourcePath: `file${i}.md`,
+      diagnostic: createDiagnostic({
+        severity: 'info' as const,
+        ruleId: 'plugin-search-replaced',
+        message: `details ${i}`,
+        source: 'mkdocs-material-to-starlight',
+      }),
+    }));
+    const out = formatReport(diags, undefined, { verbose: true });
+    expect(out).toContain('file0.md');
+    expect(out).toContain('details 0');
+  });
+
+  it('keeps warning and error rows visible by default (only info is folded)', () => {
+    // Warnings are actionable; errors block the build. Folding either would
+    // hide what the user needs to fix. Info folding must not bleed into the
+    // other two severities.
+    const diags = [
+      {
+        sourcePath: 'warn.md',
+        diagnostic: createDiagnostic({
+          severity: 'warning' as const,
+          ruleId: 'broken-link',
+          message: 'target missing',
+          source: 'mkdocs-material-to-starlight',
+        }),
+      },
+      {
+        sourcePath: 'err.md',
+        diagnostic: createDiagnostic({
+          severity: 'error' as const,
+          ruleId: 'output-syntax-error',
+          message: 'bad MDX',
+          source: 'mkdocs-material-to-starlight',
+        }),
+      },
+    ];
+    const out = formatReport(diags);
+    expect(out).toContain('warn.md');
+    expect(out).toContain('target missing');
+    expect(out).toContain('err.md');
+    expect(out).toContain('bad MDX');
+  });
+
+  it('hints that folded info detail lives in verbose / MIGRATION_NOTES when info groups were folded', () => {
+    // After hiding info rows by default, the user needs a discoverable path
+    // back to that detail — name --verbose and MIGRATION_NOTES.md explicitly
+    // so they can re-expand without consulting --help.
+    const out = formatReport(
+      [
+        {
+          sourcePath: 'a.md',
+          diagnostic: createDiagnostic({
+            severity: 'info' as const,
+            ruleId: 'plugin-search-replaced',
+            message: 'm',
+            source: 'mkdocs-material-to-starlight',
+          }),
+        },
+      ],
+      '/converted/site',
+    );
+    expect(out).toMatch(/--verbose/);
+    expect(out).toMatch(/MIGRATION_NOTES\.md/);
+  });
+
+  it('does not emit the verbose hint when nothing was folded (no info diagnostics)', () => {
+    const out = formatReport([
+      {
+        sourcePath: 'a.md',
+        diagnostic: createDiagnostic({
+          severity: 'warning' as const,
+          ruleId: 'r',
+          message: 'm',
+          source: 'mkdocs-material-to-starlight',
+        }),
+      },
+    ]);
+    expect(out).not.toMatch(/--verbose/);
   });
 
   it('summarizes counts by severity at the end', () => {

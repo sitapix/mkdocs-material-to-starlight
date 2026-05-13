@@ -26,6 +26,7 @@ export type Command =
       readonly ci: boolean;
       readonly force: boolean;
       readonly quiet: boolean;
+      readonly verbose: boolean;
       readonly json: boolean;
       readonly color: boolean | null;
       readonly packageManager: 'npm' | 'pnpm' | 'yarn' | 'bun' | null;
@@ -80,6 +81,7 @@ const CONVERT_OPTIONS = {
   ci: { type: 'boolean' },
   force: { type: 'boolean', short: 'f' },
   quiet: { type: 'boolean', short: 'q' },
+  verbose: { type: 'boolean', short: 'v' },
   json: { type: 'boolean' },
   color: { type: 'boolean' },
   'no-color': { type: 'boolean' },
@@ -244,6 +246,7 @@ function parseConvertArgs(argv: ReadonlyArray<string>): Command {
     ci: parsed.values.ci === true,
     force: parsed.values.force === true,
     quiet: parsed.values.quiet === true,
+    verbose: parsed.values.verbose === true,
     json: parsed.values.json === true,
     color: parsed.values.color === true ? true : parsed.values['no-color'] === true ? false : null,
     packageManager: wizardResult.packageManager,

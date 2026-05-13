@@ -70,6 +70,7 @@ General:
   --ci                     Implies --no-interactive; disables color
   -f, --force              Overwrite a non-empty output directory
   -q, --quiet              Suppress info logs
+  -v, --verbose            Expand info-diagnostic detail in the report
   --json                   Emit conversion plan/report as JSON to stdout
   --color / --no-color     Override TTY/env color detection
   -C, --dir <path>         Output directory (alternative to positional[1])
@@ -299,6 +300,7 @@ interface ConvertCommand {
   readonly check: boolean;
   readonly checkTimeoutMs: number | null;
   readonly force: boolean;
+  readonly verbose: boolean;
   // wizard surface — Commit A (easy parametrizations)
   readonly linksValidator: boolean | null;
   readonly tabs: 'mdx' | 'html' | null;
@@ -409,7 +411,7 @@ async function runConvertCompute(
   return {
     kind: 'ok',
     exitCode,
-    report: formatReport(allDiagnostics, command.outputDir),
+    report: formatReport(allDiagnostics, command.outputDir, { verbose: command.verbose }),
   };
 }
 
