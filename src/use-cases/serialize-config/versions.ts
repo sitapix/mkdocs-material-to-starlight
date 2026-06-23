@@ -53,26 +53,39 @@ export const CORE_VERSIONS = {
   //     code-branch, question, question-circle, desktop, mobile-android,
   //     window, notes, analytics, solidjs) that the curated icon map now
   //     references; a pin <0.39.1 resolves to icons that do not exist.
-  // Under npm's `^0.y.z` rule, `^0.39.1` resolves to `>=0.39.1 <0.40.0`,
-  // covering both the sidebar shape and the new icon names.
-  starlight: '^0.39.1',
-  // Bumped to match Starlight 0.38's peer dep `astro@^6.0.0`. Starlight
-  // pins the major Astro version; mismatch raises `ERESOLVE` on install.
-  astro: '^6.0.0',
+  //   - 0.40.0 (latest) is the floor for several companion plugins at their
+  //     current pins (e.g. starlight-github-alerts 0.3.0 → `>=0.40.0`). It
+  //     peers `astro@^6.4.5` and adds a new required peer
+  //     `@astrojs/markdown-satteri@^0.2.0` (npm auto-installs it).
+  // Under npm's `^0.y.z` rule, `^0.40.0` resolves to `>=0.40.0 <0.41.0`.
+  //
+  // NOT bumped to an Astro 7 stack: as of this refresh, Astro 7.0.0 is
+  // published but the latest Starlight (0.40.0) still peers `astro@^6.4.5`
+  // (i.e. `<7`). No Starlight release supports Astro 7 yet. Pinning
+  // `astro@^7` here would make `@astrojs/starlight` unresolvable and break
+  // `npm install` on every generated project (ERESOLVE). Hold the whole
+  // stack on Astro 6 until Starlight ships an Astro-7-compatible release.
+  starlight: '^0.40.0',
+  // Pinned to Starlight 0.40's peer floor `astro@^6.4.5` (resolves
+  // `>=6.4.5 <7.0.0`). Starlight pins the major Astro version; a mismatch
+  // raises `ERESOLVE` on install. Deliberately `<7` — see the Astro 7 note
+  // above.
+  astro: '^6.4.5',
   // Biome 2.3+ supports `.astro` (HTML/CSS/JS/TS sub-blocks) plus the
   // rest of the Astro/Starlight scaffold (.mjs, .ts, .json, .css). Baked
   // in as a devDep so `npm run format` works the moment users
   // `npm install`. Markdown/MDX is intentionally NOT formatted by Biome
   // — those go through remark-stringify in the converter.
-  biome: '^2.3.0',
+  biome: '^2.5.0',
   // Image processing dep used by Astro and Starlight assets pipeline.
-  sharp: '^0.33.0',
+  sharp: '^0.35.0',
   // Default-on link-validation plugin, run on every build.
-  starlightLinksValidator: '^0.24.0',
+  // (0.24.1 peers `@astrojs/starlight >=0.38.0`, `astro >=6.0.0`.)
+  starlightLinksValidator: '^0.24.1',
   // Default-on AI-assistant accessibility — generates llms.txt /
   // llms-full.txt / llms-small.txt automatically from Starlight content
-  // with no per-site config needed.
-  starlightLlmsTxt: '^0.8.0',
+  // with no per-site config needed. (0.10.0 peers `astro ^6.0.0`.)
+  starlightLlmsTxt: '^0.10.0',
 } as const;
 
 /**
@@ -90,51 +103,58 @@ export const FEATURE_DEPENDENCIES: Readonly<
     // astro.config wires into customCss resolves on a fresh install.
     // rehype-katex pulls it in transitively, but pinning makes the path
     // stable across version bumps.
-    ['katex', '^0.16.11'],
+    ['katex', '^0.17.0'],
   ],
-  mermaid: [['astro-mermaid', '^1.0.0']],
-  'image-zoom': [['starlight-image-zoom', '^0.14.0']],
+  // astro-mermaid 2.x peers `astro >=4` and adds peers
+  // `@mermaid-js/layout-elk ^0.2.0` + `mermaid ^10 || ^11` (npm
+  // auto-installs them). `^1.0.0` could not reach the 2.x line.
+  mermaid: [['astro-mermaid', '^2.0.0']],
+  'image-zoom': [['starlight-image-zoom', '^0.14.2']],
   // `mike` (versioned docs) → `starlight-versions`, plus
   // `starlight-changelogs` so users can publish changelog entries
   // between versions. Gap-analysis (2026-05-03) recommends bundling
   // them: users running mike almost always want release notes alongside
   // the version switcher.
   versions: [
-    ['starlight-versions', '^0.8.0'],
+    // starlight-versions 0.9.0 peers `@astrojs/starlight >=0.39.0`; `^0.8.0`
+    // could not reach it.
+    ['starlight-versions', '^0.9.0'],
     ['starlight-changelogs', '^0.5.0'],
   ],
-  blog: [['starlight-blog', '^0.26.0']],
-  tags: [['starlight-tags', '^1.0.0']],
+  blog: [['starlight-blog', '^0.26.1']],
+  tags: [['starlight-tags', '^1.0.1']],
   // last-updated is a Starlight built-in (`lastUpdated: true`) — no extra deps.
   'last-updated': [],
   rss: [['@astrojs/rss', '^4.0.0']],
   'package-managers': [['starlight-package-managers', '^0.12.0']],
-  'swagger-ui': [['starlight-openapi', '^0.25.0']],
+  'swagger-ui': [['starlight-openapi', '^0.25.3']],
   // pymdownx.keys (`++ctrl+alt+del++`) → starlight-kbd. The plugin
   // styles plain `<kbd>` tags via injected CSS so existing emitted HTML
   // keeps working — installing the dep is the value-add.
   kbd: [['starlight-kbd', '^0.4.0']],
   // GitHub-style `> [!NOTE]` blockquote alerts → starlight-github-alerts.
   // Detected from source scan; the plugin transforms the alert syntax
-  // into Starlight asides at build time.
-  'github-alerts': [['starlight-github-alerts', '^0.2.0']],
+  // into Starlight asides at build time. 0.3.0 peers
+  // `@astrojs/starlight >=0.40.0`, which our core pin now satisfies; the
+  // older `^0.2.0` pin paired with the previous Starlight 0.39 floor.
+  'github-alerts': [['starlight-github-alerts', '^0.3.0']],
   // Material `theme.features: [announce.dismiss]` (Insiders flag) →
   // starlight-announcement. Provides dismissible banners with optional
   // scheduling.
   announcement: [['starlight-announcement', '^1.1.0']],
   // Material `theme.features: [content.action.view]` →
   // starlight-page-actions. Adds page-action buttons (View source, etc.).
-  'page-actions': [['starlight-page-actions', '^0.6.0']],
+  'page-actions': [['starlight-page-actions', '^0.6.1']],
   // Material `social` plugin (per-page OG card PNGs) → astro-og-canvas.
   // The canonical Starlight pattern (HiDeoo guides, 2026) is to mount
   // an Astro endpoint that calls `OGImageRoute` from astro-og-canvas.
   // Distinct from Starlight's `social: []` header config.
-  'og-cards': [['astro-og-canvas', '^0.11.0']],
+  'og-cards': [['astro-og-canvas', '^0.11.1']],
   // ATX headings with `attr_list` classes (`## Title { .badge }`)
   // detected by `scan-heading-badges` → `starlight-heading-badges`. The
   // plugin renders the class as an inline Badge next to the heading
   // text, recreating Material's heading-badge idiom.
-  'heading-badges': [['starlight-heading-badges', '^0.5.0']],
+  'heading-badges': [['starlight-heading-badges', '^0.7.0']],
   // `mkdocs-git-authors-plugin` and `mkdocs-git-committers-2` (per-page
   // git contributors) → `starlight-contributor-list`. Starlight has no
   // first-party per-page contributor block; this community plugin gives
@@ -142,15 +162,23 @@ export const FEATURE_DEPENDENCIES: Readonly<
   // log contributors here (no git port), so the integration emits a
   // placeholder `list: []` the user fills in.
   //
-  // Pinned at `^0.4.0` (last release on npm, 2026-03-16). The package has
-  // since been deprecated in favor of `astro-contributors`, but that
-  // successor is GitHub-only (hardcodes api.github.com, requires
+  // Pinned at `^0.3.2`, NOT the newer `0.4.0`. `0.4.0` (last release on
+  // npm, 2026-03-16) narrowed its peer dependency to `astro@^5.0.0`,
+  // which conflicts head-on with the `astro@^6.0.0` the rest of this
+  // stack pins (Starlight 0.38+ peers on `astro@^6`). Emitting
+  // `starlight-contributor-list@^0.4.0` next to `astro@^6.0.0` makes
+  // `npm install` fail with ERESOLVE ("peer astro@^5.0.0 from
+  // starlight-contributor-list@0.4.0"). `0.3.2` declares only
+  // `@astrojs/starlight: ">=0.30"` with no astro peer pin, so it resolves
+  // cleanly against astro 6 + Starlight 0.39. `^0.3.2` stays below
+  // `0.4.0`, so it will not pick up the astro-5-only release.
+  //
+  // The package has since been deprecated in favor of `astro-contributors`,
+  // but that successor is GitHub-only (hardcodes api.github.com, requires
   // PUBLIC_GITHUB_TOKEN, resolves avatars from github.com/{login}.png)
   // and ships components instead of a Starlight plugin — a behaviorally
-  // breaking swap for GitLab / self-hosted / non-GitHub users. There
-  // is no `0.5.0` on npm; bumping to a non-existent range raises
-  // ERESOLVE on install. Hold at `^0.4.0` until we either ship a
-  // first-party port (`starlight-git-contributors`) or get a
-  // remote-agnostic upstream.
-  'contributor-list': [['starlight-contributor-list', '^0.4.0']],
+  // breaking swap for GitLab / self-hosted / non-GitHub users. Hold at
+  // `^0.3.2` until `0.4.0`'s astro peer is broadened upstream, or we ship a
+  // first-party port (`starlight-git-contributors`) on astro 6.
+  'contributor-list': [['starlight-contributor-list', '^0.3.2']],
 };

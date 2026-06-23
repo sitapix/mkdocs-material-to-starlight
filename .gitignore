@@ -68,3 +68,6 @@ CLAUDE.md
 # converter outputs stay out of git. See tests/fixtures/real-world/README.md.
 /tests/fixtures/real-world/*/
 !/tests/fixtures/real-world/README.md
+
+# Serena MCP local cache
+/.serena/
