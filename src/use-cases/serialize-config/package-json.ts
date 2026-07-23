@@ -59,7 +59,6 @@ export function serializePackageJson(input: PackageJsonInput): string {
   const dependencies: Record<string, string> = {
     astro: CORE_VERSIONS.astro,
     '@astrojs/starlight': CORE_VERSIONS.starlight,
-    sharp: CORE_VERSIONS.sharp,
     'starlight-links-validator': CORE_VERSIONS.starlightLinksValidator,
     'starlight-llms-txt': CORE_VERSIONS.starlightLlmsTxt,
   };
@@ -74,6 +73,11 @@ export function serializePackageJson(input: PackageJsonInput): string {
   pkg.dependencies = dependencies;
   pkg.devDependencies = {
     '@biomejs/biome': CORE_VERSIONS.biome,
+    // Required by `astro check` (the converter's `--check` pass and the
+    // user's own runs). Missing, astro prompts to install them — which
+    // hangs forever in non-interactive contexts. See versions.ts.
+    '@astrojs/check': CORE_VERSIONS.astroCheck,
+    typescript: CORE_VERSIONS.typescript,
   };
   return `${JSON.stringify(pkg, null, 2)}\n`;
 }

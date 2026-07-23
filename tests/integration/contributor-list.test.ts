@@ -41,7 +41,7 @@ describe('starlight-contributor-list integration — git-authors / git-committer
     expect(pkg.dependencies).toHaveProperty('starlight-contributor-list');
   });
 
-  it('pins starlight-contributor-list to ^0.3.2 (0.4.0 peers on astro@^5, conflicting with our astro@^6)', async () => {
+  it('pins starlight-contributor-list to ^0.3.2 (0.4.0 peers on astro@^5, conflicting with our astro@^7)', async () => {
     writeMkdocs('  - git-authors');
 
     const result = await convertSiteFromDisk({ projectDir: project, outputDir: out });
