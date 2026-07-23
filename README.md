@@ -34,7 +34,7 @@ Your docs are live on Starlight. Requires Node 20+.
 
 ## Why use this
 
-- **Tested at real scale.** A first `--check` run typically takes 1–5 minutes; `astro check` is the slow step, not the converter. Repeat `--check` runs finish in 10–30s. Without `--check`, conversion alone finishes in seconds.
+- **Tested at real scale.** Conversion finishes in seconds, even on thousand-page sites. A `--check` run adds seconds to a couple of minutes depending on site size (it needs `npm install` to have run in the output directory first; without it, the check reports that immediately instead of hanging).
 - **Maps every Material feature.** Admonitions, tabs, grids, snippets, icons, math, mermaid, i18n, mike versions. Features without a clean Starlight equivalent (Jinja macros, custom theme overrides) become diagnostics with file and line numbers.
 - **Scripts cleanly.** The wizard prints its equivalent unattended command on exit. Drop that command into a CI workflow. Exit codes follow Unix convention.
 - **Idempotent.** Running it twice produces byte-identical output, so reruns do not churn diffs.
@@ -50,9 +50,9 @@ If MkDocs Material renders it, this tool maps it. The mapping by area:
 
 | MkDocs Material | Starlight output |
 |---|---|
-| `!!! note "Title"` admonitions (12 types) | `:::note[Title]` aside directives, type-mapped to Starlight's 4 |
+| `!!! note "Title"` admonitions (12 types) | `:::note[Title]` aside directives; the 7 types Starlight's 4 asides can't express (abstract, info, question, success, failure, bug, example) are preserved as first-class blocks via `starlight-markdown-blocks` |
 | `??? note` / `???+ note` collapsible | `<details><summary>Title</summary>...</details>` |
-| `=== "Tab"` content tabs | `<div class="sl-tabs">…</div>` (with shim CSS) |
+| `=== "Tab"` content tabs | Starlight `<Tabs>/<TabItem>` MDX components (default; `--tabs html` keeps `.md` with a shim) |
 | `<div class="grid cards" markdown>` | `<div class="sl-card-grid">…</div>` |
 | `<div class="grid" markdown>` | `<div class="sl-grid">…</div>` |
 | `:material-rocket:` / `:fontawesome-brands-github:` | `:icon[rocket]` / `:icon[github]`, with curated name mapping plus SVG fallback |
@@ -76,7 +76,12 @@ If MkDocs Material renders it, this tool maps it. The mapping by area:
 |---|---|
 | `nav:` tree | `sidebar` config in `astro.config.mjs` |
 | `site_name`, `site_description`, `site_url` | `title`, `description` on the integration; `site` on Astro config |
+| `site_url` with a subpath (GitHub Pages project sites) | Astro `base:` plus `starlight-base-path` so content links resolve on subpath deploys |
+| `theme.features: navigation.tabs` | `starlight-sidebar-topics` — top-level nav sections become topics with per-topic sidebars (`--no-sidebar-topics` opts out) |
+| `theme.features: navigation.top` | `starlight-scroll-to-top` |
+| `theme.features: announce.dismiss` / `content.action.view` | `starlight-announcement` / `starlight-page-actions` |
 | Missing frontmatter `title` | Synthesized from first H1 or humanized filename (Starlight requires it) |
+| Missing 404 page | Minimal styled `404.md` scaffolded (skipped when the source converts its own) |
 
 </details>
 
@@ -95,8 +100,13 @@ If MkDocs Material renders it, this tool maps it. The mapping by area:
 | `mike` (versioned docs) | `starlight-versions` dep |
 | `mkdocs-git-revision-date-localized` | Built-in `lastUpdated: true` |
 | `blog`, `tags` (Material) | `starlight-blog`, `starlight-tags` deps |
+| `social` (Material, per-page OG cards) | `astro-og-canvas` dep plus a `src/pages/og/[...slug].png.ts` endpoint |
+| `mkdocs-d2-plugin` | `astro-d2` dep (the `d2` CLI must be on PATH at build time) |
+| Giscus comments (`overrides/partials/comments.html`) | `starlight-giscus` with the repo/category IDs parsed from the partial; unparseable configs stay a diagnostic |
+| `mkdocs-swagger-ui-tag` | `starlight-openapi` dep |
 | `mkdocs-macros-plugin` (Jinja2) | Per-occurrence diagnostic with file:line locator (cannot be evaluated) |
-| `gen-files`, `print-site`, `monorepo`, `multirepo`, `social`, `meta`, `privacy`, `mkdocstrings`, `mkdocs-jupyter` | Diagnostic in `MIGRATION_NOTES.md` with documented workaround |
+| `mkdocs-puml` / `plantuml-markdown` | Diagnostic — `astro-plantuml` still peers astro@^5 and won't resolve against the Astro 7 stack |
+| `gen-files`, `print-site`, `monorepo`, `multirepo`, `meta`, `privacy`, `mkdocstrings`, `mkdocs-jupyter` | Diagnostic in `MIGRATION_NOTES.md` with documented workaround |
 
 </details>
 
@@ -106,12 +116,14 @@ If MkDocs Material renders it, this tool maps it. The mapping by area:
 
 ```
 output/
-├── astro.config.mjs              ← migrated config: sidebar, redirects, locales
+├── astro.config.mjs              ← migrated config: sidebar, redirects, locales, plugins
 ├── package.json                  ← scripts and pinned deps for every feature you used
+├── biome.json                    ← formatter/linter config (npm run format works day one)
 ├── MIGRATION_NOTES.md            ← human-readable diagnostics, grouped by rule
 ├── public/                       ← non-Markdown assets (images, PDFs) copied through
 └── src/
-    ├── content/docs/             ← every Markdown page, converted
+    ├── content.config.ts         ← docs collection wired to Starlight's loader/schema
+    ├── content/docs/             ← every Markdown page, converted (plus a 404 page)
     └── styles/mkdocs-migration.css  ← shim so grids, cards, and tabs render correctly
 ```
 
@@ -170,12 +182,17 @@ mkdocs-material-to-starlight <project-dir> <output-dir> [options]
 mkdocs-material-to-starlight <project-dir> --explain
 mkdocs-material-to-starlight compare <baseline-url> <converted-url> [options]
 
-Convert options:
+Convert options (abbreviated — run --help for the full Tier 1/Tier 2 list):
   --snippet-base-path <path>   Resolve PyMdown snippets against this directory.
                                Repeatable; first match wins.
-  --check                      After conversion, run `astro check` against the
-                               output and surface its diagnostics.
-  --check-timeout <ms>         Override the astro-check timeout (default: 5min).
+  --check / --no-check         Run `astro check` against the output and surface
+                               its diagnostics. Needs `npm install` in the output
+                               directory first; reports that immediately otherwise.
+  --check-timeout <ms>         Override the astro-check timeout (default: 10min).
+  --sidebar-topics             Install starlight-sidebar-topics for nav.tabs
+  --no-sidebar-topics          Keep the flat sidebar instead.
+  --tabs <mdx|html>            Tabs output strategy (default: mdx).
+  --palette <translate|skip|custom>  Palette handling (default: translate).
   --dry-run                    Plan only, do not write files. (Not yet wired through.)
   --yes                        Accept wizard defaults; skip interactive prompts.
 
@@ -231,7 +248,7 @@ The success result also exposes `astroConfigSource`, `packageJsonSource`, `migra
 
 Read these before you commit the output:
 
-- **Theme palette and custom CSS or JS** (`theme.palette`, `overrides/`, `extra_css`, `extra_javascript`) land in `MIGRATION_NOTES.md` rather than getting auto-translated. Starlight's design system has a different structure from Material's, so you will want to re-pick colors against the Starlight theme.
+- **Theme palette, fonts, `extra_css`, and `extra_javascript` are auto-translated** (accent colors → Starlight custom properties, `theme.font` → Fontsource packages, extra assets → `customCss`/`head` entries), but **custom `overrides/` templates are not** — they land in `MIGRATION_NOTES.md`. Starlight's design system differs from Material's, so review the translated colors against the Starlight theme.
 - **`mkdocs-macros-plugin` Jinja2 expressions** cannot be evaluated. Each `{{ … }}` and `{% … %}` site is reported with file and line so it can be replaced by hand.
 - **`mkdocs-section-index` and `mkdocs-literate-nav`** cover the common cases. Advanced patterns (per-directory recursive `SUMMARY.md`, implicit-index injection for entries not in `nav:`) are not yet implemented.
 - **`--dry-run`** is parsed but a no-op. Use `--explain` instead.
@@ -257,7 +274,7 @@ src/
 └── interface/      CLI and programmatic API; the only place that wires concrete adapters
 ```
 
-The full working agreement and architectural rules live in [`CLAUDE.md`](./CLAUDE.md).
+Each layer's import rules and boundaries are documented in its own README ([`src/domain/`](./src/domain/README.md), [`src/use-cases/`](./src/use-cases/README.md), [`src/infrastructure/`](./src/infrastructure/README.md), [`src/interface/`](./src/interface/README.md)).
 
 ---
 
