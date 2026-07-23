@@ -25,6 +25,7 @@ import { inferFrontmatterTypes } from '../validate-output/infer-frontmatter-type
 import { type AstroConfigInput, serializeAstroConfig } from './astro-config.js';
 import { serializeMigrationNotes } from './migration-notes.js';
 import { serializePackageJson } from './package-json.js';
+import { CORE_VERSIONS } from './versions.js';
 import type { DetectedFeature } from './versions.js';
 
 const ABSOLUTE_URL = /^[a-z][a-z0-9+\-.]*:\/\//i;
@@ -77,6 +78,12 @@ export interface AssembleConfigOutputsInput {
   readonly files: Readonly<Record<string, string>>;
   readonly allDiagnostics: ReadonlyArray<TaggedDiagnostic>;
   readonly extras: Readonly<Record<string, unknown>>;
+  /** Giscus config parsed from the comments override partial (giscus feature). */
+  readonly giscus?: NonNullable<AstroConfigInput['giscus']>;
+  /** Subpath from `site_url` (base-path feature). */
+  readonly basePath?: string;
+  /** Nav-unlisted page slugs for sidebar-topics' exclude list. */
+  readonly topicExcludeSlugs?: ReadonlyArray<string>;
 }
 
 export interface AssembleConfigOutputsResult {
@@ -105,7 +112,7 @@ export function assembleConfigOutputs(
   if (input.themeFonts?.text !== undefined) fontCssImports.push(input.themeFonts.text.package);
   if (input.themeFonts?.code !== undefined) fontCssImports.push(input.themeFonts.code.package);
   const fontDependencies: ReadonlyArray<readonly [string, string]> = fontCssImports.map(
-    (p) => [p, 'latest'] as const,
+    (p) => [p, CORE_VERSIONS.fontsource] as const,
   );
 
   const extraJsEntries: NonNullable<AstroConfigInput['extraJsEntries']> = input.extraAssets.js.map(
@@ -159,6 +166,11 @@ export function assembleConfigOutputs(
     ...(input.mikeVersions !== undefined ? { mikeVersions: input.mikeVersions } : {}),
     ...(input.blogOptions !== undefined ? { blogOptions: input.blogOptions } : {}),
     ...(input.tagsOptions !== undefined ? { tagsOptions: input.tagsOptions } : {}),
+    ...(input.giscus !== undefined ? { giscus: input.giscus } : {}),
+    ...(input.basePath !== undefined ? { basePath: input.basePath } : {}),
+    ...(input.topicExcludeSlugs !== undefined
+      ? { topicExcludeSlugs: input.topicExcludeSlugs }
+      : {}),
   });
 
   const packageJsonSource = serializePackageJson({

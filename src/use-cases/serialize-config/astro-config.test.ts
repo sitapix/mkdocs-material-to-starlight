@@ -195,6 +195,131 @@ describe('serializeAstroConfig', () => {
     expect(out).toContain('starlight(');
   });
 
+  it('replaces the sidebar with starlightSidebarTopics when sidebar-topics is detected', () => {
+    const out = serializeAstroConfig({
+      siteName: 'X',
+      siteDescription: null,
+      siteUrl: null,
+      sidebar: [
+        { kind: 'group', label: 'Guide', items: [{ kind: 'slug', slug: 'guide/intro' }] },
+        { kind: 'slug', slug: 'changelog', label: 'Changelog' },
+      ],
+      detectedFeatures: ['sidebar-topics'],
+    });
+    expect(out).toContain(`import starlightSidebarTopics from 'starlight-sidebar-topics';`);
+    // The plugin owns sidebar generation — the starlight sidebar key must
+    // not also be emitted.
+    expect(out).not.toContain('sidebar: [');
+    expect(out).toContain('starlightSidebarTopics([');
+    // Group topic: links to its first resolvable page and carries items.
+    expect(out).toContain(`label: 'Guide', link: '/guide/intro/', items:`);
+    // Standalone page topic: claims its own page via items — a link-only
+    // topic would leave the page topic-less and the plugin hard-errors.
+    expect(out).toContain(`{ label: 'Changelog', link: '/changelog/', items: ['changelog'] }`);
+    // Root ('' slug is unreferenceable in a sidebar) and the scaffolded
+    // 404 can never be claimed by a topic — both must be excluded or the
+    // plugin hard-errors at build time.
+    expect(out).toContain(`{ exclude: ['/', '/404'] }`);
+  });
+
+  it('excludes blog routes from topics when the blog feature is also active', () => {
+    // starlight-blog owns the sidebar on blog routes (posts + generated
+    // authors/tags/archive pages) — without the exclusion, sidebar-topics
+    // hard-errors on every generated blog page.
+    const out = serializeAstroConfig({
+      siteName: 'X',
+      siteDescription: null,
+      siteUrl: null,
+      sidebar: [],
+      detectedFeatures: ['sidebar-topics', 'blog'],
+      blogOptions: { blog_dir: 'news' },
+    });
+    expect(out).toContain(`{ exclude: ['/', '/404', '/news/**'] }`);
+  });
+
+  it('emits starlightScrollToTop for the scroll-to-top feature (navigation.top)', () => {
+    const out = serializeAstroConfig({
+      siteName: 'X',
+      siteDescription: null,
+      siteUrl: null,
+      sidebar: [],
+      detectedFeatures: ['scroll-to-top'],
+    });
+    expect(out).toContain(`import starlightScrollToTop from 'starlight-scroll-to-top';`);
+    expect(out).toContain('starlightScrollToTop(),');
+  });
+
+  it('emits starlightGiscus with the parsed override-partial config', () => {
+    const out = serializeAstroConfig({
+      siteName: 'X',
+      siteDescription: null,
+      siteUrl: null,
+      sidebar: [],
+      detectedFeatures: ['giscus'],
+      giscus: { repo: 'acme/docs', repoId: 'R1', category: 'Comments', categoryId: 'C1' },
+    });
+    expect(out).toContain(
+      "starlightGiscus({ repo: 'acme/docs', repoId: 'R1', category: 'Comments', categoryId: 'C1' }),",
+    );
+  });
+
+  it('does not emit starlightGiscus when the feature is present but config is missing', () => {
+    // starlight-giscus hard-requires all four options; emitting a partial
+    // invocation would crash astro:config:setup.
+    const out = serializeAstroConfig({
+      siteName: 'X',
+      siteDescription: null,
+      siteUrl: null,
+      sidebar: [],
+      detectedFeatures: ['giscus'],
+    });
+    expect(out).not.toContain('starlightGiscus');
+  });
+
+  it('emits custom block definitions for the markdown-blocks feature', () => {
+    const out = serializeAstroConfig({
+      siteName: 'X',
+      siteDescription: null,
+      siteUrl: null,
+      sidebar: [],
+      detectedFeatures: ['markdown-blocks'],
+    });
+    expect(out).toContain(
+      `import starlightMarkdownBlocks, { Aside } from 'starlight-markdown-blocks';`,
+    );
+    for (const type of ['abstract', 'info', 'question', 'success', 'failure', 'bug', 'example']) {
+      expect(out).toContain(`${type}: Aside({`);
+    }
+  });
+
+  it('splits site into origin + base and installs starlight-base-path for subpath site URLs', () => {
+    const out = serializeAstroConfig({
+      siteName: 'X',
+      siteDescription: null,
+      siteUrl: 'https://acme.github.io/widgets/',
+      sidebar: [],
+      detectedFeatures: ['base-path'],
+      basePath: '/widgets',
+    });
+    expect(out).toContain(`site: 'https://acme.github.io',`);
+    expect(out).toContain(`base: '/widgets',`);
+    // Named import — starlight-base-path ships no default export.
+    expect(out).toContain(`import { starlightBasePath } from 'starlight-base-path';`);
+    expect(out).toContain('starlightBasePath(),');
+  });
+
+  it('emits the d2 integration for the d2 feature', () => {
+    const out = serializeAstroConfig({
+      siteName: 'X',
+      siteDescription: null,
+      siteUrl: null,
+      sidebar: [],
+      detectedFeatures: ['d2'],
+    });
+    expect(out).toContain(`import d2 from 'astro-d2';`);
+    expect(out).toContain('d2(),');
+  });
+
   it('imports remark-math and rehype-katex when math feature is detected', () => {
     const out = serializeAstroConfig({
       siteName: 'X',
@@ -205,6 +330,11 @@ describe('serializeAstroConfig', () => {
     });
     expect(out).toContain(`import remarkMath from 'remark-math';`);
     expect(out).toContain(`import rehypeKatex from 'rehype-katex';`);
+    // Astro 7 defaults to the Sätteri processor; remark/rehype plugins only
+    // run inside an explicit `processor: unified({...})` from
+    // @astrojs/markdown-remark.
+    expect(out).toContain(`import { unified } from '@astrojs/markdown-remark';`);
+    expect(out).toContain('processor: unified({');
     expect(out).toContain('remarkPlugins:');
     expect(out).toContain('remarkMath');
     expect(out).toContain('rehypePlugins:');

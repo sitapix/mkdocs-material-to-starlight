@@ -78,6 +78,31 @@ describe('interface/api/convertSiteFromDisk', () => {
     expect(result.value.sidebarSource).toContain(`label: 'API'`);
   });
 
+  it('scaffolds a 404 page so Starlight builds do not warn about a missing entry', async () => {
+    // Starlight probes getEntry('docs', '404') on every build; without a
+    // 404 page, Astro's content runtime warns "Entry docs → 404 was not
+    // found." at the end of EVERY `astro build` (field-tested 2026-07-23).
+    const result = await convertSiteFromDisk({ projectDir, outputDir });
+    expect(result.ok).toBe(true);
+
+    const out = readFileSync(join(outputDir, 'src', 'content', 'docs', '404.md'), 'utf8');
+    expect(out).toContain('title: Page not found');
+    expect(out).toContain('template: splash');
+  });
+
+  it('does not clobber a 404 page converted from the source site', async () => {
+    writeFileSync(
+      join(projectDir, 'docs', '404.md'),
+      ['# Custom not found', '', 'Our own 404 copy.', ''].join('\n'),
+    );
+    const result = await convertSiteFromDisk({ projectDir, outputDir });
+    expect(result.ok).toBe(true);
+
+    const out = readFileSync(join(outputDir, 'src', 'content', 'docs', '404.md'), 'utf8');
+    expect(out).toContain('Our own 404 copy.');
+    expect(out).not.toContain('template: splash');
+  });
+
   it('returns a typed error when mkdocs.yml is missing', async () => {
     rmSync(join(projectDir, 'mkdocs.yml'));
     const result = await convertSiteFromDisk({ projectDir, outputDir });

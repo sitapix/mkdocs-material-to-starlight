@@ -26,8 +26,13 @@ import type { AssetCopy } from '../../use-cases/copy-assets/plan.js';
 import { extractPluginOptions } from '../../use-cases/detect-features/extract-plugin-options.js';
 import { detectFeaturesFromPlugins } from '../../use-cases/detect-features/from-plugins.js';
 import { detectFeaturesFromThemeFeatures } from '../../use-cases/detect-features/from-theme-features.js';
+import {
+  type GiscusConfig,
+  parseGiscusFromPartial,
+} from '../../use-cases/detect-features/giscus-override.js';
 import { resolveThemeAssets } from '../../use-cases/detect-features/resolve-theme-assets.js';
 import { runConfigAnalysis } from '../../use-cases/detect-features/run-config-analysis.js';
+import { computeUnclaimedSlugs } from '../../use-cases/serialize-config/topics-exclude.js';
 import { prepareConvertContext } from '../../use-cases/load-config/prepare-convert-context.js';
 import { assembleConfigOutputs } from '../../use-cases/serialize-config/assemble-config-outputs.js';
 import { serializeBiomeConfig } from '../../use-cases/serialize-config/biome-config.js';
@@ -97,7 +102,8 @@ export interface ConvertSiteFromDiskInput {
   readonly locales?: ReadonlyArray<string>;
   /** Rule IDs to suppress in the diagnostic stream. Deferred. */
   readonly suppressRules?: ReadonlyArray<string>;
-  /** When false, user opted out of starlight-sidebar-topics auto-install. Deferred. */
+  /** When false, opt out of the starlight-sidebar-topics auto-install for
+   *  Material `navigation.tabs` and keep the flat sidebar. */
   readonly sidebarTopics?: boolean;
   /**
    * Optional injected output validator (test seam). When omitted, the API
@@ -236,13 +242,39 @@ export async function convertSiteFromDisk(
     config.value.markdownExtensions,
   );
   const featuresFromThemeFlags = detectFeaturesFromThemeFeatures(themeFeatures);
+
+  // Material comments live in a Giscus <script> inside the theme override
+  // partial (`<custom_dir>/partials/comments.html`). starlight-giscus needs
+  // all four data attributes; when they parse, auto-install — otherwise the
+  // existing `comment-system` diagnostic keeps recommending the manual port.
+  const customDir = config.value.theme?.options?.custom_dir;
+  let giscusConfig: GiscusConfig | null = null;
+  if (typeof customDir === 'string' && customDir.length > 0) {
+    const partialPath = join(docsDir, '..', customDir, 'partials', 'comments.html');
+    const partialRead = await fs.readText(partialPath);
+    if (partialRead.ok) {
+      giscusConfig = parseGiscusFromPartial(partialRead.value);
+    }
+  }
+
+  // `site_url` with a path (`https://user.github.io/repo/`) needs Astro's
+  // `base:` plus starlight-base-path for content links — without them every
+  // absolute link 404s on subpath deploys (GitHub Pages project sites).
+  const basePath = deriveBasePath(config.value.siteUrl);
+
   const allFeatures = [
     ...new Set([
       ...siteResult.value.detectedFeatures,
       ...featuresFromPlugins,
       ...featuresFromThemeFlags,
+      ...(giscusConfig !== null ? (['giscus'] as const) : []),
+      ...(basePath !== null ? (['base-path'] as const) : []),
     ]),
-  ].sort();
+  ]
+    // `navigation.tabs` → starlight-sidebar-topics is on by default;
+    // `--no-sidebar-topics` keeps the flat sidebar instead.
+    .filter((f) => f !== 'sidebar-topics' || input.sidebarTopics !== false)
+    .sort();
 
   // Extract per-plugin option dicts so the astro-config + og-endpoint
   // serializers can translate the load-bearing knobs (blog_dir,
@@ -312,6 +344,16 @@ export async function convertSiteFromDisk(
       useDirectoryUrls: config.value.useDirectoryUrls,
       sidebar: sidebarWithPages,
       detectedFeatures: allFeatures,
+      ...(giscusConfig !== null ? { giscus: giscusConfig } : {}),
+      ...(basePath !== null ? { basePath } : {}),
+      ...(allFeatures.includes('sidebar-topics')
+        ? {
+            topicExcludeSlugs: computeUnclaimedSlugs(
+              sidebarWithPages,
+              siteResult.value.slugMap.entries().map((r) => r.slug),
+            ),
+          }
+        : {}),
       redirects,
       enableLinksValidator: input.linksValidator === true,
       extraAssets,
@@ -360,6 +402,7 @@ export async function convertSiteFromDisk(
     configFormat: input.configFormat ?? 'mjs',
     extendedFrontmatterFields,
     preserveSlugs,
+    includeBlogSchema: allFeatures.includes('blog'),
   });
   if (!writeResult.ok) {
     return err({ code: 'file-write-failed', message: writeResult.error });
@@ -418,6 +461,25 @@ async function copyAssetsToPublic(
   return ok(true);
 }
 
+/**
+ * Extract the subpath from a valid absolute `site_url`, or null when the
+ * site is served from the origin root. Trailing slashes are dropped so
+ * `https://u.github.io/repo/` yields `/repo` — the shape Astro's `base:`
+ * expects.
+ */
+function deriveBasePath(siteUrl: string | null): string | null {
+  if (siteUrl === null) return null;
+  let parsed: URL;
+  try {
+    parsed = new URL(siteUrl);
+  } catch {
+    return null;
+  }
+  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return null;
+  const path = parsed.pathname.replace(/\/+$/, '');
+  return path === '' ? null : path;
+}
+
 interface WriteOutputsInput {
   readonly outputDir: string;
   readonly files: Readonly<Record<string, string>>;
@@ -437,6 +499,12 @@ interface WriteOutputsInput {
    * fired during site conversion.
    */
   readonly preserveSlugs: boolean;
+  /**
+   * When true (blog feature detected), the emitted `content.config.ts`
+   * composes starlight-blog's `blogSchema` into `docsSchema({ extend })` so
+   * blog frontmatter (most critically `date`) is coerced to its typed form.
+   */
+  readonly includeBlogSchema: boolean;
 }
 
 async function writeOutputs(input: WriteOutputsInput): Promise<Result<true, string>> {
@@ -457,10 +525,35 @@ async function writeOutputs(input: WriteOutputsInput): Promise<Result<true, stri
       ['src', 'content.config.ts'],
       serializeContentConfig(input.extendedFrontmatterFields, {
         preserveSlugs: input.preserveSlugs,
+        includeBlogSchema: input.includeBlogSchema,
       }),
     ],
     [['src', 'styles', 'mkdocs-migration.css'], input.stylesheetSource],
   ];
+  // Starlight probes `getEntry('docs', '404')` for a custom not-found page
+  // on every build; without one, Astro's content runtime warns "Entry docs
+  // → 404 was not found." at the end of EVERY `astro build` (field-tested
+  // 2026-07-23 across four real projects). Scaffold a minimal 404 so the
+  // build is quiet and users get a styled not-found page — but never
+  // clobber a 404 the source site actually converted.
+  const hasConverted404 = Object.keys(input.files).some((p) => p === '404.md' || p === '404.mdx');
+  if (!hasConverted404) {
+    scaffold.push([
+      ['src', 'content', 'docs', '404.md'],
+      [
+        '---',
+        'title: Page not found',
+        'template: splash',
+        'editUrl: false',
+        '---',
+        '',
+        "The page you're looking for doesn't exist or has moved.",
+        '',
+        '[Back to the homepage](/)',
+        '',
+      ].join('\n'),
+    ]);
+  }
   if (input.rssEndpointSource !== null) {
     scaffold.push([['src', 'pages', 'rss.xml.ts'], input.rssEndpointSource]);
   }

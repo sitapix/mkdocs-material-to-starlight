@@ -94,6 +94,24 @@ export interface AstroConfigInput {
   /** Raw `plugins.tags` options from mkdocs.yml. Translated to
    *  `starlightTags({...})` config (see `tags-options.ts`). */
   readonly tagsOptions?: Readonly<Record<string, unknown>>;
+  /** Giscus config parsed from the Material comments override partial.
+   *  Present iff the `giscus` feature is detected — starlight-giscus
+   *  hard-requires all four fields. */
+  readonly giscus?: {
+    readonly repo: string;
+    readonly repoId: string;
+    readonly category: string;
+    readonly categoryId: string;
+  };
+  /** Subpath from `site_url` (e.g. `/repo` for GitHub Pages project
+   *  sites). When set, `site:` is emitted origin-only, `base:` carries the
+   *  path, and starlight-base-path rewrites content links (gated on the
+   *  `base-path` feature). */
+  readonly basePath?: string;
+  /** Slugs of converted pages no topic claims (not in the nav). Emitted
+   *  into starlight-sidebar-topics' `exclude` — the plugin hard-errors on
+   *  any page it cannot associate with a topic. */
+  readonly topicExcludeSlugs?: ReadonlyArray<string>;
 }
 
 export function serializeAstroConfig(input: AstroConfigInput): string {
@@ -111,6 +129,12 @@ export function serializeAstroConfig(input: AstroConfigInput): string {
   const hasPageActions = features.has('page-actions');
   const hasHeadingBadges = features.has('heading-badges');
   const hasContributorList = features.has('contributor-list');
+  const hasSidebarTopics = features.has('sidebar-topics');
+  const hasScrollToTop = features.has('scroll-to-top');
+  const hasGiscus = features.has('giscus') && input.giscus !== undefined;
+  const hasMarkdownBlocks = features.has('markdown-blocks');
+  const hasD2 = features.has('d2');
+  const hasBasePath = features.has('base-path') && input.basePath !== undefined;
 
   // `starlight-llms-txt` requires `site:` in astro.config.mjs (it builds
   // absolute URLs into the emitted llms.txt index). When the source
@@ -135,6 +159,25 @@ export function serializeAstroConfig(input: AstroConfigInput): string {
     // from Starlight content. Gap-analysis (2026-05-03) bundles this for
     // every emitted Starlight project that has a declared site URL.
     imports.push(`import starlightLlmsTxt from 'starlight-llms-txt';`);
+  }
+  if (hasSidebarTopics) {
+    imports.push(`import starlightSidebarTopics from 'starlight-sidebar-topics';`);
+  }
+  if (hasScrollToTop) {
+    imports.push(`import starlightScrollToTop from 'starlight-scroll-to-top';`);
+  }
+  if (hasGiscus) {
+    imports.push(`import starlightGiscus from 'starlight-giscus';`);
+  }
+  if (hasMarkdownBlocks) {
+    imports.push(`import starlightMarkdownBlocks, { Aside } from 'starlight-markdown-blocks';`);
+  }
+  if (hasBasePath) {
+    // Named export — the package has no default (unlike its siblings).
+    imports.push(`import { starlightBasePath } from 'starlight-base-path';`);
+  }
+  if (hasD2) {
+    imports.push(`import d2 from 'astro-d2';`);
   }
   if (hasMermaid) {
     imports.push(`import mermaid from 'astro-mermaid';`);
@@ -177,6 +220,12 @@ export function serializeAstroConfig(input: AstroConfigInput): string {
     imports.push(`import starlightContributorList from 'starlight-contributor-list';`);
   }
   if (hasMath) {
+    // Astro 7 made Sätteri the default Markdown processor; remark/rehype
+    // plugins are only honored through an explicit unified processor from
+    // `@astrojs/markdown-remark` (pinned in `versions.ts` for the math
+    // feature). Without it, remark-math/rehype-katex silently never run
+    // and formulas render as raw LaTeX text.
+    imports.push(`import { unified } from '@astrojs/markdown-remark';`);
     imports.push(`import remarkMath from 'remark-math';`);
     imports.push(`import rehypeKatex from 'rehype-katex';`);
   }
@@ -197,7 +246,16 @@ export function serializeAstroConfig(input: AstroConfigInput): string {
   // a valid absolute URL — Astro defaults to no canonical and the user
   // can re-add it manually.
   if (input.siteUrl !== null && isValidAbsoluteUrl(input.siteUrl)) {
-    lines.push(`  site: ${quote(input.siteUrl)},`);
+    if (hasBasePath && input.basePath !== undefined) {
+      // GitHub Pages project-site shape (Astro's documented pattern):
+      // `site` carries the origin, `base` carries the subpath. Starlight
+      // prefixes its own routes with `base`; starlight-base-path (in
+      // plugins below) prefixes links written in content.
+      lines.push(`  site: ${quote(new URL(input.siteUrl).origin)},`);
+      lines.push(`  base: ${quote(input.basePath)},`);
+    } else {
+      lines.push(`  site: ${quote(input.siteUrl)},`);
+    }
   }
   if (input.useDirectoryUrls === false) {
     // Mirror MkDocs `use_directory_urls: false` so flat `/page.html` URLs
@@ -242,7 +300,9 @@ export function serializeAstroConfig(input: AstroConfigInput): string {
       `      tableOfContents: { minHeadingLevel: ${String(input.tableOfContents.minHeadingLevel)}, maxHeadingLevel: ${String(input.tableOfContents.maxHeadingLevel)} },`,
     );
   }
-  lines.push(`      sidebar: ${indentSidebar(serializeSidebar(input.sidebar))},`);
+  if (!hasSidebarTopics) {
+    lines.push(`      sidebar: ${indentSidebar(serializeSidebar(input.sidebar))},`);
+  }
   const cssEntries = ['./src/styles/mkdocs-migration.css'];
   // KaTeX ships its own stylesheet; rehype-katex emits the right markup but
   // produces unstyled glyphs without it. Auto-register so users get rendered
@@ -328,8 +388,65 @@ export function serializeAstroConfig(input: AstroConfigInput): string {
   }
   const enableLinksValidator = input.enableLinksValidator === true;
   lines.push('      plugins: [');
+  if (hasSidebarTopics) {
+    // Material `navigation.tabs`: top-level nav sections become topics,
+    // each with its own sidebar. The plugin OWNS sidebar generation, so
+    // the `sidebar:` key is omitted above when this is active.
+    //
+    // `exclude` lists pages that legitimately belong to NO topic — the
+    // plugin hard-errors on any unmatched page otherwise. The scaffolded
+    // 404 is always topic-less; blog routes (posts plus starlight-blog's
+    // generated authors/tags/archive pages) carry starlight-blog's own
+    // sidebar instead of a topic.
+    // '/' is always excluded: topic membership works through slug items,
+    // and the root page's slug ('') cannot be referenced in a sidebar —
+    // so the root can never be claimed by a topic and would hard-error.
+    const excludeGlobs = ['/', '/404'];
+    if (hasBlog) {
+      const blogDir =
+        typeof input.blogOptions?.blog_dir === 'string' ? input.blogOptions.blog_dir : 'blog';
+      excludeGlobs.push(`/${blogDir}/**`);
+    }
+    // Converted pages absent from the nav (MkDocs converts every file,
+    // listed or not) — computed exactly by the caller from the slug map.
+    for (const slug of input.topicExcludeSlugs ?? []) {
+      excludeGlobs.push(`/${slug}`);
+    }
+    lines.push(`        ${indentTopics(serializeSidebarTopics(input.sidebar, excludeGlobs))},`);
+  }
   if (enableLlmsTxt) {
     lines.push('        starlightLlmsTxt(),');
+  }
+  if (hasBasePath) {
+    // Reads `base` from the Astro config above and prefixes content links.
+    lines.push('        starlightBasePath(),');
+  }
+  if (hasScrollToTop) {
+    lines.push('        starlightScrollToTop(),');
+  }
+  if (hasGiscus && input.giscus !== undefined) {
+    const g = input.giscus;
+    lines.push(
+      `        starlightGiscus({ repo: ${quote(g.repo)}, repoId: ${quote(g.repoId)}, category: ${quote(g.category)}, categoryId: ${quote(g.categoryId)} }),`,
+    );
+  }
+  if (hasMarkdownBlocks) {
+    // Material admonition types Starlight's four asides cannot express.
+    // The converter emits `:::abstract` etc. verbatim (instead of
+    // squashing to note/tip) whenever this plugin is installed; colors
+    // approximate Material's admonition palette within the plugin's
+    // blue/purple/red/orange/green/accent set.
+    lines.push('        starlightMarkdownBlocks({');
+    lines.push('          blocks: {');
+    lines.push("            abstract: Aside({ label: 'Abstract', color: 'blue', icon: '📋' }),");
+    lines.push("            info: Aside({ label: 'Info', color: 'blue', icon: 'ℹ️' }),");
+    lines.push("            question: Aside({ label: 'Question', color: 'green', icon: '❓' }),");
+    lines.push("            success: Aside({ label: 'Success', color: 'green', icon: '✅' }),");
+    lines.push("            failure: Aside({ label: 'Failure', color: 'red', icon: '❌' }),");
+    lines.push("            bug: Aside({ label: 'Bug', color: 'red', icon: '🐛' }),");
+    lines.push("            example: Aside({ label: 'Example', color: 'purple', icon: '🧪' }),");
+    lines.push('          },');
+    lines.push('        }),');
   }
   if (hasImageZoom) {
     lines.push('        imageZoom(),');
@@ -416,12 +533,19 @@ export function serializeAstroConfig(input: AstroConfigInput): string {
   if (hasMermaid) {
     lines.push('    mermaid(),');
   }
+  if (hasD2) {
+    // astro-d2 shells out to the `d2` CLI at build time — it must be on
+    // PATH (https://d2lang.com/tour/install) or builds fail.
+    lines.push('    d2(),');
+  }
   lines.push('  ],');
 
   if (hasMath) {
     lines.push('  markdown: {');
-    lines.push('    remarkPlugins: [remarkMath],');
-    lines.push('    rehypePlugins: [rehypeKatex],');
+    lines.push('    processor: unified({');
+    lines.push('      remarkPlugins: [remarkMath],');
+    lines.push('      rehypePlugins: [rehypeKatex],');
+    lines.push('    }),');
     lines.push('  },');
   }
 
@@ -474,6 +598,86 @@ function quoteKey(value: string): string {
   // Bare-identifier keys (e.g., `root`, `en`) can be emitted unquoted; keys
   // with hyphens (`zh-CN`) require quoting in JS object literals.
   return /^[A-Za-z_$][A-Za-z0-9_$]*$/.test(value) ? value : quote(value);
+}
+
+/**
+ * Serialize the sidebar tree as a starlight-sidebar-topics invocation.
+ * Each top-level entry becomes a topic: groups carry their subtree as the
+ * topic's sidebar `items` and link to their first resolvable page;
+ * standalone pages/links become link-only topics — mirroring how Material
+ * renders top-level nav sections and pages as header tabs.
+ */
+function serializeSidebarTopics(
+  entries: ReadonlyArray<SidebarEntry>,
+  excludeGlobs: ReadonlyArray<string>,
+): string {
+  const topics = entries.map((entry) => renderTopic(entry));
+  const exclude = `{ exclude: [${excludeGlobs.map(quote).join(', ')}] }`;
+  return `starlightSidebarTopics([\n${topics.map((t) => `  ${t},`).join('\n')}\n], ${exclude})`;
+}
+
+function renderTopic(entry: SidebarEntry): string {
+  switch (entry.kind) {
+    case 'slug': {
+      const label = entry.label ?? (entry.slug === '' ? 'Overview' : entry.slug);
+      if (entry.slug === '') {
+        // Root page: link-only — it lives in the exclude list (see above).
+        return `{ label: ${quote(label)}, link: '/' }`;
+      }
+      // The `items` entry CLAIMS the page for this topic; a link-only topic
+      // would leave its own page topic-less and the plugin hard-errors on
+      // any unclaimed page.
+      return `{ label: ${quote(label)}, link: ${quote(slugToLink(entry.slug))}, items: [${quote(entry.slug)}] }`;
+    }
+    case 'link':
+      return `{ label: ${quote(entry.label)}, link: ${quote(entry.href)} }`;
+    case 'group': {
+      const link = firstLinkOf(entry.items) ?? '/';
+      const items = indentTopicItems(serializeSidebar(entry.items));
+      return `{ label: ${quote(entry.label)}, link: ${quote(link)}, items: ${items} }`;
+    }
+    case 'auto': {
+      const inner = `{ autogenerate: { directory: ${quote(entry.directory)} } }`;
+      return `{ label: ${quote(entry.label)}, link: ${quote(`/${entry.directory}/`)}, items: [${inner}] }`;
+    }
+  }
+}
+
+/** Depth-first search for the first concrete page a topic can land on. */
+function firstLinkOf(entries: ReadonlyArray<SidebarEntry>): string | null {
+  for (const entry of entries) {
+    switch (entry.kind) {
+      case 'slug':
+        return slugToLink(entry.slug);
+      case 'link':
+        return entry.href;
+      case 'auto':
+        return `/${entry.directory}/`;
+      case 'group': {
+        const nested = firstLinkOf(entry.items);
+        if (nested !== null) return nested;
+      }
+    }
+  }
+  return null;
+}
+
+function slugToLink(slug: string): string {
+  return slug === '' ? '/' : `/${slug}/`;
+}
+
+/** Reflow a serializeSidebar literal for embedding as a topic's `items`. */
+function indentTopicItems(serialized: string): string {
+  const lines = serialized.split('\n');
+  if (lines.length <= 1) return serialized;
+  return lines.map((line, idx) => (idx === 0 ? line : `  ${line}`)).join('\n');
+}
+
+/** Reflow the topics invocation under the `plugins:` array indentation. */
+function indentTopics(serialized: string): string {
+  const lines = serialized.split('\n');
+  if (lines.length <= 1) return serialized;
+  return lines.map((line, idx) => (idx === 0 ? line : `        ${line}`)).join('\n');
 }
 
 function indentSidebar(serialized: string): string {
