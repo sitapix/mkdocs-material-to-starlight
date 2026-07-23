@@ -24,11 +24,13 @@ import { findSlugIncompatibleSegments } from '../../domain/starlight/slug-compat
 import { buildSlugMap, type SlugMap } from '../../domain/starlight/slug-map.js';
 // renameI18nPath is now consumed inside rewriteReadmePaths.
 import { convertFile } from '../convert-file/convert.js';
+import { detectCustomAdmonitions } from '../detect-features/custom-admonitions.js';
 import { detectFeatures } from '../detect-features/detect.js';
 import { scanMacroOccurrences } from '../detect-macros/scan.js';
 import { scanMacroExpressions } from '../detect-macros/scan-expressions.js';
 import { expandSnippets } from '../expand-snippets/expand.js';
 import { expandIncludeMarkdown } from '../include-markdown/expand.js';
+import { normalizeBlogPostSlug } from '../normalize/blog-post-slug.js';
 import { normalizeContentTabs } from '../normalize/content-tabs.js';
 import { normalizeFileTrees } from '../normalize/file-tree.js';
 import { normalizeLinkAttrLists } from '../normalize/link-attr-list.js';
@@ -36,8 +38,6 @@ import { normalizeMkdocstringsCrossRefs } from '../normalize/mkdocstrings-crossr
 import { normalizePackageManagerTabs } from '../normalize/package-manager-tabs.js';
 import { scanButtonIcons } from '../normalize/scan-button-icons.js';
 import { scanCodeFenceFlags } from '../normalize/scan-code-fence-flags.js';
-import { detectCustomAdmonitions } from '../detect-features/custom-admonitions.js';
-import { normalizeBlogPostSlug } from '../normalize/blog-post-slug.js';
 import { scanFrontmatterFields } from '../normalize/scan-frontmatter-fields.js';
 import { scanGithubAlerts } from '../normalize/scan-github-alerts.js';
 import { scanHeadingAnchors } from '../normalize/scan-heading-anchors.js';

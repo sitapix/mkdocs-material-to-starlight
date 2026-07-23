@@ -25,8 +25,8 @@ import { inferFrontmatterTypes } from '../validate-output/infer-frontmatter-type
 import { type AstroConfigInput, serializeAstroConfig } from './astro-config.js';
 import { serializeMigrationNotes } from './migration-notes.js';
 import { serializePackageJson } from './package-json.js';
-import { CORE_VERSIONS } from './versions.js';
 import type { DetectedFeature } from './versions.js';
+import { CORE_VERSIONS } from './versions.js';
 
 const ABSOLUTE_URL = /^[a-z][a-z0-9+\-.]*:\/\//i;
 

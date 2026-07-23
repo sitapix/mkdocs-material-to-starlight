@@ -32,13 +32,13 @@ import {
 } from '../../use-cases/detect-features/giscus-override.js';
 import { resolveThemeAssets } from '../../use-cases/detect-features/resolve-theme-assets.js';
 import { runConfigAnalysis } from '../../use-cases/detect-features/run-config-analysis.js';
-import { computeUnclaimedSlugs } from '../../use-cases/serialize-config/topics-exclude.js';
 import { prepareConvertContext } from '../../use-cases/load-config/prepare-convert-context.js';
 import { assembleConfigOutputs } from '../../use-cases/serialize-config/assemble-config-outputs.js';
 import { serializeBiomeConfig } from '../../use-cases/serialize-config/biome-config.js';
 import { buildOutputSources } from '../../use-cases/serialize-config/build-output-sources.js';
 import { serializeContentConfig } from '../../use-cases/serialize-config/content-config.js';
 import { serializeSidebar } from '../../use-cases/serialize-config/sidebar.js';
+import { computeUnclaimedSlugs } from '../../use-cases/serialize-config/topics-exclude.js';
 
 export interface ConvertSiteFromDiskInput {
   readonly projectDir: string;
