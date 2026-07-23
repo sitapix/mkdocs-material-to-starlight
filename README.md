@@ -274,7 +274,7 @@ src/
 └── interface/      CLI and programmatic API; the only place that wires concrete adapters
 ```
 
-Each layer's import rules and boundaries are documented in its own README ([`src/domain/`](./src/domain/README.md), [`src/use-cases/`](./src/use-cases/README.md), [`src/infrastructure/`](./src/infrastructure/README.md), [`src/interface/`](./src/interface/README.md)). The contributor working agreement — gates, dependency-refresh procedure, the real-world field-test loop, release flow — lives in [`CLAUDE.md`](./CLAUDE.md).
+Each layer's import rules and boundaries are documented in its own README ([`src/domain/`](./src/domain/README.md), [`src/use-cases/`](./src/use-cases/README.md), [`src/infrastructure/`](./src/infrastructure/README.md), [`src/interface/`](./src/interface/README.md)).
 
 ---
 
