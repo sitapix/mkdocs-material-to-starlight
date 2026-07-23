@@ -37,6 +37,7 @@ interface PlaywrightBrowser {
 
 interface PlaywrightContext {
   newPage(): Promise<PlaywrightPage>;
+  close(): Promise<void>;
 }
 
 interface PlaywrightPage {
@@ -73,12 +74,17 @@ export function createPlaywrightAutomator(): BrowserAutomator {
           message: INSTALL_HINT,
         });
       }
+      let context: PlaywrightContext | null = null;
       try {
-        const context = await browser.newContext({
+        context = await browser.newContext({
           viewport: { width: options.width, height: options.height },
         });
         const page = await context.newPage();
-        await page.goto(url, { timeout: options.timeoutMs, waitUntil: 'networkidle' });
+        // 'load', not 'networkidle': Playwright's docs discourage idle-waits
+        // — a page with polling or a long-lived analytics connection never
+        // reaches idle and the capture dies at the timeout instead of
+        // screenshotting a fully rendered page.
+        await page.goto(url, { timeout: options.timeoutMs, waitUntil: 'load' });
         const bytes = await page.screenshot({
           fullPage: options.fullPage,
           type: 'png',
@@ -87,7 +93,18 @@ export function createPlaywrightAutomator(): BrowserAutomator {
       } catch (cause) {
         const message = cause instanceof Error ? cause.message : String(cause);
         return err({ code: 'navigation-failed', url, message });
+      } finally {
+        // One context (and its renderer processes) per capture — without
+        // this, an N-page compare accumulates N live contexts in the shared
+        // browser until process exit.
+        await context?.close().catch(() => undefined);
       }
+    },
+    async dispose(): Promise<void> {
+      if (browserPromise === null) return;
+      const browser = await browserPromise;
+      browserPromise = null;
+      await browser?.close().catch(() => undefined);
     },
   };
 }

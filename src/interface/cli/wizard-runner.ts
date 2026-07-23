@@ -365,17 +365,18 @@ export async function runWizardFlow(
  * serves only as a "still alive" pulse.
  *
  * Why the duration looks high for `--check`: conversion itself is fast
- * (often under a second). The slow step is `astro check` running against
- * the converted output. First runs can take several minutes; the converter
- * has no control over that.
+ * (often under a second). `astro check` adds seconds-to-a-couple-minutes
+ * depending on site size — and requires `npm install` to have run in the
+ * output directory first (without it, the check fails fast with an
+ * actionable diagnostic rather than running).
  */
 function renderConvertAnnouncement(prompter: Prompter, withAstroCheck: boolean): void {
   if (withAstroCheck) {
     prompter.note(
       [
-        'First `--check` run: typically 1–5 minutes.',
-        '`astro check` is the slow step. The converter itself is sub-second on most sites.',
-        'Repeat `--check` runs are typically 10–30s.',
+        '`--check` runs `astro check`: typically seconds, up to a couple of minutes on large sites.',
+        'It needs dependencies installed — if `npm install` has not run in the output directory,',
+        'the check reports that immediately instead of running.',
         '',
         'Phases: walk files → transform AST → write output → astro check',
       ].join('\n'),

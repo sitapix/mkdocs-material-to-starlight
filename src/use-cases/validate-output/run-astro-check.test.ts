@@ -68,8 +68,20 @@ describe('runAstroCheck', () => {
     const runner = fakeRunner({ capture });
     await runAstroCheck({ runner, outputDir: '/converted/site' });
     expect(capture.command).toBe('npx');
-    expect(capture.args).toEqual(['--yes', 'astro', 'check']);
+    // No `--yes`: on a project without node_modules, npx must abort fast
+    // (routing to astro-check-not-installed) instead of spending minutes
+    // downloading an unpinned latest astro that fails anyway.
+    expect(capture.args).toEqual(['astro', 'check']);
     expect(capture.options?.cwd).toBe('/converted/site');
+  });
+
+  it('disables astro telemetry in the child environment', async () => {
+    // First-run telemetry consent banners would pollute the parsed output
+    // and the silence tracking.
+    const capture: { command?: string; args?: string[]; options?: ProcessRunOptions } = {};
+    const runner = fakeRunner({ capture });
+    await runAstroCheck({ runner, outputDir: '/out' });
+    expect(capture.options?.env).toEqual({ ASTRO_TELEMETRY_DISABLED: '1' });
   });
 
   it('forwards a custom timeout to the runner', async () => {

@@ -37,11 +37,30 @@ export function createNodeProcessRunner(): ProcessRunner {
         let timedOut = false;
         let timer: NodeJS.Timeout | null = null;
         let lastOutputAt = Date.now();
+        // Snapshot of the silent gap AT the kill, not at stream close: an
+        // orphaned grandchild can keep writing after the kill, and 'close'
+        // can fire much later — both would corrupt the hang/slow verdict
+        // the timeout diagnostic builds from this number.
+        let silenceAtKill: number | null = null;
+        let settled = false;
+        const settle = (result: Result<ProcessOutput, ProcessRunnerError>): void => {
+          if (settled) return;
+          settled = true;
+          if (timer !== null) clearTimeout(timer);
+          resolve(result);
+        };
 
         if (options.timeoutMs !== undefined) {
           timer = setTimeout(() => {
             timedOut = true;
-            child.kill('SIGKILL');
+            silenceAtKill = Date.now() - lastOutputAt;
+            killTree(child);
+            // Drop our read ends of the pipes. A grandchild that survived
+            // the kill (e.g. `npx` dead, its spawned tool alive) would
+            // otherwise hold them open and defer 'close' — historically
+            // past the timeout for as long as the orphan lived.
+            child.stdout?.destroy();
+            child.stderr?.destroy();
           }, options.timeoutMs);
         }
 
@@ -57,21 +76,29 @@ export function createNodeProcessRunner(): ProcessRunner {
         });
 
         child.on('error', (cause: Error) => {
-          if (timer !== null) clearTimeout(timer);
-          resolve(err(translateSpawnError(cause, command)));
+          settle(err(translateSpawnError(cause, command)));
         });
 
-        child.on('close', (code: number | null) => {
-          if (timer !== null) clearTimeout(timer);
-          resolve(
+        const finish = (code: number | null): void => {
+          settle(
             ok<ProcessOutput>({
               exitCode: timedOut ? null : code,
               stdout,
               stderr,
               timedOut,
-              silenceMs: Date.now() - lastOutputAt,
+              silenceMs: silenceAtKill ?? Date.now() - lastOutputAt,
             }),
           );
+        };
+        child.on('close', (code: number | null) => {
+          finish(code);
+        });
+        // Fallback: with the pipes destroyed on timeout, 'close' fires
+        // promptly — but if a platform quirk keeps a stream half-open,
+        // 'exit' guarantees the promise still settles at the timeout
+        // boundary instead of hanging on stdio.
+        child.on('exit', (code: number | null) => {
+          if (timedOut) finish(code);
         });
       });
     },
@@ -81,9 +108,40 @@ export function createNodeProcessRunner(): ProcessRunner {
 function buildSpawnOptions(options: ProcessRunOptions): {
   cwd: string;
   env: NodeJS.ProcessEnv;
+  stdio: ['ignore', 'pipe', 'pipe'];
+  detached: boolean;
 } {
   const env = options.env === undefined ? { ...process.env } : { ...process.env, ...options.env };
-  return { cwd: options.cwd, env };
+  return {
+    cwd: options.cwd,
+    env,
+    // stdin 'ignore': children see EOF instead of an open, never-written
+    // pipe. Any tool that tries to prompt interactively (astro check's
+    // "npm i @astrojs/check — Continue?") fails fast instead of waiting
+    // silently for the whole timeout.
+    stdio: ['ignore', 'pipe', 'pipe'],
+    // Own process group (POSIX) so a timeout kill can take out the whole
+    // tree — `npx` wrappers spawn the real tool as a grandchild, and
+    // killing only the wrapper used to leave that tool running.
+    detached: process.platform !== 'win32',
+  };
+}
+
+/** Kill the child's whole process group; fall back to a direct kill where
+ *  group signalling is unavailable (Windows, or the group is already gone). */
+function killTree(child: {
+  readonly pid?: number | undefined;
+  kill(signal: NodeJS.Signals): boolean;
+}): void {
+  if (child.pid !== undefined && process.platform !== 'win32') {
+    try {
+      process.kill(-child.pid, 'SIGKILL');
+      return;
+    } catch {
+      // Group already reaped or not a group leader — fall through.
+    }
+  }
+  child.kill('SIGKILL');
 }
 
 function translateSpawnError(cause: unknown, command: string): ProcessRunnerError {

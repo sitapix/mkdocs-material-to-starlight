@@ -435,12 +435,19 @@ async function runCompare(
     baselineUrl: joinUrl(command.baselineUrl, path),
     convertedUrl: joinUrl(command.convertedUrl, path),
   }));
-  const report = await compareSites({
-    pairs,
-    browser,
-    differ,
-    threshold: command.threshold,
-  });
+  let report: Awaited<ReturnType<typeof compareSites>>;
+  try {
+    report = await compareSites({
+      pairs,
+      browser,
+      differ,
+      threshold: command.threshold,
+    });
+  } finally {
+    // Shut the launched browser down gracefully rather than relying on
+    // bin.ts's process.exit to reap chromium.
+    await browser.dispose?.();
+  }
   const text = serializeVisualDiffReport(report);
   if (command.reportPath !== null) {
     const written = await atomicWriteText(command.reportPath, text);

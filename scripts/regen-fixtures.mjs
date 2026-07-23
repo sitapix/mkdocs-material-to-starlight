@@ -34,10 +34,7 @@ function discoverFixtures() {
   });
   return entries.map((name) => {
     const sourceDir = join(CORPUS, name);
-    const candidates = [
-      join(CORPUS, `${name}-out`),
-      join(CORPUS, `${name}-en-out`),
-    ];
+    const candidates = [join(CORPUS, `${name}-out`), join(CORPUS, `${name}-en-out`)];
     const outputDir = candidates.find((c) => existsSync(c)) ?? candidates[0];
     return { name, sourceDir, outputDir };
   });
@@ -46,7 +43,15 @@ function discoverFixtures() {
 async function regen(fixture) {
   console.log(`→ ${fixture.name}`);
   if (existsSync(fixture.outputDir)) {
-    rmSync(fixture.outputDir, { recursive: true, force: true });
+    // Clear stale converter output but keep the install state: nuking
+    // node_modules + package-lock.json forced a full ~20s+ reinstall per
+    // regen iteration, and a follow-up `npx astro build` in the wiped dir
+    // silently fell back to npx's cache instead of project-local binaries.
+    const KEEP = new Set(['node_modules', 'package-lock.json']);
+    for (const entry of readdirSync(fixture.outputDir)) {
+      if (KEEP.has(entry)) continue;
+      rmSync(join(fixture.outputDir, entry), { recursive: true, force: true });
+    }
   }
   const result = await convertSiteFromDisk({
     projectDir: fixture.sourceDir,

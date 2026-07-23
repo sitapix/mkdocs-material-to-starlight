@@ -39,9 +39,18 @@ export async function runAstroCheck(
   options: RunAstroCheckOptions,
 ): Promise<ReadonlyArray<Diagnostic>> {
   const timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
-  const result = await options.runner.run('npx', ['--yes', 'astro', 'check'], {
+  // Deliberately NO `--yes`: when the output project has no node_modules,
+  // npx would otherwise spend minutes silently downloading an UNPINNED
+  // latest astro (version skew vs the project's pin) only to fail on the
+  // missing @astrojs/starlight anyway. Without the flag, non-interactive
+  // npx aborts immediately and the message routes to the existing
+  // `astro-check-not-installed` diagnostic below.
+  const result = await options.runner.run('npx', ['astro', 'check'], {
     cwd: options.outputDir,
     timeoutMs,
+    // Telemetry consent banners would pollute the parsed output (and the
+    // silence tracking) on first run.
+    env: { ASTRO_TELEMETRY_DISABLED: '1' },
   });
 
   if (!result.ok) {

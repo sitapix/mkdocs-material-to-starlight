@@ -1,6 +1,19 @@
 import { describe, expect, it } from 'vitest';
 import { inferFrontmatterTypes } from './infer-frontmatter-types.js';
 
+describe('inferFrontmatterTypes flow-sequence parsing', () => {
+  it('does not shred quoted inline-array items containing commas', () => {
+    // `['a, b', 'c']` is two string items, not three. A naive comma split
+    // still classifies as array-of-string here, but the split must respect
+    // quotes so future per-item logic stays correct.
+    const out = inferFrontmatterTypes(
+      ['tags'],
+      [{ source: `---\ntitle: X\ntags: ['alpha, beta', 'gamma']\n---\n` }],
+    );
+    expect(out.tags).toBe('z.array(z.string()).optional()');
+  });
+});
+
 describe('inferFrontmatterTypes', () => {
   it('returns empty map when no fields supplied', () => {
     expect(inferFrontmatterTypes([], [])).toEqual({});

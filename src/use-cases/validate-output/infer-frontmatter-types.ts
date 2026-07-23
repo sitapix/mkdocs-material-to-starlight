@@ -114,10 +114,7 @@ function classifyScalar(rawValue: string): Observation {
   if (value.length === 0) return 'unknown';
   const inlineArr = value.match(INLINE_ARRAY_RE);
   if (inlineArr !== null) {
-    const items = (inlineArr[1] ?? '')
-      .split(',')
-      .map((s) => s.trim())
-      .filter((s) => s.length > 0);
+    const items = splitFlowItems(inlineArr[1] ?? '');
     return items.length === 0 ? 'unknown' : 'array-of-string';
   }
   // YAML 1.2 recognises `true|True|TRUE|false|False|FALSE` as boolean —
@@ -131,6 +128,39 @@ function classifyScalar(rawValue: string): Observation {
   if (/^-?\d+(?:\.\d+)?$/.test(value)) return 'number';
   if (ISO_DATE_RE.test(value.replace(/^['"]|['"]$/g, ''))) return 'date';
   return 'string';
+}
+
+/**
+ * Split flow-sequence innards on commas OUTSIDE quotes. A naive
+ * `split(',')` shreds quoted items containing commas
+ * (`tags: ['a, b', 'c']` → three items instead of two).
+ */
+function splitFlowItems(inner: string): string[] {
+  const items: string[] = [];
+  let current = '';
+  let quote: string | null = null;
+  for (const ch of inner) {
+    if (quote !== null) {
+      current += ch;
+      if (ch === quote) quote = null;
+      continue;
+    }
+    if (ch === "'" || ch === '"') {
+      quote = ch;
+      current += ch;
+      continue;
+    }
+    if (ch === ',') {
+      const trimmed = current.trim();
+      if (trimmed.length > 0) items.push(trimmed);
+      current = '';
+      continue;
+    }
+    current += ch;
+  }
+  const tail = current.trim();
+  if (tail.length > 0) items.push(tail);
+  return items;
 }
 
 function addObservation(out: Map<string, Set<Observation>>, key: string, obs: Observation): void {

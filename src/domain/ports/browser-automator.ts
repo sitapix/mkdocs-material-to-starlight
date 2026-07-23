@@ -33,4 +33,11 @@ export interface CaptureOptions {
 
 export interface BrowserAutomator {
   capture(url: string, options: CaptureOptions): Promise<Result<Uint8Array, BrowserAutomatorError>>;
+  /**
+   * Release any long-lived resources (e.g. a launched browser). Optional so
+   * stateless fakes stay one-liners; callers that finish a capture session
+   * should invoke it when present rather than relying on process exit to
+   * reap child processes.
+   */
+  dispose?(): Promise<void>;
 }
