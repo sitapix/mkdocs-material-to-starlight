@@ -18,8 +18,21 @@ describe('detectFeaturesFromThemeFeatures', () => {
     expect(out.has('page-actions')).toBe(true);
   });
 
+  it('maps navigation.tabs to the sidebar-topics feature (drives starlight-sidebar-topics)', () => {
+    // The interface layer filters this out when `--no-sidebar-topics` is set.
+    const out = detectFeaturesFromThemeFeatures(['navigation.tabs']);
+    expect(out.has('sidebar-topics')).toBe(true);
+  });
+
+  it('maps navigation.top to the scroll-to-top feature (drives starlight-scroll-to-top)', () => {
+    const out = detectFeaturesFromThemeFeatures(['navigation.top']);
+    expect(out.has('scroll-to-top')).toBe(true);
+  });
+
   it('returns empty set when no recognized flags are present', () => {
     expect(detectFeaturesFromThemeFeatures([]).size).toBe(0);
-    expect(detectFeaturesFromThemeFeatures(['navigation.tabs', 'content.code.copy']).size).toBe(0);
+    expect(detectFeaturesFromThemeFeatures(['navigation.footer', 'content.code.copy']).size).toBe(
+      0,
+    );
   });
 });

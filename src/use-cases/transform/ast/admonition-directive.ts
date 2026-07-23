@@ -27,9 +27,20 @@ import {
 import {
   type AsideDescriptor,
   type BlockquoteDescriptor,
+  CUSTOM_BLOCK_ADMONITION_TYPES,
   type MappedAdmonition,
   mapAdmonitionToAside,
 } from '../admonition-mapping.js';
+
+export interface AdmonitionDirectiveOptions {
+  /**
+   * When true (site pre-scan found types beyond Starlight's asides and
+   * starlight-markdown-blocks is being installed), keep those types'
+   * directive names verbatim (`:::abstract`) instead of squashing them to
+   * note/tip/danger — astro.config defines them as custom blocks.
+   */
+  readonly preserveCustomTypes?: boolean;
+}
 
 interface ContainerDirectiveLike {
   type: 'containerDirective';
@@ -47,7 +58,9 @@ interface DirectiveData {
 
 const STARLIGHT_NAMES: ReadonlySet<string> = new Set(['note', 'tip', 'caution', 'danger']);
 
-export const transformAdmonitionDirectives: Plugin<[], Root> = () => {
+export const transformAdmonitionDirectives: Plugin<[AdmonitionDirectiveOptions?], Root> = (
+  options = {},
+) => {
   return (tree) => {
     visit(tree, 'containerDirective', (node, index, parent) => {
       const directive = node as unknown as ContainerDirectiveLike;
@@ -65,6 +78,17 @@ export const transformAdmonitionDirectives: Plugin<[], Root> = () => {
       if (collapsible !== null && parent !== undefined && index !== undefined) {
         replaceWithDetails(parent, index, directive, collapsible);
         return [SKIP, index + 1];
+      }
+
+      if (options.preserveCustomTypes === true && CUSTOM_BLOCK_ADMONITION_TYPES.has(parsed.type)) {
+        // starlight-markdown-blocks defines this type as a first-class
+        // block — keep the name and skip the aside squash (no icon attr;
+        // the block config carries the icon).
+        directive.name = parsed.type;
+        const data: DirectiveData = directive.data ?? {};
+        data.starlightConverted = true;
+        directive.data = data;
+        return SKIP;
       }
 
       const mapping = mapAdmonitionToAside(parsed.type);

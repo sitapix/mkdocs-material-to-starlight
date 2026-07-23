@@ -36,6 +36,8 @@ import { normalizeMkdocstringsCrossRefs } from '../normalize/mkdocstrings-crossr
 import { normalizePackageManagerTabs } from '../normalize/package-manager-tabs.js';
 import { scanButtonIcons } from '../normalize/scan-button-icons.js';
 import { scanCodeFenceFlags } from '../normalize/scan-code-fence-flags.js';
+import { detectCustomAdmonitions } from '../detect-features/custom-admonitions.js';
+import { normalizeBlogPostSlug } from '../normalize/blog-post-slug.js';
 import { scanFrontmatterFields } from '../normalize/scan-frontmatter-fields.js';
 import { scanGithubAlerts } from '../normalize/scan-github-alerts.js';
 import { scanHeadingAnchors } from '../normalize/scan-heading-anchors.js';
@@ -253,11 +255,14 @@ export async function convertSite(
     });
   }
 
+  // Pre-pass: read every source up front. Two consumers need the full
+  // corpus before any file converts: (1) the custom-admonition detector
+  // below — the per-file admonition transform must behave identically for
+  // EVERY file, so the site-level decision has to precede the first
+  // conversion; (2) the main loop, which now reads from memory instead of
+  // hitting the fs port a second time.
+  const sourceTexts = new Map<string, string>();
   for (const sourcePath of emitPaths) {
-    // The path on disk may differ from the emit path — README.md was
-    // rewritten to index.md above. Look up the disk location from the
-    // rewrite map; falls back to the emit path for files that weren't
-    // renamed.
     const diskPath = readmeRename.diskByEmit.get(sourcePath) ?? sourcePath;
     const fullPath = joinPath(input.docsDir, diskPath);
     const read = await input.fs.readText(fullPath);
@@ -267,6 +272,25 @@ export async function convertSite(
         message: `failed to read "${fullPath}": ${read.error.message}`,
       });
     }
+    sourceTexts.set(sourcePath, read.value);
+  }
+
+  // Material admonition types Starlight's four asides cannot express
+  // (abstract, question, example, …) → starlight-markdown-blocks defines
+  // them as first-class blocks and the admonition transform keeps their
+  // names verbatim instead of squashing to note/tip.
+  const preserveCustomAdmonitionTypes = detectCustomAdmonitions(sourceTexts.values());
+  if (preserveCustomAdmonitionTypes) {
+    featureUnion.add('markdown-blocks');
+  }
+
+  for (const sourcePath of emitPaths) {
+    // The path on disk may differ from the emit path — README.md was
+    // rewritten to index.md above. Look up the disk location from the
+    // rewrite map; falls back to the emit path for files that weren't
+    // renamed.
+    const diskPath = readmeRename.diskByEmit.get(sourcePath) ?? sourcePath;
+    const read = { value: sourceTexts.get(sourcePath) ?? '' };
 
     let source = read.value;
     // Normalize typer-style {* path *} snippet directives before any other
@@ -395,6 +419,19 @@ export async function convertSite(
       }
     }
 
+    // Material blog posts may author a `slug:` — Material's URL tail, but
+    // Starlight's absolute slug. Re-prefix it so the post stays inside the
+    // `<blogDir>/posts` namespace starlight-blog owns; a verbatim
+    // pass-through crashes the build ("Failed to get blog configuration
+    // for entry").
+    if (input.blogDir !== undefined && sourcePath.startsWith(`${input.blogDir}/posts/`)) {
+      const slugRewrite = normalizeBlogPostSlug(source, `${input.blogDir}/posts`);
+      source = slugRewrite.text;
+      for (const diagnostic of slugRewrite.diagnostics) {
+        diagnostics.push({ sourcePath, diagnostic });
+      }
+    }
+
     // Detect landing-style root index.md and rewrite to Starlight splash template.
     // Runs after all text expansion so the final Markdown content is available.
     const landingResult = detectLandingPage(source, sourcePath);
@@ -458,6 +495,7 @@ export async function convertSite(
       repoContext: input.repoContext ?? null,
       emitMdxTabs: input.emitMdxTabs !== false,
       tabsLinked: input.tabsLinked === true,
+      preserveCustomAdmonitionTypes,
     });
     // The rewrite already produced the canonical emit path (READMEs to
     // index, `page.fr.md` to `fr/page.md`, dots slugified). Honour the

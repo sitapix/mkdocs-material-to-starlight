@@ -32,6 +32,10 @@ const PLUGIN_TO_FEATURE: ReadonlyMap<string, DetectedFeature> = new Map([
   ['rss', 'rss'] as const,
   // mkdocs-mermaid2-plugin → astro-mermaid (alternative to superfences mermaid path).
   ['mermaid2', 'mermaid'] as const,
+  // mkdocs-d2-plugin (registers as `d2`) → astro-d2. Same fenced ```d2
+  // code-block syntax; astro-d2 requires the `d2` CLI at build time (the
+  // emitted astro.config carries that caveat).
+  ['d2', 'd2'] as const,
   // mkdocs-swagger-ui-tag → starlight-openapi.
   ['mkdocs-swagger-ui-tag', 'swagger-ui'] as const,
   ['swagger-ui-tag', 'swagger-ui'] as const,

@@ -5,11 +5,11 @@ import { unified } from 'unified';
 import { describe, expect, it } from 'vitest';
 import { transformAdmonitionDirectives } from './admonition-directive.js';
 
-function process(source: string): string {
+function process(source: string, options?: { preserveCustomTypes?: boolean }): string {
   const file = unified()
     .use(remarkParse)
     .use(remarkDirective)
-    .use(transformAdmonitionDirectives)
+    .use(transformAdmonitionDirectives, options ?? {})
     .use(remarkStringify, { bullet: '-', emphasis: '_', fences: true })
     .processSync(source);
   return String(file);
@@ -69,6 +69,33 @@ describe('transformAdmonitionDirectives', () => {
     const first = process(':::warning\nx\n:::\n');
     const second = process(first);
     expect(second).toBe(first);
+  });
+
+  it('preserves custom-block types verbatim when preserveCustomTypes is set', () => {
+    // Site-level pre-scan found types beyond Starlight's asides →
+    // starlight-markdown-blocks defines them, so :::abstract stays.
+    const out = process(':::abstract\nSummary.\n:::\n', { preserveCustomTypes: true });
+    expect(out).toContain(':::abstract');
+    expect(out).not.toContain(':::note');
+    // No icon attr — the block config carries the icon.
+    expect(out).not.toContain('icon=');
+  });
+
+  it('still renames clean-mapping types (warning→caution) in preserve mode', () => {
+    const out = process(':::warning\nBe careful.\n:::\n', { preserveCustomTypes: true });
+    expect(out).toContain(':::caution');
+  });
+
+  it('still renders :::quote as a blockquote in preserve mode', () => {
+    const out = process(':::quote\nA line.\n:::\n', { preserveCustomTypes: true });
+    expect(out).not.toContain(':::quote');
+    expect(out).toMatch(/^>\s*A line\./m);
+  });
+
+  it('squashes custom types by default (no preserve flag)', () => {
+    const out = process(':::abstract\nSummary.\n:::\n');
+    expect(out).toContain(':::note');
+    expect(out).not.toContain(':::abstract');
   });
 
   it('converts a collapsible-closed admonition (collapsible="closed") to <details>', () => {

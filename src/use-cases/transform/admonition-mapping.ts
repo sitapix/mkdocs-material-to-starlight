@@ -42,3 +42,23 @@ const TABLE: Readonly<Record<AdmonitionType, MappedAdmonition>> = {
 export function mapAdmonitionToAside(type: AdmonitionType): MappedAdmonition {
   return TABLE[type];
 }
+
+/**
+ * The Material types the four Starlight asides cannot express faithfully —
+ * every entry above that degrades to note/tip/danger with an icon hint.
+ * When the site-level pre-scan finds any of these, the converter installs
+ * `starlight-markdown-blocks`, defines them as custom block types in
+ * astro.config, and the admonition transform keeps their names verbatim
+ * (`:::abstract`) instead of applying the squash mapping. `warning` is a
+ * clean rename (→ caution) and `quote` renders as a blockquote, so neither
+ * belongs here.
+ */
+export const CUSTOM_BLOCK_ADMONITION_TYPES: ReadonlySet<AdmonitionType> = new Set([
+  'abstract',
+  'info',
+  'question',
+  'success',
+  'failure',
+  'bug',
+  'example',
+]);

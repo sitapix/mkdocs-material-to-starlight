@@ -94,6 +94,13 @@ export interface ConvertFileInput {
    * Material's linked-tabs feature does. No effect when `emitMdxTabs` is false.
    */
   readonly tabsLinked?: boolean;
+  /**
+   * When true (site-level pre-scan found admonition types Starlight's four
+   * asides cannot express, so starlight-markdown-blocks is installed),
+   * those types keep their names verbatim (`:::abstract`) instead of being
+   * squashed to note/tip/danger with icon hints.
+   */
+  readonly preserveCustomAdmonitionTypes?: boolean;
 }
 
 export interface ConvertFileOutput {
@@ -204,7 +211,9 @@ export function convertFile(input: ConvertFileInput): ConvertFileOutput {
     .use(remarkMath)
     .use(remarkDirective)
     .use(ensureTitle, { sourcePath: input.sourcePath, diagnostics })
-    .use(transformAdmonitionDirectives)
+    .use(transformAdmonitionDirectives, {
+      preserveCustomTypes: input.preserveCustomAdmonitionTypes === true,
+    })
     .use(transformGridDirectives)
     .use(transformTabDirectives, {
       emitMdxTabs: input.emitMdxTabs !== false,
