@@ -819,7 +819,7 @@ const TABLE: ReadonlyArray<MappingRow> = [
       'Python-Markdown `smarty` extension (ASCII smart quotes, em/en dashes, ellipsis)',
     requiredExtensions: ['smarty'],
     starlightOutput:
-      'recommend `remark-smartypants` in `markdown.remarkPlugins` of `astro.config.mjs`; defaults match `smarty` substitutions',
+      'recommend `remark-smartypants` via the unified processor (`markdown.processor`, `@astrojs/markdown-remark`) in `astro.config.mjs`; defaults match `smarty` substitutions',
     fileExt: 'md',
     conversionType: 'recommended-dep',
     risk: 'low',

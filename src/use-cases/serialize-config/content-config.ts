@@ -29,23 +29,59 @@ export interface SerializeContentConfigOptions {
    * the converter having to warn the user to rename or hand-edit.
    */
   readonly preserveSlugs?: boolean;
+  /**
+   * When true (blog feature detected), compose starlight-blog's
+   * `blogSchema` into `docsSchema({ extend })`. Without it every blog
+   * field stays a raw frontmatter value — most fatally `date`, which
+   * starlight-blog sorts with `.getTime()` at prerender time, so
+   * `astro build` crashes with "b.data.date.getTime is not a function"
+   * on any site with dated posts (field-tested on squidfunk's
+   * mkdocs-material docs, 2026-07-23). Inferred frontmatter fields that
+   * `blogSchema` already declares are dropped so the merge cannot
+   * clobber its coercions.
+   */
+  readonly includeBlogSchema?: boolean;
 }
+
+/**
+ * Frontmatter fields owned by starlight-blog's `blogSchema` (0.28.0,
+ * `blogEntrySchema` in its schema.ts). When the blog schema is composed,
+ * inferred fields with these names must NOT be re-declared in the merged
+ * `z.object` — `.merge()` lets the last declaration win, and e.g. an
+ * inferred `date: z.unknown()` would undo `z.date()`'s string→Date
+ * coercion, recreating the crash the composition exists to fix.
+ */
+const BLOG_SCHEMA_FIELDS: ReadonlySet<string> = new Set([
+  'authors',
+  'date',
+  'excerpt',
+  'metrics',
+  'tags',
+  'cover',
+  'featured',
+]);
 
 export function serializeContentConfig(
   extendedFields: Readonly<Record<string, string>> = {},
   options: SerializeContentConfigOptions = {},
 ): string {
-  const fields = Object.keys(extendedFields).sort();
+  const withBlog = options.includeBlogSchema === true;
+  const fields = Object.keys(extendedFields)
+    .filter((f) => !withBlog || !BLOG_SCHEMA_FIELDS.has(f))
+    .sort();
   const baseImports = [
     `import { defineCollection } from 'astro:content';`,
     `import { docsLoader } from '@astrojs/starlight/loaders';`,
     `import { docsSchema } from '@astrojs/starlight/schema';`,
   ];
+  if (withBlog) {
+    baseImports.push(`import { blogSchema } from 'starlight-blog/schema';`);
+  }
 
   const loaderInvocation =
     options.preserveSlugs === true ? renderDocsLoaderWithGenerateId() : 'docsLoader()';
 
-  if (fields.length === 0) {
+  if (fields.length === 0 && !withBlog) {
     return [
       ...baseImports,
       ``,
@@ -53,6 +89,36 @@ export function serializeContentConfig(
       `  docs: defineCollection({`,
       `    loader: ${loaderInvocation},`,
       `    schema: docsSchema(),`,
+      `  }),`,
+      `};`,
+      ``,
+    ].join('\n');
+  }
+
+  if (withBlog) {
+    return [
+      ...baseImports,
+      `import { z } from 'astro/zod';`,
+      ``,
+      `export const collections = {`,
+      `  docs: defineCollection({`,
+      `    loader: ${loaderInvocation},`,
+      `    schema: docsSchema({`,
+      `      // starlight-blog needs its schema composed here; without it,`,
+      `      // post \`date\` frontmatter never becomes a Date and astro`,
+      `      // build crashes sorting posts. \`date\` is re-declared with`,
+      `      // z.coerce.date() because the converter quotes date-like`,
+      `      // frontmatter values during normalization — coercion accepts`,
+      `      // both the quoted string and a bare YAML timestamp, and`,
+      `      // starlight-blog still receives a real Date.`,
+      `      extend: (context) =>`,
+      `        blogSchema(context).merge(`,
+      `          z.object({`,
+      `            date: z.coerce.date().optional(),`,
+      ...fields.map((f) => `            ${quoteFieldName(f)}: ${extendedFields[f]},`),
+      `          }),`,
+      `        ),`,
+      `    }),`,
       `  }),`,
       `};`,
       ``,

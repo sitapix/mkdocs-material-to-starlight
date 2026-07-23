@@ -110,6 +110,68 @@ describe('serializeContentConfig', () => {
     expect(out).toMatch(/index|readme/i);
   });
 
+  it('composes blogSchema into docsSchema({ extend }) when includeBlogSchema is true', () => {
+    // Field-tested regression (squidfunk/mkdocs-material docs, 2026-07-23):
+    // without blogSchema composed, blog post `date` frontmatter stays a raw
+    // string and starlight-blog's prerender sort crashes `astro build` with
+    // "b.data.date.getTime is not a function".
+    const out = serializeContentConfig({}, { includeBlogSchema: true });
+    expect(out).toContain(`import { blogSchema } from 'starlight-blog/schema';`);
+    expect(out).toContain('blogSchema(context).merge(');
+    // The converter's normalizer quotes date-like frontmatter values, so
+    // blogSchema's `z.date()` alone would reject every post — the emitted
+    // schema re-declares date with coercion.
+    expect(out).toContain('date: z.coerce.date().optional(),');
+    expect(out).toContain("import { z } from 'astro/zod';");
+  });
+
+  it('merges surviving inferred fields alongside blogSchema', () => {
+    const out = serializeContentConfig(
+      { icon: 'z.string().optional()', readtime: 'z.number().optional()' },
+      { includeBlogSchema: true },
+    );
+    expect(out).toContain(`import { blogSchema } from 'starlight-blog/schema';`);
+    expect(out).toContain("import { z } from 'astro/zod';");
+    expect(out).toContain('blogSchema(context).merge(');
+    expect(out).toContain('icon: z.string().optional(),');
+    expect(out).toContain('readtime: z.number().optional(),');
+  });
+
+  it('drops inferred fields that blogSchema already declares so the merge cannot clobber its coercions', () => {
+    // `.merge()` lets the right-hand object win. An inferred
+    // `date: z.unknown()` merged on top of blogSchema would undo the
+    // string→Date coercion and recreate the exact crash this composition
+    // fixes — same for authors/tags/cover/excerpt/metrics/featured.
+    const out = serializeContentConfig(
+      {
+        date: 'z.unknown().optional()',
+        authors: 'z.array(z.string()).optional()',
+        tags: 'z.array(z.string()).optional()',
+        icon: 'z.string().optional()',
+      },
+      { includeBlogSchema: true },
+    );
+    expect(out).not.toContain('date: z.unknown()');
+    expect(out).not.toContain('authors: z.array');
+    expect(out).not.toContain('tags: z.array');
+    expect(out).toContain('icon: z.string().optional(),');
+  });
+
+  it('keeps blog-owned field names in the extend when blog is NOT detected', () => {
+    // The filter is strictly scoped to blogSchema composition: a non-blog
+    // site whose pages use `date`/`tags` frontmatter still gets those
+    // inferred fields (there is no schema to clash with).
+    const out = serializeContentConfig({ date: 'z.unknown().optional()' });
+    expect(out).toContain('date: z.unknown().optional(),');
+    expect(out).not.toContain('blogSchema');
+  });
+
+  it('composes blogSchema with preserveSlugs (generateId) in the same emission', () => {
+    const out = serializeContentConfig({}, { includeBlogSchema: true, preserveSlugs: true });
+    expect(out).toContain('generateId');
+    expect(out).toContain('blogSchema(context).merge(');
+  });
+
   it('preserves docsSchema() emission when preserveSlugs is true', () => {
     // The two options compose: a site can both override the slug derivation
     // and extend the frontmatter schema with custom fields.

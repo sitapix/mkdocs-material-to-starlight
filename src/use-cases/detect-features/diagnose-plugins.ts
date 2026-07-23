@@ -327,7 +327,7 @@ const PLUGIN_DIAGNOSTICS: ReadonlyMap<string, PluginDiagnosticSpec> = new Map([
       ruleId: 'extension-arithmatex-detected',
       severity: 'info',
       message:
-        '`pymdownx.arithmatex` (math rendering) detected. The converter has automatically: (1) added `remark-math`, `rehype-katex`, and `katex` to `package.json`; (2) wired both plugins into `astro.config.mjs` `markdown.{remarkPlugins,rehypePlugins}`; and (3) registered `katex/dist/katex.min.css` in Starlight `customCss`. Run `npm install` and formulas will render — no further configuration needed. To swap KaTeX for MathJax, replace `rehype-katex` with `rehype-mathjax` in both files and remove the `katex.min.css` line.',
+        '`pymdownx.arithmatex` (math rendering) detected. The converter has automatically: (1) added `remark-math`, `rehype-katex`, `katex`, and `@astrojs/markdown-remark` to `package.json`; (2) wired both plugins into `astro.config.mjs` via `markdown.processor: unified({...})` (required on Astro 7, whose default Sätteri processor ignores remark/rehype plugins); and (3) registered `katex/dist/katex.min.css` in Starlight `customCss`. Run `npm install` and formulas will render — no further configuration needed. To swap KaTeX for MathJax, replace `rehype-katex` with `rehype-mathjax` in both files and remove the `katex.min.css` line.',
     },
   ],
   [
@@ -426,7 +426,7 @@ const PLUGIN_DIAGNOSTICS: ReadonlyMap<string, PluginDiagnosticSpec> = new Map([
       ruleId: 'extension-smarty-recommend',
       severity: 'info',
       message:
-        '`smarty` extension detected (smart quotes, em/en dashes, ellipsis substitutions). remark-parse does not perform these substitutions by default. Add `remark-smartypants` to `markdown.remarkPlugins` in `astro.config.mjs` to preserve the typography.',
+        '`smarty` extension detected (smart quotes, em/en dashes, ellipsis substitutions). remark-parse does not perform these substitutions by default. Install `remark-smartypants` and `@astrojs/markdown-remark`, then add the plugin to `markdown.processor: unified({ remarkPlugins: [...] })` in `astro.config.mjs` to preserve the typography.',
     },
   ],
   [
@@ -489,7 +489,7 @@ const PLUGIN_DIAGNOSTICS: ReadonlyMap<string, PluginDiagnosticSpec> = new Map([
       ruleId: 'plugin-puml-recommend',
       severity: 'info',
       message:
-        '`mkdocs-puml` (PlantUML rendering) detected. Install `astro-plantuml` and add it to your Astro integrations — the same `@startuml...@enduml` fenced syntax is supported.',
+        '`mkdocs-puml` (PlantUML rendering) detected. The equivalent integration is `astro-plantuml` (same `@startuml...@enduml` fenced syntax), but its current release (0.1.4) peers `astro@^5.5.6` and will not resolve against this Astro 7 project — install manually with `--legacy-peer-deps` at your own risk, or watch upstream for an Astro 7 release.',
     },
   ],
   [
@@ -498,7 +498,7 @@ const PLUGIN_DIAGNOSTICS: ReadonlyMap<string, PluginDiagnosticSpec> = new Map([
       ruleId: 'plugin-puml-recommend',
       severity: 'info',
       message:
-        '`plantuml-markdown` detected. Install `astro-plantuml` and add it to your Astro integrations — the same `@startuml...@enduml` fenced syntax is supported.',
+        '`plantuml-markdown` detected. The equivalent integration is `astro-plantuml` (same `@startuml...@enduml` fenced syntax), but its current release (0.1.4) peers `astro@^5.5.6` and will not resolve against this Astro 7 project — install manually with `--legacy-peer-deps` at your own risk, or watch upstream for an Astro 7 release.',
     },
   ],
   [

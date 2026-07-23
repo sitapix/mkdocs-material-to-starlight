@@ -38,8 +38,10 @@
   "exclude": [
     "node_modules",
     "dist",
-    "tests/fixtures/real-world/*-out",
-    "tests/fixtures/real-world/*-out-*",
-    "tests/fixtures/real-world/**/node_modules"
+    // The whole real-world corpus is local-only clones + converter output
+    // (see its README) — nothing first-party. Source clones can carry their
+    // own TS (mkdocs-material ships its theme source), so excluding only
+    // the *-out shapes is not enough.
+    "tests/fixtures/real-world"
   ]
 }

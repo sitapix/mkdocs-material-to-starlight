@@ -34,6 +34,7 @@ import { normalizeDefinitionLists } from './deflists.js';
 import { normalizeStandardEmoji } from './emoji.js';
 import { normalizeFancylists } from './fancylists.js';
 import { normalizeFrontmatterCommentsStrip } from './frontmatter-comments-strip.js';
+import { normalizeFrontmatterDateFlatten } from './frontmatter-date-flatten.js';
 import { normalizeFrontmatterHide } from './frontmatter-hide.js';
 import { normalizeFrontmatterTemplate } from './frontmatter-template.js';
 import { normalizeFrontmatterTitleCoercion } from './frontmatter-title-coerce.js';
@@ -126,6 +127,11 @@ export function normalize(source: string, report?: NormalizeReport): string {
   // 'splash', so unhandled Material Jinja templates would crash `astro build`
   // with "template: Invalid option" — see the frontmatter-template module.
   current = normalizeFrontmatterTemplate(current);
+  // Flatten Material blog's nested `date: { created, updated }` mapping to
+  // the scalar `date:` (+ `lastUpdated:`) shape starlight-blog and
+  // Starlight understand. Must run BEFORE title-coerce so the flattened
+  // scalar gets the same quoting treatment as an authored one.
+  current = normalizeFrontmatterDateFlatten(current);
   // Re-quote string-typed frontmatter fields whose unquoted value would
   // be coerced by YAML to a non-string (date, number, bool). Without this,
   // a meeting-notes site that uses `title: 2025-10-15` rejects every page

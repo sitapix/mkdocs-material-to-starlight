@@ -863,7 +863,7 @@ const REGISTRY_ENTRIES: ReadonlyArray<DiagnosticEntry> = [
     severity: 'warning',
     description:
       '`pymdownx.arithmatex` was configured. The converter passes `$inline$` and `$$block$$` math through to remark-math, but Astro needs a rehype renderer to actually display the formulas.',
-    fix: 'Install `rehype-katex` (preferred for static rendering) or `rehype-mathjax`, then add it to the markdown integrations in `astro.config.mjs`: `markdown: { remarkPlugins: [remarkMath], rehypePlugins: [rehypeKatex] }`. Also add `import "katex/dist/katex.min.css"` to your global CSS. Full setup: https://docs.astro.build/en/guides/markdown-content/#markdown-plugins and https://github.com/remarkjs/remark-math.',
+    fix: 'Install `rehype-katex` (preferred for static rendering) or `rehype-mathjax` plus `@astrojs/markdown-remark`, then wire them through the unified processor in `astro.config.mjs` (Astro 7 defaults to Sätteri, which ignores remark/rehype plugins): `markdown: { processor: unified({ remarkPlugins: [remarkMath], rehypePlugins: [rehypeKatex] }) }` with `import { unified } from "@astrojs/markdown-remark"`. Also add `import "katex/dist/katex.min.css"` to your global CSS. Full setup: https://docs.astro.build/en/guides/markdown-content/#markdown-plugins and https://github.com/remarkjs/remark-math.',
   },
   {
     id: 'latex-delimiter-unsupported',
@@ -1032,6 +1032,13 @@ const REGISTRY_ENTRIES: ReadonlyArray<DiagnosticEntry> = [
     description:
       "Page frontmatter `social:` block (`cards`, `cards_layout`, `cards_layout_options`) was detected — Material's per-page social-card override. The converter auto-wires `astro-og-canvas` for OG image generation, but per-page customisation works differently in Astro.",
     fix: 'Edit the generator endpoint at `src/pages/og/[...slug].png.ts` and branch on the page slug or frontmatter for per-page layouts. To skip OG generation for a specific page, return a 404 from that endpoint when frontmatter sets `social.cards: false`. Hand-port any `cards_layout_options` (background_color, font_family) into the og-canvas configuration.',
+  },
+  {
+    id: 'blog-post-slug-prefixed',
+    severity: 'info',
+    description:
+      "A blog post's authored `slug:` frontmatter was re-prefixed with the blog posts namespace (e.g. `slug: my-post` → `slug: blog/posts/my-post`). Material reads a post slug as the URL tail under the blog's date-based path; Starlight reads it as the page's absolute slug, which would move the post outside starlight-blog's `prefix` and crash `astro build` with \"Failed to get blog configuration for entry\".",
+    fix: "No action needed for the build. If inbound links target Material's original post URL, add an entry to `redirects:` in `astro.config.mjs` mapping the old date-based path to the new `blog/...` slug.",
   },
   {
     id: 'blog-more-marker-detected',
@@ -1203,7 +1210,7 @@ const REGISTRY_ENTRIES: ReadonlyArray<DiagnosticEntry> = [
     severity: 'info',
     description:
       "`mkdocs.yml` enables Python-Markdown's `smarty` extension (smart quotes, em/en dashes, ellipsis). remark-parse does not perform these substitutions by default, so prose typography would regress after migration.",
-    fix: "Add `remark-smartypants` to `markdown.remarkPlugins` in `astro.config.mjs`: `import smartypants from 'remark-smartypants'; ... markdown: { remarkPlugins: [smartypants] }`. The defaults match `smarty`'s ASCII substitutions one-for-one.",
+    fix: "Install `remark-smartypants` and `@astrojs/markdown-remark`, then wire the plugin through the unified processor in `astro.config.mjs` (Astro 7's default Sätteri processor ignores remark plugins): `import { unified } from '@astrojs/markdown-remark'; import smartypants from 'remark-smartypants'; ... markdown: { processor: unified({ remarkPlugins: [smartypants] }) }`. The defaults match `smarty`'s ASCII substitutions one-for-one.",
     relatedFeatureId: 'smarty',
   },
   {
@@ -1251,7 +1258,7 @@ const REGISTRY_ENTRIES: ReadonlyArray<DiagnosticEntry> = [
     severity: 'info',
     description:
       '`smarty` extension was detected (smart quotes, em/en dashes, ellipsis substitutions). remark-parse does not perform these substitutions by default.',
-    fix: 'Add `remark-smartypants` to `markdown.remarkPlugins` in `astro.config.mjs` to preserve typography.',
+    fix: 'Add `remark-smartypants` to the unified processor (`markdown.processor: unified({ remarkPlugins: [...] })` via `@astrojs/markdown-remark`) in `astro.config.mjs` to preserve typography.',
     relatedFeatureId: 'smarty',
   },
   {
