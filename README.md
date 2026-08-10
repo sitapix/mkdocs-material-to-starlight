@@ -5,9 +5,9 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
 [![Node](https://img.shields.io/node/v/mkdocs-material-to-starlight.svg)](./package.json)
 
-**Move your MkDocs Material site to Astro Starlight without rewriting pages by hand.**
+**Convert an MkDocs Material site to Astro Starlight.**
 
-Point one command at your `mkdocs.yml` and get a buildable Starlight project: pages converted, plugins mapped, sidebar wired up, redirects preserved, i18n intact. Anything the converter cannot handle lands in `MIGRATION_NOTES.md` with a file and line number.
+The converter reads `mkdocs.yml` and writes a buildable Starlight project with converted pages, navigation, redirects, and locales. It records unsupported syntax and plugins in `MIGRATION_NOTES.md` with file and line numbers.
 
 ---
 
@@ -17,7 +17,7 @@ Point one command at your `mkdocs.yml` and get a buildable Starlight project: pa
 npx mkdocs-material-to-starlight
 ```
 
-The interactive wizard reads your `mkdocs.yml`, asks about the decisions that apply to your site, and writes a working Astro project. Then:
+The wizard reads `mkdocs.yml`, asks about site-specific choices, and writes to `./starlight-out`. Requires Node 20.19+.
 
 ```bash
 cd ./starlight-out
@@ -25,32 +25,19 @@ npm install
 npm run dev
 ```
 
-Your docs are live on Starlight. Requires Node 20+.
-
-> **Preview the plan without writing files:**
+> Preview the plan without writing files:
 > `npx mkdocs-material-to-starlight ./my-mkdocs --explain`
 
 ---
 
-## Why use this
-
-- **Tested at real scale.** Conversion finishes in seconds, even on thousand-page sites. A `--check` run adds seconds to a couple of minutes depending on site size (it needs `npm install` to have run in the output directory first; without it, the check reports that immediately instead of hanging).
-- **Maps every Material feature.** Admonitions, tabs, grids, snippets, icons, math, mermaid, i18n, mike versions. Features without a clean Starlight equivalent (Jinja macros, custom theme overrides) become diagnostics with file and line numbers.
-- **Scripts cleanly.** The wizard prints its equivalent unattended command on exit. Drop that command into a CI workflow. Exit codes follow Unix convention.
-- **Idempotent.** Running it twice produces byte-identical output, so reruns do not churn diffs.
-
----
-
 ## What it converts
-
-If MkDocs Material renders it, this tool maps it. The mapping by area:
 
 <details>
 <summary><strong>Markdown syntax and PyMdown extensions</strong></summary>
 
 | MkDocs Material | Starlight output |
 |---|---|
-| `!!! note "Title"` admonitions (12 types) | `:::note[Title]` aside directives; the 7 types Starlight's 4 asides can't express (abstract, info, question, success, failure, bug, example) are preserved by a generated Astro 7-native remark plugin |
+| `!!! note "Title"` admonitions (12 types) | `:::note[Title]` aside directives; a generated Astro 7-native remark plugin preserves abstract, info, question, success, failure, bug, and example |
 | `??? note` / `???+ note` collapsible | `<details><summary>Title</summary>...</details>` |
 | `=== "Tab"` content tabs | Starlight `<Tabs>/<TabItem>` MDX components (default; `--tabs html` keeps `.md` with a shim) |
 | `<div class="grid cards" markdown>` | `<div class="sl-card-grid">…</div>` |
@@ -77,7 +64,7 @@ If MkDocs Material renders it, this tool maps it. The mapping by area:
 | `nav:` tree | `sidebar` config in `astro.config.mjs` |
 | `site_name`, `site_description`, `site_url` | `title`, `description` on the integration; `site` on Astro config |
 | `site_url` with a subpath (GitHub Pages project sites) | Astro `base:` plus `starlight-base-path` so content links resolve on subpath deploys |
-| `theme.features: navigation.tabs` | `starlight-sidebar-topics` — top-level nav sections become topics with per-topic sidebars (`--no-sidebar-topics` opts out) |
+| `theme.features: navigation.tabs` | `starlight-sidebar-topics`; top-level nav sections become topics with per-topic sidebars (`--no-sidebar-topics` opts out) |
 | `theme.features: navigation.top` | `starlight-scroll-to-top` |
 | `theme.features: announce.dismiss` / `content.action.view` | `starlight-announcement` / `starlight-page-actions` |
 | `draft_docs` | Matching files receive `draft: true`; `starlight-auto-drafts` keeps them in dev and removes production sidebar links |
@@ -105,8 +92,8 @@ If MkDocs Material renders it, this tool maps it. The mapping by area:
 | `mkdocs-d2-plugin` | `astro-d2` dep (the `d2` CLI must be on PATH at build time) |
 | Giscus comments (`overrides/partials/comments.html`) | `starlight-giscus` with the repo/category IDs parsed from the partial; unparseable configs stay a diagnostic |
 | `mkdocs-swagger-ui-tag` | `starlight-openapi` dep |
-| `mkdocs-macros-plugin` (Jinja2) | Per-occurrence diagnostic with file:line locator (cannot be evaluated) |
-| `mkdocs-puml` / `plantuml-markdown` | Diagnostic — `astro-plantuml` still peers astro@^5 and won't resolve against the Astro 7 stack |
+| `mkdocs-macros-plugin` (Jinja2) | Diagnostic at each occurrence with a file and line locator |
+| `mkdocs-puml` / `plantuml-markdown` | Diagnostic: `astro-plantuml` still peers astro@^5 and won't resolve against the Astro 7 stack |
 | Interactive `pymdownx.superfences.custom_fences` | Diagnostic recommending `astro-live-code` and a renderable language fence with the `live` metadata flag |
 | `mkdocs-print-site-plugin` | Recommends `starlight-to-pdf` for PDF artifacts; documents the custom `print.astro` path for combined HTML |
 | `gen-files`, `monorepo`, `multirepo`, `meta`, `privacy`, `mkdocstrings`, `mkdocs-jupyter` | Diagnostic in `MIGRATION_NOTES.md` with documented workaround |
@@ -115,38 +102,38 @@ If MkDocs Material renders it, this tool maps it. The mapping by area:
 
 ---
 
-## What you get
+## Output
 
 ```
 output/
 ├── astro.config.mjs              ← migrated config: sidebar, redirects, locales, plugins
-├── package.json                  ← scripts and pinned deps for every feature you used
-├── biome.json                    ← formatter/linter config (npm run format works day one)
+├── package.json                  ← scripts and pinned dependencies
+├── biome.json                    ← formatter and linter config
 ├── MIGRATION_NOTES.md            ← human-readable diagnostics, grouped by rule
 ├── public/                       ← non-Markdown assets (images, PDFs) copied through
 └── src/
     ├── content.config.ts         ← docs collection wired to Starlight's loader/schema
-    ├── content/docs/             ← every Markdown page, converted (plus a 404 page)
-    └── styles/mkdocs-migration.css  ← shim so grids, cards, and tabs render correctly
+    ├── content/docs/             ← converted Markdown pages and a 404 page
+    └── styles/mkdocs-migration.css  ← styles for grids, cards, and tabs
 ```
 
-The project builds as-is for the common case. `cd output && npm install && npm run dev` and you have a running Starlight site.
+Run `cd output && npm install && npm run dev` to start the converted site.
 
 ---
 
 ## Common workflows
 
 ```bash
-# First-time conversion: interactive wizard (recommended)
+# Interactive conversion
 npx mkdocs-material-to-starlight
 
-# Unattended (CI or scripted): accepts the wizard's defaults
+# Unattended conversion with wizard defaults
 npx mkdocs-material-to-starlight ./mkdocs-project ./starlight-out --yes
 
-# Dry-run: print the migration plan, write nothing
+# Print the migration plan without writing files
 npx mkdocs-material-to-starlight ./mkdocs-project --explain
 
-# Run with astro check so type and link errors fail fast
+# Run astro check on the output
 npx mkdocs-material-to-starlight ./mkdocs-project ./starlight-out --yes --check
 
 # Resolve PyMdown snippets from a custom directory
@@ -154,13 +141,11 @@ npx mkdocs-material-to-starlight ./mkdocs-project ./starlight-out \
   --yes --snippet-base-path docs --snippet-base-path includes
 ```
 
-The wizard prints the equivalent unattended command when it finishes, ready to paste into CI.
-
 ---
 
 ## Diagnostics
 
-The converter does not throw on bad input. Anything it cannot handle becomes a typed diagnostic on the run report. A malformed admonition will not abort a 2,000-page conversion.
+The converter reports bad input as typed diagnostics and continues with the remaining files.
 
 In your terminal:
 
@@ -168,13 +153,7 @@ In your terminal:
 api/auth.md:12:4  warning  broken-link  link target "missing.md" was not found in the slug map
 ```
 
-In `outputDir/MIGRATION_NOTES.md`:
-
-- A per-rule breakdown of every diagnostic, grouped by file
-- Any unmapped `mkdocs.yml` top-level fields you may want to migrate by hand
-- Workaround pointers for plugins that have no clean Starlight equivalent
-
-Every rule is documented. `--explain` prints the registered description and fix for each one before you run a conversion.
+`outputDir/MIGRATION_NOTES.md` groups diagnostics by rule and file. It also lists unmapped `mkdocs.yml` fields and workarounds for unsupported plugins. Run `--explain` to print each rule's description and fix before conversion.
 
 ---
 
@@ -185,12 +164,12 @@ mkdocs-material-to-starlight <project-dir> <output-dir> [options]
 mkdocs-material-to-starlight <project-dir> --explain
 mkdocs-material-to-starlight compare <baseline-url> <converted-url> [options]
 
-Convert options (abbreviated — run --help for the full Tier 1/Tier 2 list):
+Convert options (run `--help` for the full list):
   --snippet-base-path <path>   Resolve PyMdown snippets against this directory.
                                Repeatable; first match wins.
   --check / --no-check         Run `astro check` against the output and surface
                                its diagnostics. Needs `npm install` in the output
-                               directory first; reports that immediately otherwise.
+                               directory first; reports the missing install otherwise.
   --check-timeout <ms>         Override the astro-check timeout (default: 10min).
   --sidebar-topics             Install starlight-sidebar-topics for nav.tabs
   --no-sidebar-topics          Keep the flat sidebar instead.
@@ -211,14 +190,12 @@ Common:
 
 Exit codes: `0` success, `1` runtime or check failure, `2` usage error.
 
-The `compare` subcommand requires Playwright and pixelmatch as optional peers:
+Install the `compare` peer dependencies before using that subcommand:
 
 ```bash
 npm install playwright pixelmatch pngjs
 npx playwright install chromium
 ```
-
-These are optional. The converter itself does not depend on them.
 
 ---
 
@@ -243,31 +220,27 @@ for (const tagged of result.value.diagnostics) {
 }
 ```
 
-The success result also exposes `astroConfigSource`, `packageJsonSource`, `migrationNotesSource`, and `sidebarSource` for inspection or custom write strategies.
+The success result exposes `astroConfigSource`, `packageJsonSource`, `migrationNotesSource`, and `sidebarSource` for custom write strategies.
 
 ---
 
 ## Limitations
 
-Read these before you commit the output:
-
-- **Theme palette, fonts, `extra_css`, and `extra_javascript` are auto-translated** (accent colors → Starlight custom properties, `theme.font` → Fontsource packages, extra assets → `customCss`/`head` entries), but **custom `overrides/` templates are not** — they land in `MIGRATION_NOTES.md`. Starlight's design system differs from Material's, so review the translated colors against the Starlight theme.
-- **`mkdocs-macros-plugin` Jinja2 expressions** cannot be evaluated. Each `{{ … }}` and `{% … %}` site is reported with file and line so it can be replaced by hand.
-- **`mkdocs-section-index` and `mkdocs-literate-nav`** cover the common cases. Advanced patterns (per-directory recursive `SUMMARY.md`, implicit-index injection for entries not in `nav:`) are not yet implemented.
-- **`--dry-run`** is parsed but a no-op. Use `--explain` instead.
-
-Run `--explain` first to see which features in your site will trigger diagnostics.
+- The converter maps theme palettes to Starlight custom properties, fonts to Fontsource packages, and extra assets to `customCss` or `head` entries. It records custom `overrides/` templates in `MIGRATION_NOTES.md`. Review translated colors against the Starlight theme.
+- The converter cannot evaluate `mkdocs-macros-plugin` Jinja2 expressions. It reports each `{{ … }}` and `{% … %}` occurrence with its file and line.
+- `mkdocs-section-index` and `mkdocs-literate-nav` support standard layouts. They do not support recursive per-directory `SUMMARY.md` files or implicit indexes for entries outside `nav:`.
+- `--dry-run` has no effect. Use `--explain`.
 
 ---
 
-## How it works
+## Architecture
 
-Built on the [unified](https://unifiedjs.com) and [remark](https://github.com/remarkjs/remark) ecosystem. Four design pillars:
+The converter uses [unified](https://unifiedjs.com) and [remark](https://github.com/remarkjs/remark).
 
-- **Plugin-isolated.** Every transform owns a disjoint MDAST `(node-type, name)` namespace. Plugins are commutative; reordering them does not change output.
-- **Idempotent.** `convert(convert(x)) === convert(x)` byte-equal. Verified at unit, composed, file, site, and CLI levels.
-- **Diagnostic-first.** Failures attach typed diagnostics to the report. They never throw.
-- **Functional core, imperative shell.** Pure logic in `domain/` and `use-cases/`. All I/O lives behind ports in `infrastructure/`.
+- Each transform owns a disjoint MDAST `(node-type, name)` namespace, so plugin order does not change output.
+- A second conversion produces byte-identical output: `convert(convert(x)) === convert(x)`.
+- Input failures produce typed diagnostics instead of exceptions.
+- Pure logic lives in `domain/` and `use-cases/`; `infrastructure/` handles I/O through ports.
 
 ```
 src/
@@ -277,13 +250,13 @@ src/
 └── interface/      CLI and programmatic API; the only place that wires concrete adapters
 ```
 
-Each layer's import rules and boundaries are documented in its own README ([`src/domain/`](./src/domain/README.md), [`src/use-cases/`](./src/use-cases/README.md), [`src/infrastructure/`](./src/infrastructure/README.md), [`src/interface/`](./src/interface/README.md)).
+See each layer's README for import rules: [`src/domain/`](./src/domain/README.md), [`src/use-cases/`](./src/use-cases/README.md), [`src/infrastructure/`](./src/infrastructure/README.md), and [`src/interface/`](./src/interface/README.md).
 
 ---
 
 ## Development
 
-Requires Node 20+.
+Requires Node 20.19+.
 
 ```bash
 npm install
@@ -295,9 +268,7 @@ npx vitest run path/to/file.test.ts           # single test file
 npx vitest run -t 'pattern matches subject'   # single test by title
 ```
 
-Every commit that introduces production code includes the failing test that motivated it. The idempotency property test runs the full pipeline twice on every fixture and asserts byte-equality of the second pass.
-
-Bug reports, real-world fixtures, and PRs are welcome at [github.com/sitapix/mkdocs-material-to-starlight/issues](https://github.com/sitapix/mkdocs-material-to-starlight/issues). Sites that break the converter are the most valuable contribution.
+Report bugs and submit fixtures at [github.com/sitapix/mkdocs-material-to-starlight/issues](https://github.com/sitapix/mkdocs-material-to-starlight/issues).
 
 ---
 
