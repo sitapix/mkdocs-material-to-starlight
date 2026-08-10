@@ -37,6 +37,17 @@ describe('ensureTitle', () => {
     expect(out).toContain('title: Auth Tokens');
   });
 
+  it.each([
+    ['api.md', 'API'],
+    ['oauth-overview.md', 'OAuth Overview'],
+    ['nodejs-runtime.md', 'Node.js Runtime'],
+    ['graphql-schema.md', 'GraphQL Schema'],
+    ['postgresql-tuning.md', 'PostgreSQL Tuning'],
+  ])('uses technical casing for synthesized filename title %s', (sourcePath, title) => {
+    const out = process('plain\n', sourcePath);
+    expect(out).toContain(`title: ${title}`);
+  });
+
   it('uses index.md → "Home" by convention', () => {
     const out = process('plain\n', 'index.md');
     expect(out).toContain('title: Home');

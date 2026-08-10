@@ -62,13 +62,14 @@ npm run dev
 | MkDocs | Starlight output |
 |---|---|
 | `nav:` tree | `sidebar` config in `astro.config.mjs` |
+| No `nav:` tree | Complete sidebar synthesized from the docs directory tree, with software-aware group casing |
 | `site_name`, `site_description`, `site_url` | `title`, `description` on the integration; `site` on Astro config |
 | `site_url` with a subpath (GitHub Pages project sites) | Astro `base:` plus `starlight-base-path` so content links resolve on subpath deploys |
 | `theme.features: navigation.tabs` | `starlight-sidebar-topics`; top-level nav sections become topics with per-topic sidebars (`--no-sidebar-topics` opts out) |
 | `theme.features: navigation.top` | `starlight-scroll-to-top` |
 | `theme.features: announce.dismiss` / `content.action.view` | `starlight-announcement` / `starlight-page-actions` |
 | `draft_docs` | Matching files receive `draft: true`; `starlight-auto-drafts` keeps them in dev and removes production sidebar links |
-| Missing frontmatter `title` | Synthesized from first H1 or humanized filename (Starlight requires it) |
+| Missing frontmatter `title` | Synthesized from first H1 or a software-aware humanized filename (Starlight requires it) |
 | Missing 404 page | Minimal styled `404.md` scaffolded (skipped when the source converts its own) |
 
 </details>

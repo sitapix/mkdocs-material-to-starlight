@@ -20,6 +20,7 @@ import type { Heading, Root, Yaml } from 'mdast';
 import type { Plugin } from 'unified';
 import type { Diagnostic } from '../../../domain/diagnostics/diagnostic.js';
 import { createDiagnostic } from '../../../domain/diagnostics/diagnostic.js';
+import { humanizeSidebarLabel } from '../../compile-navigation/humanize-sidebar-label.js';
 
 export interface EnsureTitleOptions {
   readonly sourcePath: string;
@@ -237,11 +238,7 @@ function humanizeFilename(sourcePath: string): string {
   if (stem === 'index') {
     return 'Home';
   }
-  return stem
-    .split(/[-_\s]+/)
-    .filter((word) => word.length > 0)
-    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-    .join(' ');
+  return humanizeSidebarLabel(stem);
 }
 
 function quoteIfNeeded(title: string): string {

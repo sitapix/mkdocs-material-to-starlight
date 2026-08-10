@@ -78,7 +78,12 @@ describe('interface/api/convertSiteFromDisk', () => {
     expect(result.value.sidebarSource).toContain(`label: 'API'`);
   });
 
-  it('does not emit empty sidebar topics when navigation.tabs has no nav', async () => {
+  it('synthesizes capitalized sidebar topics when navigation.tabs has no nav', async () => {
+    mkdirSync(join(projectDir, 'docs', 'runtime-systems', 'nodejs'), { recursive: true });
+    writeFileSync(
+      join(projectDir, 'docs', 'runtime-systems', 'nodejs', 'event-loop.md'),
+      '---\ntitle: Event Loop\n---\n',
+    );
     writeFileSync(
       join(projectDir, 'mkdocs.yml'),
       [
@@ -97,8 +102,10 @@ describe('interface/api/convertSiteFromDisk', () => {
     if (!result.ok) return;
 
     const astroConfig = readFileSync(join(outputDir, 'astro.config.mjs'), 'utf8');
-    expect(astroConfig).not.toContain('starlightSidebarTopics');
+    expect(astroConfig).toContain('starlightSidebarTopics');
     expect(astroConfig).not.toContain('sidebar: []');
+    expect(astroConfig).toContain("label: 'Runtime Systems'");
+    expect(astroConfig).toContain("label: 'Node.js'");
   });
 
   it('emits a narrow pnpm build policy when pnpm is selected', async () => {
