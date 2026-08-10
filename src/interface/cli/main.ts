@@ -86,7 +86,7 @@ Convert:
   --check-timeout <ms>     Override astro-check timeout (default 10min)
   --dry-run                In-memory only; no files written
   --snippet-base-path <p>  Resolve PyMdown snippets here (repeatable)
-  --package-manager <pm>   npm | pnpm | yarn | bun (next-steps hint only)
+  --package-manager <pm>   npm | pnpm | yarn | bun (scaffold policy + next steps)
 
 Wizard decisions (Tier 1 — also surfaced as flags):
   --tabs <mdx|html>        Tabs strategy when content.tabs.link is set
@@ -368,9 +368,12 @@ async function runConvertCompute(
   if (command.dryRun) {
     return { kind: 'fatal', message: '--dry-run is not yet supported in this build' };
   }
+  const packageManager =
+    command.packageManager ?? (await detectRepositoryPackageManager(command.projectDir)) ?? 'npm';
   const input = {
     projectDir: command.projectDir,
     outputDir: command.outputDir,
+    packageManager,
     ...(command.force ? { force: true } : {}),
     ...(command.snippetBasePaths !== null ? { snippetBasePaths: command.snippetBasePaths } : {}),
     ...(command.linksValidator !== null ? { linksValidator: command.linksValidator } : {}),
@@ -412,8 +415,6 @@ async function runConvertCompute(
   // astro check — means the generated project will not build. A clean exit 0
   // here would silently ship broken output to consumers.
   const exitCode = allDiagnostics.some((d) => d.diagnostic.severity === 'error') ? 1 : 0;
-  const packageManager =
-    command.packageManager ?? (await detectRepositoryPackageManager(command.projectDir)) ?? 'npm';
   return {
     kind: 'ok',
     exitCode,

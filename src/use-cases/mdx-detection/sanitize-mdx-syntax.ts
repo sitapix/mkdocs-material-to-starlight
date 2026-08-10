@@ -618,14 +618,10 @@ export function stripInlineAttrLists(source: string, report?: SanitizeReport): s
         continue;
       }
       if (ID_TOKEN_RE.test(t)) continue;
-      // PyMdown bare flag attribute (`data-tip-move`). Treat as a class/
-      // attribute-shaped token so the strip proceeds. We require the token
-      // to contain `-` OR be a known flag-shape — bare identifiers like
-      // `note` (paragraph text mid-block) shouldn't trigger the strip.
-      if (FLAG_TOKEN_RE.test(t) && /-/.test(t)) {
-        hasClassOrKv = true;
-        continue;
-      }
+      // PyMdown also tolerates bare flag-like tokens. Accept them only as
+      // companions to a class or key/value token; the final hasClassOrKv
+      // guard keeps a prose/JS-shaped `{note}` expression untouched.
+      if (FLAG_TOKEN_RE.test(t)) continue;
       allValid = false;
       break;
     }

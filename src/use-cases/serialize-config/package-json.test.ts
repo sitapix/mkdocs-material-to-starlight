@@ -74,13 +74,15 @@ describe('serializePackageJson', () => {
     expect(parsed.dependencies).toHaveProperty('katex');
   });
 
-  it('adds astro-mermaid when mermaid feature is detected', () => {
+  it('adds astro-mermaid and its required Mermaid peer when mermaid is detected', () => {
     const out = serializePackageJson({
       siteName: 'X',
       siteDescription: null,
       detectedFeatures: ['mermaid'],
     });
-    expect(JSON.parse(out).dependencies).toHaveProperty('astro-mermaid');
+    const dependencies = JSON.parse(out).dependencies;
+    expect(dependencies).toHaveProperty('astro-mermaid');
+    expect(dependencies).toHaveProperty('mermaid');
   });
 
   it('adds @astrojs/rss when rss feature is detected', () => {
@@ -102,6 +104,7 @@ describe('serializePackageJson', () => {
     expect(parsed.dependencies).not.toHaveProperty('remark-math');
     expect(parsed.dependencies).not.toHaveProperty('rehype-katex');
     expect(parsed.dependencies).not.toHaveProperty('astro-mermaid');
+    expect(parsed.dependencies).not.toHaveProperty('mermaid');
   });
 
   it('uses packageName directly when provided, bypassing slugification', () => {

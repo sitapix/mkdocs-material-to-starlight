@@ -154,10 +154,15 @@ export const FEATURE_DEPENDENCIES: Readonly<
     // config imports it by name.
     ['@astrojs/markdown-remark', '^7.2.2'],
   ],
-  // astro-mermaid 2.x peers `astro >=4` and adds peers
-  // `@mermaid-js/layout-elk ^0.2.0` + `mermaid ^10 || ^11` (npm
-  // auto-installs them). `^1.0.0` could not reach the 2.x line.
-  mermaid: [['astro-mermaid', '^2.1.0']],
+  // astro-mermaid 2.x peers `astro >=4` and requires `mermaid ^10 || ^11`.
+  // Pin Mermaid directly because strict package managers such as pnpm do not
+  // guarantee a root-level peer link for astro-mermaid's generated import.
+  // `@mermaid-js/layout-elk` is optional and is not needed by the default
+  // renderer. `^1.0.0` could not reach the 2.x line.
+  mermaid: [
+    ['astro-mermaid', '^2.1.0'],
+    ['mermaid', '^11.16.1'],
+  ],
   // 0.15.0 peers `@astrojs/starlight >=0.41.0`, matching the core pin.
   'image-zoom': [['starlight-image-zoom', '^0.15.0']],
   // `mike` (versioned docs) → `starlight-versions`.

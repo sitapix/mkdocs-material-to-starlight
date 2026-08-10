@@ -65,7 +65,7 @@ describe('serializeAstroConfig expressiveCode', () => {
 });
 
 describe('serializeAstroConfig', () => {
-  it('produces a complete astro.config.mjs file with site name and empty sidebar', () => {
+  it('lets Starlight autogenerate navigation when the source has no sidebar', () => {
     const out = serializeAstroConfig({
       siteName: 'My Docs',
       siteDescription: null,
@@ -76,7 +76,7 @@ describe('serializeAstroConfig', () => {
     expect(out).toContain(`import starlight from '@astrojs/starlight';`);
     expect(out).toContain(`export default defineConfig`);
     expect(out).toContain(`title: 'My Docs'`);
-    expect(out).toContain(`sidebar: []`);
+    expect(out).not.toContain(`sidebar:`);
   });
 
   it('includes site description when present', () => {
@@ -235,6 +235,17 @@ describe('serializeAstroConfig', () => {
       blogOptions: { blog_dir: 'news' },
     });
     expect(out).toContain(`{ exclude: ['/', '/404', '/news/**'] }`);
+  });
+
+  it('excludes generated starlight-tags routes from sidebar topics', () => {
+    const out = serializeAstroConfig({
+      siteName: 'X',
+      siteDescription: null,
+      siteUrl: null,
+      sidebar: [{ kind: 'group', label: 'Guide', items: [{ kind: 'slug', slug: 'guide' }] }],
+      detectedFeatures: ['sidebar-topics', 'tags'],
+    });
+    expect(out).toContain(`{ exclude: ['/', '/404', '/tags', '/tags/**'] }`);
   });
 
   it('emits starlightScrollToTop for the scroll-to-top feature (navigation.top)', () => {

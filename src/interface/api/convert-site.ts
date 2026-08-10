@@ -18,6 +18,7 @@
 
 import { join } from 'node:path';
 import { err, ok, type Result } from '../../domain/result.js';
+import type { PackageManager } from '../../domain/wizard/answers.js';
 import { atomicCopyFile, atomicWriteText } from '../../infrastructure/fs/atomic-write.js';
 import { buildSidebar } from '../../use-cases/compile-navigation/build-sidebar.js';
 import { convertSite, type TaggedDiagnostic } from '../../use-cases/convert-site/convert.js';
@@ -38,6 +39,7 @@ import { assembleConfigOutputs } from '../../use-cases/serialize-config/assemble
 import { serializeBiomeConfig } from '../../use-cases/serialize-config/biome-config.js';
 import { buildOutputSources } from '../../use-cases/serialize-config/build-output-sources.js';
 import { serializeContentConfig } from '../../use-cases/serialize-config/content-config.js';
+import { serializePnpmWorkspace } from '../../use-cases/serialize-config/pnpm-workspace.js';
 import { serializeSidebar } from '../../use-cases/serialize-config/sidebar.js';
 import { computeUnclaimedSlugs } from '../../use-cases/serialize-config/topics-exclude.js';
 
@@ -62,6 +64,8 @@ export interface ConvertSiteFromDiskInput {
   readonly configFormat?: 'mjs' | 'ts';
   /** Override for the package.json name field; bypasses slugification. */
   readonly packageName?: string;
+  /** Package manager selected by the CLI. pnpm receives its required build policy file. */
+  readonly packageManager?: PackageManager;
   /** When true and a logo is present, emits replacesTitle: true in the logo block. */
   readonly logoReplacesTitle?: boolean;
   /** Explicit version slugs for starlight-versions. Overrides the placeholder when the
@@ -275,7 +279,10 @@ export async function convertSiteFromDisk(
   ]
     // `navigation.tabs` → starlight-sidebar-topics is on by default;
     // `--no-sidebar-topics` keeps the flat sidebar instead.
-    .filter((f) => f !== 'sidebar-topics' || input.sidebarTopics !== false)
+    .filter(
+      (f) =>
+        f !== 'sidebar-topics' || (input.sidebarTopics !== false && sidebarWithPages.length > 0),
+    )
     .sort();
 
   // Extract per-plugin option dicts so the astro-config + og-endpoint
@@ -412,6 +419,7 @@ export async function convertSiteFromDisk(
     extendedFrontmatterFields,
     preserveSlugs,
     includeBlogSchema: allFeatures.includes('blog'),
+    ...(input.packageManager === undefined ? {} : { packageManager: input.packageManager }),
   });
   if (!writeResult.ok) {
     return err({ code: 'file-write-failed', message: writeResult.error });
@@ -515,6 +523,8 @@ interface WriteOutputsInput {
    * blog frontmatter (most critically `date`) is coerced to its typed form.
    */
   readonly includeBlogSchema: boolean;
+  /** Emit package-manager-specific project policy when required. */
+  readonly packageManager?: PackageManager;
 }
 
 async function writeOutputs(input: WriteOutputsInput): Promise<Result<true, string>> {
@@ -540,6 +550,9 @@ async function writeOutputs(input: WriteOutputsInput): Promise<Result<true, stri
     ],
     [['src', 'styles', 'mkdocs-migration.css'], input.stylesheetSource],
   ];
+  if (input.packageManager === 'pnpm') {
+    scaffold.push([['pnpm-workspace.yaml'], serializePnpmWorkspace()]);
+  }
   // Starlight probes `getEntry('docs', '404')` for a custom not-found page
   // on every build; without one, Astro's content runtime warns "Entry docs
   // → 404 was not found." at the end of EVERY `astro build` (field-tested

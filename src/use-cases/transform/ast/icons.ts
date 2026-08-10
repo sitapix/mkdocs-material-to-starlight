@@ -231,7 +231,12 @@ function isPureAttrList(blob: string): boolean {
     }
     tokens.push(trimmed.slice(start, j));
   }
-  return tokens.length > 0 && tokens.every((t) => ATTR_TOKEN_RE.test(t));
+  const hasClassOrAttribute = tokens.some((token) => token.startsWith('.') || token.includes('='));
+  return (
+    tokens.length > 0 &&
+    hasClassOrAttribute &&
+    tokens.every((token) => ATTR_TOKEN_RE.test(token) || /^[A-Za-z][\w-]*$/.test(token))
+  );
 }
 
 function unmappedDiagnostic(descriptor: { original: string }): Diagnostic {

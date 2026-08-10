@@ -301,7 +301,7 @@ export function serializeAstroConfig(input: AstroConfigInput): string {
       `      tableOfContents: { minHeadingLevel: ${String(input.tableOfContents.minHeadingLevel)}, maxHeadingLevel: ${String(input.tableOfContents.maxHeadingLevel)} },`,
     );
   }
-  if (!hasSidebarTopics) {
+  if (!hasSidebarTopics && input.sidebar.length > 0) {
     lines.push(`      sidebar: ${indentSidebar(serializeSidebar(input.sidebar))},`);
   }
   const cssEntries = ['./src/styles/mkdocs-migration.css'];
@@ -407,6 +407,11 @@ export function serializeAstroConfig(input: AstroConfigInput): string {
       const blogDir =
         typeof input.blogOptions?.blog_dir === 'string' ? input.blogOptions.blog_dir : 'blog';
       excludeGlobs.push(`/${blogDir}/**`);
+    }
+    if (hasTags) {
+      // starlight-tags owns its generated index and per-tag routes. They are
+      // not content slugs and cannot be claimed by a sidebar topic.
+      excludeGlobs.push('/tags', '/tags/**');
     }
     // Converted pages absent from the nav (MkDocs converts every file,
     // listed or not) — computed exactly by the caller from the slug map.

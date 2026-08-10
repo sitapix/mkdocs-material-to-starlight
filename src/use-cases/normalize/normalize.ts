@@ -35,6 +35,7 @@ import { normalizeStandardEmoji } from './emoji.js';
 import { normalizeFancylists } from './fancylists.js';
 import { normalizeFrontmatterCommentsStrip } from './frontmatter-comments-strip.js';
 import { normalizeFrontmatterDateFlatten } from './frontmatter-date-flatten.js';
+import { normalizeFrontmatterFence } from './frontmatter-fence.js';
 import { normalizeFrontmatterHide } from './frontmatter-hide.js';
 import { normalizeFrontmatterTemplate } from './frontmatter-template.js';
 import { normalizeFrontmatterTitleCoercion } from './frontmatter-title-coerce.js';
@@ -69,7 +70,10 @@ export interface NormalizeReport {
 }
 
 export function normalize(source: string, report?: NormalizeReport): string {
-  let current = source;
+  // Python-Markdown accepts `...` as a YAML frontmatter terminator, while
+  // remark-frontmatter requires a matching `---`. Canonicalize before every
+  // transform that scans frontmatter so metadata cannot leak into the body.
+  let current = normalizeFrontmatterFence(source);
   // Run BEFORE everything else: remark-parse rejects link targets that
   // contain `{{` (treats the whole `[text](url)` as plain text), so any
   // Jinja-in-URL braces must be entity-escaped before parsing or the

@@ -45,6 +45,12 @@ describe('normalizeAttrList', () => {
     expect(out).toBe('See :icon[clock] here.\n');
   });
 
+  it('strips mixed class and bare-flag attrs after a Material icon', () => {
+    const src = ':material-link:{ .prominent centered } [Project guide](/guide/)\n';
+    const out = normalizeAttrList(src);
+    expect(out).toBe(':material-link: [Project guide](/guide/)\n');
+  });
+
   it('is idempotent', () => {
     const src = "| Code { scope='col' } | Name { .sr-only } |\n";
     const once = normalizeAttrList(src);

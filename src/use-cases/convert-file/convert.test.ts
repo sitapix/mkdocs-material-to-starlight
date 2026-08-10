@@ -118,6 +118,33 @@ describe('convertFile', () => {
     expect(out.text).toContain(':::note');
   });
 
+  it('canonicalizes a YAML document-end marker used as the frontmatter closer', () => {
+    const map = fixture(['guides/remote-access.md']);
+    const source = [
+      '---',
+      'tags:',
+      '  - Networking',
+      '...',
+      '',
+      '# Remote Access',
+      '',
+      'Use the client to connect.',
+      '',
+    ].join('\n');
+
+    const out = convertFile({
+      source,
+      sourcePath: 'guides/remote-access.md',
+      slugMap: map,
+    });
+
+    expect(out.text).toMatch(/^---\ntitle: Remote Access\ntags:\n {2}- Networking\n---/);
+    expect(out.text).not.toContain('\n***\n');
+    expect(out.text).not.toContain('\n...\n');
+    expect(out.text).not.toMatch(/^# Remote Access\b/m);
+    expect(out.text).toContain('Use the client to connect.');
+  });
+
   it('does not double-convert directives already in Starlight form', () => {
     const map = fixture(['index.md']);
     const source = ':::tip\nAlready Starlight.\n:::\n';

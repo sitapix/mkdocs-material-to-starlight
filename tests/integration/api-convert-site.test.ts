@@ -78,6 +78,44 @@ describe('interface/api/convertSiteFromDisk', () => {
     expect(result.value.sidebarSource).toContain(`label: 'API'`);
   });
 
+  it('does not emit empty sidebar topics when navigation.tabs has no nav', async () => {
+    writeFileSync(
+      join(projectDir, 'mkdocs.yml'),
+      [
+        'site_name: Demo',
+        'docs_dir: docs',
+        'theme:',
+        '  name: material',
+        '  features:',
+        '    - navigation.tabs',
+        '',
+      ].join('\n'),
+    );
+
+    const result = await convertSiteFromDisk({ projectDir, outputDir });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+
+    const astroConfig = readFileSync(join(outputDir, 'astro.config.mjs'), 'utf8');
+    expect(astroConfig).not.toContain('starlightSidebarTopics');
+    expect(astroConfig).not.toContain('sidebar: []');
+  });
+
+  it('emits a narrow pnpm build policy when pnpm is selected', async () => {
+    const result = await convertSiteFromDisk({ projectDir, outputDir, packageManager: 'pnpm' });
+    expect(result.ok).toBe(true);
+
+    expect(readFileSync(join(outputDir, 'pnpm-workspace.yaml'), 'utf8')).toBe(
+      'allowBuilds:\n  esbuild: true\n',
+    );
+  });
+
+  it('does not emit pnpm policy for other package managers', async () => {
+    const result = await convertSiteFromDisk({ projectDir, outputDir, packageManager: 'yarn' });
+    expect(result.ok).toBe(true);
+    expect(existsSync(join(outputDir, 'pnpm-workspace.yaml'))).toBe(false);
+  });
+
   it('scaffolds a 404 page so Starlight builds do not warn about a missing entry', async () => {
     // Starlight probes getEntry('docs', '404') on every build; without a
     // 404 page, Astro's content runtime warns "Entry docs → 404 was not
