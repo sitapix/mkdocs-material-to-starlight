@@ -64,6 +64,30 @@ describe('convertSite', () => {
     }
   });
 
+  it('marks draft_docs matches and enables the auto-drafts feature', async () => {
+    const fs = makeFs({
+      'docs/index.md': '# Home\n',
+      'docs/drafts/preview.md': '---\ntitle: Preview\n---\n\nNot ready.\n',
+    });
+    const result = await convertSite({
+      docsDir: 'docs',
+      sourcePaths: ['index.md', 'drafts/preview.md'],
+      fs,
+      draftDocsPatterns: ['drafts/'],
+    });
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.value.files['drafts/preview.md']).toContain('draft: true');
+      expect(result.value.files['index.md']).not.toContain('draft: true');
+      expect(result.value.detectedFeatures).toContain('auto-drafts');
+      expect(
+        result.value.diagnostics.some(
+          ({ diagnostic }) => diagnostic.ruleId === 'draft-docs-applied',
+        ),
+      ).toBe(true);
+    }
+  });
+
   it('returns a per-file converted output for every listed source', async () => {
     const fs = makeFs({
       'docs/index.md': '# Welcome\n',

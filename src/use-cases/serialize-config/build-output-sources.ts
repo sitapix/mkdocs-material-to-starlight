@@ -12,6 +12,7 @@
 import type { MaterialFontConfig } from '../../domain/starlight/font-mapping.js';
 import type { PaletteStrategy, StarlightPalette } from '../../domain/starlight/palette-mapping.js';
 import type { TaggedDiagnostic } from '../convert-site/convert.js';
+import { serializeMaterialAdmonitionsPlugin } from './material-admonitions.js';
 import { serializeOgEndpoint } from './og-endpoint.js';
 import { serializeRssEndpoint } from './rss-endpoint.js';
 import { serializeStyleSheet } from './styles.js';
@@ -48,6 +49,7 @@ export interface BuildOutputSourcesResult {
   readonly rssEndpointSource: string | null;
   readonly ogEndpointSource: string | null;
   readonly tagsYmlSource: string | null;
+  readonly materialAdmonitionsSource: string | null;
   readonly preserveSlugs: boolean;
 }
 
@@ -101,6 +103,10 @@ export function buildOutputSources(input: BuildOutputSourcesInput): BuildOutputS
   // structure; emit a minimal stub the user can extend.
   const tagsYmlSource = input.detectedFeatures.includes('tags') ? TAGS_YML_STUB : null;
 
+  const materialAdmonitionsSource = input.detectedFeatures.includes('markdown-blocks')
+    ? serializeMaterialAdmonitionsPlugin()
+    : null;
+
   // Auto-apply Starlight 0.35+'s `docsLoader({ generateId })` when any
   // source path has segments github-slugger would reshape. Replaces the
   // historic `slug-incompatible-path` warning with a real fix: the
@@ -115,6 +121,7 @@ export function buildOutputSources(input: BuildOutputSourcesInput): BuildOutputS
     rssEndpointSource,
     ogEndpointSource,
     tagsYmlSource,
+    materialAdmonitionsSource,
     preserveSlugs,
   };
 }

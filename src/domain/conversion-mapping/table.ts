@@ -323,6 +323,17 @@ const TABLE: ReadonlyArray<MappingRow> = [
     risk: 'low',
   },
   {
+    featureId: 'interactive-custom-fences',
+    materialInput:
+      'pymdownx.superfences.custom_fences entries whose name/class/formatter indicates a live playground or framework preview',
+    requiredExtensions: ['pymdownx.superfences'],
+    starlightOutput:
+      'diagnostic recommending astro-live-code; Python formatter callbacks require a manual rewrite to renderable language fences with trailing `live` metadata',
+    fileExt: 'mdx',
+    conversionType: 'recommended-dep',
+    risk: 'medium',
+  },
+  {
     featureId: 'plugin-glightbox',
     materialInput: 'mkdocs.yml plugins: [glightbox] (image lightbox plugin)',
     requiredExtensions: [],
@@ -338,9 +349,8 @@ const TABLE: ReadonlyArray<MappingRow> = [
     requiredExtensions: [],
     requiredPlugins: ['mike'],
     starlightOutput:
-      'starlight-versions Starlight plugin auto-wired (versions list left as a stub); starlight-changelogs companion package added to package.json deps so users can publish release notes alongside the version switcher',
-    summary:
-      'Adds starlight-versions (versions list left as a stub) plus starlight-changelogs companion package.',
+      'starlight-versions Starlight plugin auto-wired (versions list left as a stub)',
+    summary: 'Adds starlight-versions with the versions list left as a stub.',
     fileExt: 'md',
     conversionType: 'recommended-dep',
     risk: 'medium',
@@ -507,6 +517,16 @@ const TABLE: ReadonlyArray<MappingRow> = [
     fileExt: 'md',
     conversionType: 'text-pre-parse',
     risk: 'medium',
+  },
+  {
+    featureId: 'draft-docs',
+    materialInput: 'MkDocs 1.6 `draft_docs` gitignore-style path patterns',
+    requiredExtensions: [],
+    starlightOutput:
+      'matching pages receive `draft: true` frontmatter; starlight-auto-drafts dependency and plugin are emitted to preserve dev visibility and filter production sidebar links',
+    fileExt: 'md',
+    conversionType: 'text-pre-parse',
+    risk: 'low',
   },
   {
     featureId: 'snippets-auto-append',
@@ -907,6 +927,17 @@ const TABLE: ReadonlyArray<MappingRow> = [
     starlightOutput:
       'recommend native MDX `<video>` elements or `starlight-videos` plugin (course-style video components)',
     fileExt: 'mdx',
+    conversionType: 'recommended-dep',
+    risk: 'medium',
+  },
+  {
+    featureId: 'plugin-print-site',
+    materialInput: '`mkdocs-print-site-plugin` (combined printable HTML page)',
+    requiredExtensions: [],
+    requiredPlugins: ['print-site'],
+    starlightOutput:
+      'recommend starlight-to-pdf for the printable artifact; retain a custom src/pages/print.astro + print stylesheet recommendation when combined HTML is required',
+    fileExt: 'md',
     conversionType: 'recommended-dep',
     risk: 'medium',
   },

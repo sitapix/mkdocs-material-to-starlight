@@ -1,7 +1,15 @@
 import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import packageJson from '../../../package.json' with { type: 'json' };
+
+const wizardFlow = vi.hoisted(() => ({ result: { kind: 'cancelled' } as unknown }));
+
+vi.mock('./wizard-runner.js', () => ({
+  runWizardFlow: vi.fn(async () => wizardFlow.result),
+}));
+
 import { runCli } from './main.js';
 
 describe('runCli', () => {
@@ -44,7 +52,7 @@ describe('runCli', () => {
   it('prints version and exits 0 on --version', async () => {
     const code = await runCli(['--version'], makeIo());
     expect(code).toBe(0);
-    expect(stdout.join('\n').trim().length).toBeGreaterThan(0);
+    expect(stdout.join('\n').trim()).toBe(packageJson.version);
   });
 
   it('exits 2 with a usage message on zero args in non-interactive env', async () => {
@@ -53,6 +61,30 @@ describe('runCli', () => {
     // In CI/non-TTY environments the wizard branch fires and directs the user
     // to either pass --yes or use a terminal.
     expect(stderr.join('\n')).toMatch(/--yes|missing/i);
+  });
+
+  it('maps every interactive wizard result to its CLI exit code', async () => {
+    const stdoutDescriptor = Object.getOwnPropertyDescriptor(process.stdout, 'isTTY');
+    const stdinDescriptor = Object.getOwnPropertyDescriptor(process.stdin, 'isTTY');
+    const originalCi = process.env.CI;
+    Object.defineProperty(process.stdout, 'isTTY', { configurable: true, value: true });
+    Object.defineProperty(process.stdin, 'isTTY', { configurable: true, value: true });
+    delete process.env.CI;
+    try {
+      wizardFlow.result = { kind: 'cancelled' };
+      await expect(runCli([], makeIo())).resolves.toBe(130);
+      wizardFlow.result = { kind: 'non-interactive' };
+      await expect(runCli([], makeIo())).resolves.toBe(2);
+      wizardFlow.result = { kind: 'completed', exitCode: 1 };
+      await expect(runCli([], makeIo())).resolves.toBe(1);
+    } finally {
+      if (stdoutDescriptor) Object.defineProperty(process.stdout, 'isTTY', stdoutDescriptor);
+      else Reflect.deleteProperty(process.stdout, 'isTTY');
+      if (stdinDescriptor) Object.defineProperty(process.stdin, 'isTTY', stdinDescriptor);
+      else Reflect.deleteProperty(process.stdin, 'isTTY');
+      if (originalCi === undefined) delete process.env.CI;
+      else process.env.CI = originalCi;
+    }
   });
 
   it('converts a project end-to-end and exits 0', async () => {
@@ -246,5 +278,189 @@ describe('runCli', () => {
     );
     expect(indexOut).toContain('inlined body');
     expect(indexOut).not.toContain('--8<--');
+  });
+
+  it('reports --dry-run as an unsupported runtime operation', async () => {
+    const code = await runCli([projectDir, outputDir, '--dry-run'], makeIo());
+    expect(code).toBe(1);
+    expect(stderr.join('\n')).toContain('--dry-run is not yet supported');
+  });
+
+  it('threads every non-default conversion option into a real conversion', async () => {
+    const code = await runCli(
+      [
+        projectDir,
+        outputDir,
+        '--force',
+        '--snippet-base-path=docs',
+        '--no-links-validator',
+        '--tabs=html',
+        '--no-sidebar-topics',
+        '--no-rss',
+        '--mike-versions=1.0',
+        '--palette=skip',
+        '--config-format=ts',
+        '--package-name=custom-docs',
+        '--cards=skip',
+        '--mdx-mode=always',
+        '--logo-replaces-title',
+        '--keep-explicit-heading-ids',
+        '--no-smart-symbols',
+        '--no-emoji-shortcodes',
+        '--no-inline-marks',
+        '--no-auto-append',
+        '--snippet-max-depth=4',
+        '--snippet-dedent-subsections',
+        '--expressive-code-theme=github-dark',
+        '--admonition-map=custom-map.json',
+        '--extra-asset=extra.css',
+        '--locale=fr',
+        '--suppress=feature-tabs-link-occurrence',
+      ],
+      makeIo(),
+    );
+
+    expect([0, 1]).toContain(code);
+    expect(existsSync(join(outputDir, 'astro.config.ts'))).toBe(true);
+    expect(existsSync(join(outputDir, 'package.json'))).toBe(true);
+  });
+
+  it('passes an explicit astro-check timeout to the process runner', async () => {
+    let timeoutMs: number | undefined;
+    const code = await runCli(
+      [projectDir, outputDir, '--check', '--check-timeout=1234'],
+      makeIo(),
+      {
+        processRunner: {
+          async run(_command, _args, options) {
+            timeoutMs = options?.timeoutMs;
+            return {
+              ok: true,
+              value: { exitCode: 0, stdout: '', stderr: '', timedOut: false },
+            };
+          },
+        },
+      },
+    );
+
+    expect(code).toBe(0);
+    expect(timeoutMs).toBe(1234);
+  });
+
+  it('writes compare output to a report file and disposes the browser', async () => {
+    const reportPath = join(outputDir, 'visual-report.md');
+    const dispose = vi.fn(async () => {});
+    const code = await runCli(
+      [
+        'compare',
+        'http://baseline/',
+        'http://converted/',
+        '--pages',
+        'about',
+        '--report',
+        reportPath,
+      ],
+      makeIo(),
+      {
+        browserAutomator: {
+          async capture() {
+            return { ok: true as const, value: new Uint8Array([0]) };
+          },
+          dispose,
+        },
+        imageDiffer: {
+          async diff() {
+            return {
+              ok: true as const,
+              value: { mismatchedPixels: 0, width: 1, height: 1 },
+            };
+          },
+        },
+      },
+    );
+
+    expect(code).toBe(0);
+    expect(dispose).toHaveBeenCalledOnce();
+    expect(stdout).toContain(`wrote ${reportPath}`);
+    expect(existsSync(reportPath)).toBe(true);
+  });
+
+  it('reports a compare report write failure', async () => {
+    const blockingFile = join(outputDir, 'blocking-file');
+    writeFileSync(blockingFile, 'occupied');
+    const code = await runCli(
+      [
+        'compare',
+        'http://baseline',
+        'http://converted',
+        '--pages',
+        '/',
+        '--report',
+        join(blockingFile, 'report.md'),
+      ],
+      makeIo(),
+      {
+        browserAutomator: {
+          async capture() {
+            return { ok: true as const, value: new Uint8Array([0]) };
+          },
+        },
+        imageDiffer: {
+          async diff() {
+            return {
+              ok: true as const,
+              value: { mismatchedPixels: 0, width: 1, height: 1 },
+            };
+          },
+        },
+      },
+    );
+
+    expect(code).toBe(1);
+    expect(stderr.join('\n')).toContain('failed to write');
+  });
+
+  it('explains an auto-discovered nested project', async () => {
+    rmSync(join(projectDir, 'mkdocs.yml'));
+    mkdirSync(join(projectDir, 'website', 'docs'), { recursive: true });
+    writeFileSync(join(projectDir, 'website', 'mkdocs.yml'), 'site_name: Nested\n');
+
+    const code = await runCli([projectDir, '--explain'], makeIo());
+
+    expect(code).toBe(0);
+    expect(stderr.join('\n')).toContain('auto-discovered website/mkdocs.yml');
+    expect(stdout.join('\n')).toContain('Summary by depth');
+  });
+
+  it('reports ambiguous, absent, unreadable, invalid YAML, and invalid config explain inputs', async () => {
+    rmSync(join(projectDir, 'mkdocs.yml'));
+    mkdirSync(join(projectDir, 'one'), { recursive: true });
+    mkdirSync(join(projectDir, 'two'), { recursive: true });
+    writeFileSync(join(projectDir, 'one', 'mkdocs.yml'), 'site_name: One\n');
+    writeFileSync(join(projectDir, 'two', 'mkdocs.yml'), 'site_name: Two\n');
+    await expect(runCli([projectDir, '--explain'], makeIo())).resolves.toBe(1);
+    expect(stderr.join('\n')).toContain('multiple mkdocs.yml');
+
+    rmSync(join(projectDir, 'one'), { recursive: true, force: true });
+    rmSync(join(projectDir, 'two'), { recursive: true, force: true });
+    stderr = [];
+    await expect(runCli([projectDir, '--explain'], makeIo())).resolves.toBe(1);
+    expect(stderr.join('\n')).toContain('not found');
+
+    mkdirSync(join(projectDir, 'mkdocs.yml'));
+    stderr = [];
+    await expect(runCli([projectDir, '--explain'], makeIo())).resolves.toBe(1);
+    expect(stderr.join('\n')).toContain('could not read');
+
+    rmSync(join(projectDir, 'mkdocs.yml'), { recursive: true, force: true });
+    writeFileSync(join(projectDir, 'mkdocs.yml'), 'site_name: [\n');
+    stderr = [];
+    await expect(runCli([projectDir, '--explain'], makeIo())).resolves.toBe(1);
+    expect(stderr.join('\n')).toContain('not valid YAML');
+
+    writeFileSync(join(projectDir, 'mkdocs.yml'), 'docs_dir: docs\n');
+    stderr = [];
+    await expect(runCli([projectDir, '--explain'], makeIo())).resolves.toBe(1);
+    expect(stderr.join('\n')).toContain('malformed required fields');
   });
 });

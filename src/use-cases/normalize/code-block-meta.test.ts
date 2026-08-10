@@ -57,7 +57,60 @@ describe('normalizeCodeBlockMeta', () => {
     // as the language identifier.
     const out = normalizeCodeBlockMeta('``` hl_lines="3 4"\ncode\n```\n');
     expect(out).not.toContain('```hl_lines');
-    expect(out).toContain('{3,4}');
+    expect(out).toContain('```text {3,4}');
+  });
+
+  describe('normalizes real-project language identifiers', () => {
+    it.each([
+      ['Python', 'python'],
+      ['Markdown', 'markdown'],
+      ['TOML', 'toml'],
+      ['Dockerfile', 'dockerfile'],
+    ])('lowercases `%s` to `%s`', (sourceLanguage, expectedLanguage) => {
+      const out = normalizeCodeBlockMeta(`\`\`\`${sourceLanguage}\ncode\n\`\`\`\n`);
+      expect(out).toBe(`\`\`\`${expectedLanguage}\ncode\n\`\`\`\n`);
+    });
+
+    it.each([
+      ['pycon', 'python'],
+      ['output', 'text'],
+      ['.sh', 'bash'],
+    ])('maps unsupported alias `%s` to `%s`', (sourceLanguage, expectedLanguage) => {
+      const out = normalizeCodeBlockMeta(`\`\`\`${sourceLanguage}\ncode\n\`\`\`\n`);
+      expect(out).toBe(`\`\`\`${expectedLanguage}\ncode\n\`\`\`\n`);
+    });
+
+    it('normalizes a language while preserving Expressive Code metadata', () => {
+      expect(normalizeCodeBlockMeta('```TOML {12,13}\ncode\n```\n')).toContain('```toml {12,13}');
+    });
+  });
+
+  describe('adds a language to metadata-only fences', () => {
+    it('uses text for a title-only fence', () => {
+      expect(normalizeCodeBlockMeta('``` title="Content"\nbody\n```\n')).toContain(
+        '```text title="Content"',
+      );
+    });
+
+    it('uses text for an Expressive Code line-range with no language', () => {
+      expect(normalizeCodeBlockMeta('```{3,4}\nbody\n```\n')).toContain('```text {3,4}');
+    });
+
+    it('drops an orphan quote left by a malformed Material hl_lines value', () => {
+      expect(normalizeCodeBlockMeta('``` hl_lines="4 5""\nbody\n```\n')).toContain(
+        '```text {4,5}\n',
+      );
+    });
+
+    it('keeps a bare fence bare', () => {
+      expect(normalizeCodeBlockMeta('```\nbody\n```\n')).toBe('```\nbody\n```\n');
+    });
+
+    it('is idempotent after adding the fallback language', () => {
+      const source = '``` title="Content"\nbody\n```\n';
+      const first = normalizeCodeBlockMeta(source);
+      expect(normalizeCodeBlockMeta(first)).toBe(first);
+    });
   });
 
   describe('extracts title= from inside Material attr-list braces (Tier 3 #12)', () => {

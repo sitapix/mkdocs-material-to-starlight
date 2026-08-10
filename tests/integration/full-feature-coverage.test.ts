@@ -118,6 +118,7 @@ describe('full feature coverage end-to-end', () => {
     // Recommended-dep loop fired for plugin-driven features
     expect(packageJson.dependencies).toHaveProperty('starlight-image-zoom');
     expect(packageJson.dependencies).toHaveProperty('starlight-versions');
+    expect(packageJson.dependencies).toHaveProperty('starlight-auto-drafts');
 
     // astro.config.mjs imports and wires every detected plugin
     const astroConfig = readFileSync(join(outputDir, 'astro.config.mjs'), 'utf8');
@@ -126,11 +127,20 @@ describe('full feature coverage end-to-end', () => {
     expect(astroConfig).toContain(`import mermaid from 'astro-mermaid';`);
     expect(astroConfig).toContain(`import imageZoom from 'starlight-image-zoom';`);
     expect(astroConfig).toContain(`import starlightVersions from 'starlight-versions';`);
+    expect(astroConfig).toContain(`import starlightAutoDrafts from 'starlight-auto-drafts';`);
     expect(astroConfig).toContain('mermaid()');
     expect(astroConfig).toContain('imageZoom()');
     expect(astroConfig).toContain('remarkMath');
     expect(astroConfig).toContain('rehypeKatex');
     expect(astroConfig).toContain('starlightVersions(');
+    expect(astroConfig).toContain('starlightAutoDrafts()');
+
+    // MkDocs 1.6 draft_docs → Starlight draft frontmatter + auto-drafts.
+    const draftOut = readFileSync(
+      join(outputDir, 'src', 'content', 'docs', 'drafts', 'preview.md'),
+      'utf8',
+    );
+    expect(draftOut).toMatch(/^---\ndraft: true\n/);
 
     // Project scaffold complete
     expect(existsSync(join(outputDir, 'package.json'))).toBe(true);
@@ -222,6 +232,8 @@ function setupProject(projectDir: string): void {
       'site_description: Exercises every shipped feature.',
       'nav:',
       '  - Home: index.md',
+      'draft_docs: |',
+      '  drafts/',
       'plugins:',
       '  - search',
       '  - glightbox',
@@ -310,6 +322,12 @@ function setupProject(projectDir: string): void {
       '```',
       '',
     ].join('\n'),
+  );
+
+  mkdirSync(join(projectDir, 'docs', 'drafts'), { recursive: true });
+  writeFileSync(
+    join(projectDir, 'docs', 'drafts', 'preview.md'),
+    ['---', 'title: Preview', '---', '', '# Draft preview', ''].join('\n'),
   );
 }
 

@@ -81,6 +81,47 @@ describe('answersToFlags', () => {
       '--package-manager=pnpm',
     );
   });
+
+  it('serializes every advanced non-default answer', () => {
+    const flags = answersToFlags({
+      ...baseline,
+      palette: 'skip',
+      extraAssets: ['extra.css'],
+      locales: ['fr'],
+      snippetMaxDepth: 4,
+      snippetDedentSubsections: true,
+      expressiveCodeTheme: 'github-dark',
+      cards: 'skip',
+      mdxMode: 'never',
+      logoReplacesTitle: true,
+      admonitionMapPath: 'admonitions.json',
+      keepExplicitHeadingIds: true,
+      smartSymbols: false,
+      emojiShortcodes: false,
+      inlineMarks: false,
+      autoAppend: false,
+    });
+
+    expect(flags).toEqual(
+      expect.arrayContaining([
+        '--palette=skip',
+        '--extra-asset=extra.css',
+        '--locale=fr',
+        '--snippet-max-depth=4',
+        '--snippet-dedent-subsections',
+        '--expressive-code-theme=github-dark',
+        '--cards=skip',
+        '--mdx-mode=never',
+        '--logo-replaces-title',
+        '--admonition-map=admonitions.json',
+        '--keep-explicit-heading-ids',
+        '--no-smart-symbols',
+        '--no-emoji-shortcodes',
+        '--no-inline-marks',
+        '--no-auto-append',
+      ]),
+    );
+  });
 });
 
 describe('answersToFlags ↔ parseArgs round-trip', () => {

@@ -10,6 +10,7 @@ describe('serializePackageJson', () => {
     const parsed = JSON.parse(out);
     expect(parsed.name).toBe('my-docs');
     expect(parsed.type).toBe('module');
+    expect(parsed.engines).toEqual({ node: '>=22.12.0' });
     expect(parsed.dependencies).toMatchObject({
       astro: expect.any(String),
       '@astrojs/starlight': expect.any(String),
@@ -112,10 +113,10 @@ describe('serializePackageJson', () => {
     expect(JSON.parse(out).name).toBe('my-pkg');
   });
 
-  it('adds starlight-changelogs alongside starlight-versions when versions is detected (mike companion)', () => {
-    // When the user runs `mike` for versioning, the natural companion is
-    // `starlight-changelogs` so users can publish changelog entries between
-    // versions. The gap-analysis report (2026-05-03) recommends bundling them.
+  it('adds starlight-versions without the incompatible changelogs companion', () => {
+    // starlight-changelogs 0.5.1 pulls an Astro 5 tree into this Astro 7
+    // project through @ascorbic/loader-utils, including known high-severity
+    // advisories. Version switching itself only needs starlight-versions.
     const out = serializePackageJson({
       siteName: 'X',
       siteDescription: null,
@@ -123,7 +124,7 @@ describe('serializePackageJson', () => {
     });
     const parsed = JSON.parse(out);
     expect(parsed.dependencies).toHaveProperty('starlight-versions');
-    expect(parsed.dependencies).toHaveProperty('starlight-changelogs');
+    expect(parsed.dependencies).not.toHaveProperty('starlight-changelogs');
   });
 
   it('adds starlight-kbd when kbd feature is detected (pymdownx.keys companion)', () => {
@@ -172,6 +173,27 @@ describe('serializePackageJson', () => {
       detectedFeatures: ['github-alerts'],
     });
     expect(JSON.parse(out).dependencies).toHaveProperty('starlight-github-alerts');
+  });
+
+  it('adds starlight-auto-drafts when draft_docs matched a source file', () => {
+    const out = serializePackageJson({
+      siteName: 'X',
+      siteDescription: null,
+      detectedFeatures: ['auto-drafts'],
+    });
+    expect(JSON.parse(out).dependencies).toHaveProperty('starlight-auto-drafts', '^0.3.0');
+  });
+
+  it('uses native remark dependencies instead of starlight-markdown-blocks', () => {
+    const out = serializePackageJson({
+      siteName: 'X',
+      siteDescription: null,
+      detectedFeatures: ['markdown-blocks'],
+    });
+    const dependencies = JSON.parse(out).dependencies;
+    expect(dependencies).toHaveProperty('@astrojs/markdown-remark');
+    expect(dependencies).toHaveProperty('unist-util-visit');
+    expect(dependencies).not.toHaveProperty('starlight-markdown-blocks');
   });
 
   it('does not add starlight-github-alerts when github-alerts is not detected', () => {

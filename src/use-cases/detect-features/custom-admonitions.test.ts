@@ -17,7 +17,7 @@ describe('detectCustomAdmonitions', () => {
 
   it('ignores types the four Starlight asides express cleanly', () => {
     // note/tip/danger are native; warning is a clean rename; quote becomes
-    // a blockquote — none justify installing starlight-markdown-blocks.
+    // a blockquote — none justify emitting the custom remark plugin.
     expect(
       detectCustomAdmonitions([
         '!!! note\n    A.\n',

@@ -50,7 +50,7 @@ If MkDocs Material renders it, this tool maps it. The mapping by area:
 
 | MkDocs Material | Starlight output |
 |---|---|
-| `!!! note "Title"` admonitions (12 types) | `:::note[Title]` aside directives; the 7 types Starlight's 4 asides can't express (abstract, info, question, success, failure, bug, example) are preserved as first-class blocks via `starlight-markdown-blocks` |
+| `!!! note "Title"` admonitions (12 types) | `:::note[Title]` aside directives; the 7 types Starlight's 4 asides can't express (abstract, info, question, success, failure, bug, example) are preserved by a generated Astro 7-native remark plugin |
 | `??? note` / `???+ note` collapsible | `<details><summary>Title</summary>...</details>` |
 | `=== "Tab"` content tabs | Starlight `<Tabs>/<TabItem>` MDX components (default; `--tabs html` keeps `.md` with a shim) |
 | `<div class="grid cards" markdown>` | `<div class="sl-card-grid">…</div>` |
@@ -80,6 +80,7 @@ If MkDocs Material renders it, this tool maps it. The mapping by area:
 | `theme.features: navigation.tabs` | `starlight-sidebar-topics` — top-level nav sections become topics with per-topic sidebars (`--no-sidebar-topics` opts out) |
 | `theme.features: navigation.top` | `starlight-scroll-to-top` |
 | `theme.features: announce.dismiss` / `content.action.view` | `starlight-announcement` / `starlight-page-actions` |
+| `draft_docs` | Matching files receive `draft: true`; `starlight-auto-drafts` keeps them in dev and removes production sidebar links |
 | Missing frontmatter `title` | Synthesized from first H1 or humanized filename (Starlight requires it) |
 | Missing 404 page | Minimal styled `404.md` scaffolded (skipped when the source converts its own) |
 
@@ -91,7 +92,7 @@ If MkDocs Material renders it, this tool maps it. The mapping by area:
 | MkDocs plugin | Starlight output |
 |---|---|
 | `mkdocs-redirects` | `redirects: { … }` in `astro.config.mjs` |
-| `mkdocs-static-i18n` | Directory-prefix layout (`fr/page.md`) plus `locales: { … }` |
+| `mkdocs-static-i18n` | Directory-prefix layout (`fr/page.md`) plus `locales: { … }`; recommends the optional `starlight-i18n` editor extension |
 | `mkdocs-section-index` | Section `index.md` hoisted to first child of its sidebar group |
 | `mkdocs-literate-nav` | `SUMMARY.md` parsed and used as the nav source |
 | `mkdocs-include-markdown-plugin` | `{% include %}` resolved inline before conversion |
@@ -106,7 +107,9 @@ If MkDocs Material renders it, this tool maps it. The mapping by area:
 | `mkdocs-swagger-ui-tag` | `starlight-openapi` dep |
 | `mkdocs-macros-plugin` (Jinja2) | Per-occurrence diagnostic with file:line locator (cannot be evaluated) |
 | `mkdocs-puml` / `plantuml-markdown` | Diagnostic — `astro-plantuml` still peers astro@^5 and won't resolve against the Astro 7 stack |
-| `gen-files`, `print-site`, `monorepo`, `multirepo`, `meta`, `privacy`, `mkdocstrings`, `mkdocs-jupyter` | Diagnostic in `MIGRATION_NOTES.md` with documented workaround |
+| Interactive `pymdownx.superfences.custom_fences` | Diagnostic recommending `astro-live-code` and a renderable language fence with the `live` metadata flag |
+| `mkdocs-print-site-plugin` | Recommends `starlight-to-pdf` for PDF artifacts; documents the custom `print.astro` path for combined HTML |
+| `gen-files`, `monorepo`, `multirepo`, `meta`, `privacy`, `mkdocstrings`, `mkdocs-jupyter` | Diagnostic in `MIGRATION_NOTES.md` with documented workaround |
 
 </details>
 

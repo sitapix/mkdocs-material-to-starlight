@@ -23,6 +23,7 @@ import { buildSidebar } from '../../use-cases/compile-navigation/build-sidebar.j
 import { convertSite, type TaggedDiagnostic } from '../../use-cases/convert-site/convert.js';
 import { applyThemeAssetCopies } from '../../use-cases/copy-assets/apply-theme-asset-copies.js';
 import type { AssetCopy } from '../../use-cases/copy-assets/plan.js';
+import { extractDraftDocsPatterns } from '../../use-cases/detect-features/draft-docs.js';
 import { extractPluginOptions } from '../../use-cases/detect-features/extract-plugin-options.js';
 import { detectFeaturesFromPlugins } from '../../use-cases/detect-features/from-plugins.js';
 import { detectFeaturesFromThemeFeatures } from '../../use-cases/detect-features/from-theme-features.js';
@@ -191,6 +192,7 @@ export async function convertSiteFromDisk(
     docsDir,
     sourcePaths: sourceListing.value,
     fs,
+    draftDocsPatterns: extractDraftDocsPatterns(config.value.extras),
     repoContext,
     autoAppendContent,
     i18nLocales,
@@ -376,19 +378,25 @@ export async function convertSiteFromDisk(
       extras: config.value.extras,
     });
 
-  const { stylesheetSource, rssEndpointSource, ogEndpointSource, tagsYmlSource, preserveSlugs } =
-    buildOutputSources({
-      siteName: config.value.siteName,
-      siteDescription: config.value.siteDescription,
-      siteUrl: config.value.siteUrl,
-      palette,
-      paletteStrategy: input.palette,
-      themeFonts,
-      detectedFeatures: allFeatures,
-      socialCardsLayoutOptions,
-      rssOption: input.rss,
-      siteDiagnostics: siteResult.value.diagnostics,
-    });
+  const {
+    stylesheetSource,
+    rssEndpointSource,
+    ogEndpointSource,
+    tagsYmlSource,
+    materialAdmonitionsSource,
+    preserveSlugs,
+  } = buildOutputSources({
+    siteName: config.value.siteName,
+    siteDescription: config.value.siteDescription,
+    siteUrl: config.value.siteUrl,
+    palette,
+    paletteStrategy: input.palette,
+    themeFonts,
+    detectedFeatures: allFeatures,
+    socialCardsLayoutOptions,
+    rssOption: input.rss,
+    siteDiagnostics: siteResult.value.diagnostics,
+  });
   const writeResult = await writeOutputs({
     outputDir: input.outputDir,
     files: siteResult.value.files,
@@ -399,6 +407,7 @@ export async function convertSiteFromDisk(
     rssEndpointSource,
     ogEndpointSource,
     tagsYmlSource,
+    materialAdmonitionsSource,
     configFormat: input.configFormat ?? 'mjs',
     extendedFrontmatterFields,
     preserveSlugs,
@@ -490,6 +499,7 @@ interface WriteOutputsInput {
   readonly rssEndpointSource: string | null;
   readonly ogEndpointSource: string | null;
   readonly tagsYmlSource: string | null;
+  readonly materialAdmonitionsSource: string | null;
   readonly configFormat: 'mjs' | 'ts';
   readonly extendedFrontmatterFields: Readonly<Record<string, string>>;
   /**
@@ -562,6 +572,12 @@ async function writeOutputs(input: WriteOutputsInput): Promise<Result<true, stri
   }
   if (input.tagsYmlSource !== null) {
     scaffold.push([['tags.yml'], input.tagsYmlSource]);
+  }
+  if (input.materialAdmonitionsSource !== null) {
+    scaffold.push([
+      ['src', 'plugins', 'material-admonitions.mjs'],
+      input.materialAdmonitionsSource,
+    ]);
   }
   for (const [parts, content] of scaffold) {
     const writeRes = await writeOne(join(input.outputDir, ...parts), content);

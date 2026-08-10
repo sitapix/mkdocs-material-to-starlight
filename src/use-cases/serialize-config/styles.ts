@@ -95,6 +95,31 @@ const STYLESHEET = `/*
   width: 1em;
   height: 1em;
 }
+
+/* Astro 7-native custom Material admonition variants. */
+.starlight-custom-aside--color-blue {
+  --sl-color-asides-text-accent: var(--sl-color-blue-high);
+  --sl-color-asides-border: var(--sl-color-blue);
+  background-color: var(--sl-color-blue-low);
+}
+
+.starlight-custom-aside--color-purple {
+  --sl-color-asides-text-accent: var(--sl-color-purple-high);
+  --sl-color-asides-border: var(--sl-color-purple);
+  background-color: var(--sl-color-purple-low);
+}
+
+.starlight-custom-aside--color-red {
+  --sl-color-asides-text-accent: var(--sl-color-red-high);
+  --sl-color-asides-border: var(--sl-color-red);
+  background-color: var(--sl-color-red-low);
+}
+
+.starlight-custom-aside--color-green {
+  --sl-color-asides-text-accent: var(--sl-color-green-high);
+  --sl-color-asides-border: var(--sl-color-green);
+  background-color: var(--sl-color-green-low);
+}
 `;
 
 export function serializeStyleSheet(

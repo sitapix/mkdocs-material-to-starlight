@@ -20,6 +20,14 @@ describe('serializeStyleSheet', () => {
     expect(out).toContain('.sl-tab');
   });
 
+  it('declares colors for the generated Material admonition plugin', () => {
+    const out = serializeStyleSheet();
+    expect(out).toContain('.starlight-custom-aside--color-blue');
+    expect(out).toContain('.starlight-custom-aside--color-purple');
+    expect(out).toContain('.starlight-custom-aside--color-red');
+    expect(out).toContain('.starlight-custom-aside--color-green');
+  });
+
   it('uses display: grid for the grid containers', () => {
     const out = serializeStyleSheet();
     expect(out).toMatch(/\.sl-card-grid\s*{[^}]*display:\s*grid/);

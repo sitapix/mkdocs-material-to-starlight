@@ -26,6 +26,7 @@ import { buildSlugMap, type SlugMap } from '../../domain/starlight/slug-map.js';
 import { convertFile } from '../convert-file/convert.js';
 import { detectCustomAdmonitions } from '../detect-features/custom-admonitions.js';
 import { detectFeatures } from '../detect-features/detect.js';
+import { createDraftDocsMatcher } from '../detect-features/draft-docs.js';
 import { scanMacroOccurrences } from '../detect-macros/scan.js';
 import { scanMacroExpressions } from '../detect-macros/scan-expressions.js';
 import { expandSnippets } from '../expand-snippets/expand.js';
@@ -33,6 +34,7 @@ import { expandIncludeMarkdown } from '../include-markdown/expand.js';
 import { normalizeBlogPostSlug } from '../normalize/blog-post-slug.js';
 import { normalizeContentTabs } from '../normalize/content-tabs.js';
 import { normalizeFileTrees } from '../normalize/file-tree.js';
+import { markFrontmatterDraft } from '../normalize/frontmatter-draft.js';
 import { normalizeLinkAttrLists } from '../normalize/link-attr-list.js';
 import { normalizeMkdocstringsCrossRefs } from '../normalize/mkdocstrings-crossref.js';
 import { normalizePackageManagerTabs } from '../normalize/package-manager-tabs.js';
@@ -59,6 +61,8 @@ export interface ConvertSiteInput {
   readonly docsDir: string;
   readonly sourcePaths: ReadonlyArray<string>;
   readonly fs: FileSystem;
+  /** MkDocs 1.6 `draft_docs` gitignore-style patterns, relative to docsDir. */
+  readonly draftDocsPatterns?: ReadonlyArray<string>;
   readonly snippetBasePaths?: ReadonlyArray<string>;
   readonly repoContext?: RepoContext | null;
   /**
@@ -203,6 +207,7 @@ export async function convertSite(
   const files: Record<string, string> = {};
   const diagnostics: TaggedDiagnostic[] = [];
   const featureUnion = new Set<DetectedFeature>();
+  const isDraftDoc = createDraftDocsMatcher(input.draftDocsPatterns ?? []);
 
   // Scan emit paths for folder/file basenames that Astro's `github-slugger`
   // will reshape (e.g. `1.0/` → `10/`, `c++-primer.md` → `c-primer`). Each
@@ -276,8 +281,8 @@ export async function convertSite(
   }
 
   // Material admonition types Starlight's four asides cannot express
-  // (abstract, question, example, …) → starlight-markdown-blocks defines
-  // them as first-class blocks and the admonition transform keeps their
+  // (abstract, question, example, …) → a generated native remark plugin
+  // defines them as first-class blocks and the admonition transform keeps their
   // names verbatim instead of squashing to note/tip.
   const preserveCustomAdmonitionTypes = detectCustomAdmonitions(sourceTexts.values());
   if (preserveCustomAdmonitionTypes) {
@@ -481,6 +486,27 @@ export async function convertSite(
     if (pmResult.promoted) {
       featureUnion.add('package-managers');
       source = pmResult.text;
+    }
+
+    // MkDocs `draft_docs` marks files by gitignore-style path patterns;
+    // Starlight marks them with frontmatter. Bridge the two representations
+    // before conversion, then install starlight-auto-drafts so explicit
+    // sidebar links are filtered from production while drafts remain visible
+    // during local development.
+    if (isDraftDoc(diskPath)) {
+      source = markFrontmatterDraft(source);
+      featureUnion.add('auto-drafts');
+      diagnostics.push({
+        sourcePath,
+        diagnostic: createDiagnostic({
+          severity: 'info',
+          ruleId: 'draft-docs-applied',
+          source: 'convert-site/draft-docs',
+          message:
+            `MkDocs draft_docs matched \`${diskPath}\`; emitted \`draft: true\` frontmatter ` +
+            'and enabled starlight-auto-drafts so the page stays available in development but is removed from production navigation.',
+        }),
+      });
     }
 
     // Link resolution happens against the ORIGINAL on-disk path so a

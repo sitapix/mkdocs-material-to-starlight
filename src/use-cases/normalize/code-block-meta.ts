@@ -36,6 +36,17 @@ const BRACE_TITLE_RE = /\btitle=(?:"([^"]*)"|'([^']*)')/;
 // parse and we must rewrite.
 const NUMERIC_RANGE_RE = /^[\s,0-9-]+$/;
 
+// Pygments/MkDocs language names are effectively case-insensitive and expose
+// aliases that Shiki's bundled grammars do not. Normalize the identifiers
+// observed in the real-project corpus before Astro sees them. `text` is an
+// Expressive Code plain-text sentinel, so output blocks keep their code chrome
+// without producing a missing-language warning.
+const LANGUAGE_ALIASES: Readonly<Record<string, string>> = {
+  '.sh': 'bash',
+  output: 'text',
+  pycon: 'python',
+};
+
 export function normalizeCodeBlockMeta(source: string): string {
   return source.replace(FENCE_RE, (full, fence: string, rest: string) => {
     const translated = translateRest(rest);
@@ -58,6 +69,12 @@ function translateRest(rest: string): string {
   if (rewritten !== null) {
     rest = rewritten;
   }
+
+  // A Markdown fence's first info-string token is always interpreted as its
+  // language. Material allows metadata without a language (` ``` title=... `
+  // and ` ``` hl_lines=... `), while Expressive Code requires a language to
+  // come first. Supply `text` in that case and canonicalize real-world aliases.
+  rest = normalizeFenceLanguage(rest);
 
   if (rest.includes('showLineNumbers') || rest.includes('{')) {
     // Already translated or already an EC marker — preserve.
@@ -107,6 +124,11 @@ function translateRest(rest: string): string {
     working = working.replace(ATTR_LIST_RE, '').trim();
   }
 
+  // A few real Material sources contain an extra quote after hl_lines, such
+  // as `hl_lines="4 5""`. Once the valid option is consumed, discard only an
+  // otherwise-empty run of orphan quote characters.
+  if (/^["']+$/.test(working)) working = '';
+
   // Anything else (title="...", custom attrs) survives verbatim.
   if (working.length > 0) parts.push(working);
 
@@ -115,6 +137,29 @@ function translateRest(rest: string): string {
   // ```python style); add a space when there's no language but there is meta.
   if (lang.length > 0) return parts.join(' ');
   return ` ${parts.join(' ')}`.trimEnd();
+}
+
+function normalizeFenceLanguage(rest: string): string {
+  const working = rest.trimStart();
+  if (working.length === 0) return rest;
+
+  // Numeric highlight ranges and key/value options are metadata, not language
+  // identifiers. `showLineNumbers` is the one supported bare option token.
+  if (
+    working.startsWith('{') ||
+    /^[A-Za-z_][A-Za-z0-9_-]*=/.test(working) ||
+    /^showLineNumbers(?:\s|$)/.test(working)
+  ) {
+    return `text ${working}`;
+  }
+
+  const languageMatch = working.match(/^[A-Za-z0-9_+\-#.]+/);
+  if (languageMatch === null) return rest;
+  const sourceLanguage = languageMatch[0] ?? '';
+  if (sourceLanguage.length === 0) return rest;
+  const lower = sourceLanguage.toLowerCase();
+  const normalized = LANGUAGE_ALIASES[lower] ?? lower;
+  return `${normalized}${working.slice(sourceLanguage.length)}`;
 }
 
 /**

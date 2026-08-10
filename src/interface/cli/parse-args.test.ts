@@ -196,6 +196,26 @@ describe('parseArgs', () => {
     expect(result.kind).toBe('explain');
   });
 
+  it('rejects --explain and ordinary conversion flags without a project', () => {
+    expect(parseArgs(['--explain']).kind).toBe('error');
+    expect(parseArgs(['--yes']).kind).toBe('error');
+  });
+
+  it('rejects mutually exclusive check flags', () => {
+    const result = parseArgs(['./project', './output', '--check', '--no-check']);
+    expect(result).toMatchObject({ kind: 'error', message: expect.stringContaining('mutually') });
+  });
+
+  it.each(['soon', '1.5', '0'])('rejects invalid snippet max depth %s', (value) => {
+    expect(parseArgs(['./project', './output', `--snippet-max-depth=${value}`]).kind).toBe('error');
+  });
+
+  it('ignores empty entries in compare --pages', () => {
+    const result = parseArgs(['compare', 'http://b', 'http://c', '--pages', ', ,about,']);
+    expect(result.kind).toBe('compare');
+    if (result.kind === 'compare') expect(result.paths).toEqual(['about']);
+  });
+
   it('accepts -y as a no-op short alias to be used by later wizard work', () => {
     // -y currently sets no field but must not cause an "unknown option" error.
     const result = parseArgs(['./project', './output', '-y']);
@@ -221,6 +241,26 @@ describe('parseArgs — wizard flag surface', () => {
   it('rejects invalid --tabs value', () => {
     const r = parseArgs(['./p', './o', '--tabs=bogus']);
     expect(r.kind).toBe('error');
+  });
+
+  it.each([
+    ['--package-manager=invalid'],
+    ['--palette=invalid'],
+    ['--cards=invalid'],
+    ['--mdx-mode=invalid'],
+    ['--config-format=invalid'],
+  ])('rejects invalid enum option %s', (flag) => {
+    expect(parseArgs(['./p', './o', flag]).kind).toBe('error');
+  });
+
+  it('parses positive boolean wizard flags', () => {
+    const r = parseArgs(['./p', './o', '--sidebar-topics', '--rss', '--links-validator']);
+    expect(r.kind).toBe('convert');
+    if (r.kind === 'convert') {
+      expect(r.sidebarTopics).toBe(true);
+      expect(r.rss).toBe(true);
+      expect(r.linksValidator).toBe(true);
+    }
   });
 
   it('parses repeated --suppress', () => {

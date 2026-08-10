@@ -73,7 +73,7 @@ describe('transformAdmonitionDirectives', () => {
 
   it('preserves custom-block types verbatim when preserveCustomTypes is set', () => {
     // Site-level pre-scan found types beyond Starlight's asides →
-    // starlight-markdown-blocks defines them, so :::abstract stays.
+    // The generated remark plugin defines them, so :::abstract stays.
     const out = process(':::abstract\nSummary.\n:::\n', { preserveCustomTypes: true });
     expect(out).toContain(':::abstract');
     expect(out).not.toContain(':::note');

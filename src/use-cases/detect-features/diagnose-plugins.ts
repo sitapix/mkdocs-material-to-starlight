@@ -116,7 +116,7 @@ const PLUGIN_DIAGNOSTICS: ReadonlyMap<string, PluginDiagnosticSpec> = new Map([
       ruleId: 'plugin-i18n-needs-rename',
       severity: 'info',
       message:
-        "mkdocs-static-i18n locales detected — per-locale source files (e.g. page.fr.md) have been renamed to Starlight's directory layout (fr/page.md) automatically. You still need to add a `locales: { … }` block to astro.config.mjs to register the locales with Starlight.",
+        "mkdocs-static-i18n locales detected — per-locale source files (e.g. page.fr.md) were renamed to Starlight's directory layout (fr/page.md), and the matching `defaultLocale` + `locales` config was emitted automatically. Optional authoring aid: install the `starlight-i18n` Visual Studio Code extension for side-by-side missing and outdated translation workflows.",
     },
   ],
   [
@@ -131,10 +131,10 @@ const PLUGIN_DIAGNOSTICS: ReadonlyMap<string, PluginDiagnosticSpec> = new Map([
   [
     'print-site',
     {
-      ruleId: 'plugin-print-site-no-equivalent',
-      severity: 'warning',
+      ruleId: 'plugin-print-site-pdf-recommended',
+      severity: 'info',
       message:
-        'mkdocs-print-site-plugin (single concatenated print page) has no Starlight equivalent. Recreate via a custom `src/pages/print.astro` endpoint paired with a print stylesheet.',
+        "mkdocs-print-site-plugin detected. For a printable PDF artifact, run the `starlight-to-pdf` CLI after `astro build` and wire it into CI. If you specifically need the plugin's single concatenated HTML route, recreate that route with a custom `src/pages/print.astro` endpoint plus a print stylesheet; starlight-to-pdf produces PDF, not the combined HTML page.",
     },
   ],
   [
@@ -296,7 +296,7 @@ const PLUGIN_DIAGNOSTICS: ReadonlyMap<string, PluginDiagnosticSpec> = new Map([
       ruleId: 'plugin-git-authors-mapped',
       severity: 'info',
       message:
-        'mkdocs-git-authors-plugin detected (per-page git contributors) — auto-wired to `starlight-contributor-list` (project-wide contributors footer). The converter installs the package and emits the integration block with a placeholder `list: []`; populate it with your contributors. For true per-page authors (Starlight has no first-party block for that), write a small Astro component that reads `git log --format` at build time.',
+        'mkdocs-git-authors-plugin detected (per-page git contributors). No package was installed: `starlight-contributor-list` is deprecated and only provides a project-wide placeholder, not equivalent per-page data. Preserve this feature with a local Astro component that reads `git log --format` at build time and renders through a Starlight component override.',
     },
   ],
   [
@@ -305,7 +305,7 @@ const PLUGIN_DIAGNOSTICS: ReadonlyMap<string, PluginDiagnosticSpec> = new Map([
       ruleId: 'plugin-git-authors-mapped',
       severity: 'info',
       message:
-        'mkdocs-git-committers-2 detected (per-page git committers) — auto-wired to `starlight-contributor-list` (project-wide contributors footer). The converter installs the package and emits the integration block with a placeholder `list: []`; populate it with your committers. For true per-page committers (Starlight has no first-party block for that), write a small Astro component that reads `git log --format` at build time.',
+        'mkdocs-git-committers-2 detected (per-page git committers). No package was installed: `starlight-contributor-list` is deprecated and only provides a project-wide placeholder, not equivalent per-page data. Preserve this feature with a local Astro component that reads `git log --format` at build time and renders through a Starlight component override.',
     },
   ],
   [
@@ -559,7 +559,10 @@ const PLUGIN_DIAGNOSTICS: ReadonlyMap<string, PluginDiagnosticSpec> = new Map([
 
 export function diagnosePlugins(
   plugins: ReadonlyArray<MkdocsPlugin>,
-  extensions: ReadonlyArray<{ readonly name: string }> = [],
+  extensions: ReadonlyArray<{
+    readonly name: string;
+    readonly options?: Readonly<Record<string, unknown>>;
+  }> = [],
 ): ReadonlyArray<Diagnostic> {
   const out: Diagnostic[] = [];
   const fired = new Set<string>();
@@ -602,7 +605,47 @@ export function diagnosePlugins(
     }
   }
 
+  const interactiveFences = findInteractiveCustomFences(extensions);
+  if (interactiveFences.length > 0) {
+    out.push(
+      createDiagnostic({
+        severity: 'info',
+        ruleId: 'extension-superfences-live-code-recommended',
+        source: SOURCE,
+        message:
+          `pymdownx.superfences custom fence${interactiveFences.length === 1 ? '' : 's'} ${interactiveFences.map((name) => `\`${name}\``).join(', ')} appear to render interactive examples. ` +
+          'The Python formatter callback cannot run in Astro. For browser-rendered JSX/Svelte/Vue examples, install `astro-live-code`, add `liveCode()` to Astro integrations, and rewrite each custom fence as a renderable language fence with trailing `live` metadata (for example, ```jsx live).',
+      }),
+    );
+  }
+
   return out;
+}
+
+const INTERACTIVE_FENCE_MARKER =
+  /(?:^|[-_.\s])(live|playground|preview|demo|sandbox|jsx|tsx|react|preact|solid|svelte|vue|astro)(?:$|[-_.\s])/i;
+
+function findInteractiveCustomFences(
+  extensions: ReadonlyArray<{
+    readonly name: string;
+    readonly options?: Readonly<Record<string, unknown>>;
+  }>,
+): ReadonlyArray<string> {
+  const superfences = extensions.find((extension) => extension.name === 'pymdownx.superfences');
+  const rawFences = superfences?.options?.custom_fences;
+  if (!Array.isArray(rawFences)) return [];
+
+  const names = new Set<string>();
+  for (const fence of rawFences) {
+    if (typeof fence !== 'object' || fence === null || Array.isArray(fence)) continue;
+    const entry = fence as Readonly<Record<string, unknown>>;
+    const name = typeof entry.name === 'string' ? entry.name : '';
+    const className = typeof entry.class === 'string' ? entry.class : '';
+    const formatter = typeof entry.format === 'string' ? entry.format : '';
+    if (name.length === 0) continue;
+    if (INTERACTIVE_FENCE_MARKER.test(`${name} ${className} ${formatter}`)) names.add(name);
+  }
+  return [...names].sort();
 }
 
 /**

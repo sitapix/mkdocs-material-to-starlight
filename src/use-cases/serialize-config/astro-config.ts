@@ -128,12 +128,12 @@ export function serializeAstroConfig(input: AstroConfigInput): string {
   const hasAnnouncement = features.has('announcement');
   const hasPageActions = features.has('page-actions');
   const hasHeadingBadges = features.has('heading-badges');
-  const hasContributorList = features.has('contributor-list');
   const hasSidebarTopics = features.has('sidebar-topics');
   const hasScrollToTop = features.has('scroll-to-top');
   const hasGiscus = features.has('giscus') && input.giscus !== undefined;
   const hasMarkdownBlocks = features.has('markdown-blocks');
   const hasD2 = features.has('d2');
+  const hasAutoDrafts = features.has('auto-drafts');
   const hasBasePath = features.has('base-path') && input.basePath !== undefined;
 
   // `starlight-llms-txt` requires `site:` in astro.config.mjs (it builds
@@ -170,7 +170,7 @@ export function serializeAstroConfig(input: AstroConfigInput): string {
     imports.push(`import starlightGiscus from 'starlight-giscus';`);
   }
   if (hasMarkdownBlocks) {
-    imports.push(`import starlightMarkdownBlocks, { Aside } from 'starlight-markdown-blocks';`);
+    imports.push(`import remarkMaterialAdmonitions from './src/plugins/material-admonitions.mjs';`);
   }
   if (hasBasePath) {
     // Named export — the package has no default (unlike its siblings).
@@ -178,6 +178,9 @@ export function serializeAstroConfig(input: AstroConfigInput): string {
   }
   if (hasD2) {
     imports.push(`import d2 from 'astro-d2';`);
+  }
+  if (hasAutoDrafts) {
+    imports.push(`import starlightAutoDrafts from 'starlight-auto-drafts';`);
   }
   if (hasMermaid) {
     imports.push(`import mermaid from 'astro-mermaid';`);
@@ -216,16 +219,14 @@ export function serializeAstroConfig(input: AstroConfigInput): string {
   if (hasHeadingBadges) {
     imports.push(`import starlightHeadingBadges from 'starlight-heading-badges';`);
   }
-  if (hasContributorList) {
-    imports.push(`import starlightContributorList from 'starlight-contributor-list';`);
-  }
-  if (hasMath) {
+  if (hasMath || hasMarkdownBlocks) {
     // Astro 7 made Sätteri the default Markdown processor; remark/rehype
     // plugins are only honored through an explicit unified processor from
-    // `@astrojs/markdown-remark` (pinned in `versions.ts` for the math
-    // feature). Without it, remark-math/rehype-katex silently never run
-    // and formulas render as raw LaTeX text.
+    // `@astrojs/markdown-remark`. Without it, local Material-admonition and
+    // math plugins silently never run.
     imports.push(`import { unified } from '@astrojs/markdown-remark';`);
+  }
+  if (hasMath) {
     imports.push(`import remarkMath from 'remark-math';`);
     imports.push(`import rehypeKatex from 'rehype-katex';`);
   }
@@ -414,6 +415,11 @@ export function serializeAstroConfig(input: AstroConfigInput): string {
     }
     lines.push(`        ${indentTopics(serializeSidebarTopics(input.sidebar, excludeGlobs))},`);
   }
+  if (hasAutoDrafts) {
+    // Keep this after sidebar-topics: auto-drafts must see the final sidebar
+    // configuration in order to remove links to draft pages in production.
+    lines.push('        starlightAutoDrafts(),');
+  }
   if (enableLlmsTxt) {
     lines.push('        starlightLlmsTxt(),');
   }
@@ -429,24 +435,6 @@ export function serializeAstroConfig(input: AstroConfigInput): string {
     lines.push(
       `        starlightGiscus({ repo: ${quote(g.repo)}, repoId: ${quote(g.repoId)}, category: ${quote(g.category)}, categoryId: ${quote(g.categoryId)} }),`,
     );
-  }
-  if (hasMarkdownBlocks) {
-    // Material admonition types Starlight's four asides cannot express.
-    // The converter emits `:::abstract` etc. verbatim (instead of
-    // squashing to note/tip) whenever this plugin is installed; colors
-    // approximate Material's admonition palette within the plugin's
-    // blue/purple/red/orange/green/accent set.
-    lines.push('        starlightMarkdownBlocks({');
-    lines.push('          blocks: {');
-    lines.push("            abstract: Aside({ label: 'Abstract', color: 'blue', icon: '📋' }),");
-    lines.push("            info: Aside({ label: 'Info', color: 'blue', icon: 'ℹ️' }),");
-    lines.push("            question: Aside({ label: 'Question', color: 'green', icon: '❓' }),");
-    lines.push("            success: Aside({ label: 'Success', color: 'green', icon: '✅' }),");
-    lines.push("            failure: Aside({ label: 'Failure', color: 'red', icon: '❌' }),");
-    lines.push("            bug: Aside({ label: 'Bug', color: 'red', icon: '🐛' }),");
-    lines.push("            example: Aside({ label: 'Example', color: 'purple', icon: '🧪' }),");
-    lines.push('          },');
-    lines.push('        }),');
   }
   if (hasImageZoom) {
     lines.push('        imageZoom(),');
@@ -484,9 +472,11 @@ export function serializeAstroConfig(input: AstroConfigInput): string {
     // starlight-kbd 0.4.0+ requires a `types` array with exactly one
     // entry flagged `default: true`. Material's `pymdownx.keys` doesn't
     // carry layout metadata, so emit a single default type the user can
-    // extend.
+    // extend. Disable the global picker: the converter may already emit a
+    // ThemeSelect override for Material's palette toggle, and starlight-kbd
+    // otherwise attempts to own the same component and warns on every build.
     lines.push(
-      "        starlightKbd({ types: [{ id: 'default', label: 'Keyboard', default: true }] }),",
+      "        starlightKbd({ globalPicker: false, types: [{ id: 'default', label: 'Keyboard', default: true }] }),",
     );
   }
   if (hasGithubAlerts) {
@@ -504,15 +494,6 @@ export function serializeAstroConfig(input: AstroConfigInput): string {
   }
   if (hasHeadingBadges) {
     lines.push('        starlightHeadingBadges(),');
-  }
-  if (hasContributorList) {
-    // The converter has no git port, so it cannot enumerate authors at
-    // conversion time. Emit a placeholder `list: []` the user fills in
-    // post-install — same pattern as starlight-announcement above.
-    lines.push(
-      '        // TODO: populate `list` with your contributors (each: { name, url, avatar }).',
-    );
-    lines.push('        starlightContributorList({ list: [] }),');
   }
   if (enableLinksValidator) {
     // Migrated MkDocs sites routinely link to pages that the original build
@@ -540,11 +521,17 @@ export function serializeAstroConfig(input: AstroConfigInput): string {
   }
   lines.push('  ],');
 
-  if (hasMath) {
+  if (hasMath || hasMarkdownBlocks) {
+    const remarkPlugins = [
+      ...(hasMarkdownBlocks ? ['remarkMaterialAdmonitions'] : []),
+      ...(hasMath ? ['remarkMath'] : []),
+    ];
     lines.push('  markdown: {');
     lines.push('    processor: unified({');
-    lines.push('      remarkPlugins: [remarkMath],');
-    lines.push('      rehypePlugins: [rehypeKatex],');
+    lines.push(`      remarkPlugins: [${remarkPlugins.join(', ')}],`);
+    if (hasMath) {
+      lines.push('      rehypePlugins: [rehypeKatex],');
+    }
     lines.push('    }),');
     lines.push('  },');
   }

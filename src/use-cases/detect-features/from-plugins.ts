@@ -49,12 +49,6 @@ const PLUGIN_TO_FEATURE: ReadonlyMap<string, DetectedFeature> = new Map([
   // header config (icon links to social-media accounts) — that one is wired
   // separately from `extra.social[]` in mkdocs.yml.
   ['social', 'og-cards'] as const,
-  // `mkdocs-git-authors-plugin` and `mkdocs-git-committers-2` →
-  // `starlight-contributor-list` (HiDeoo). Both register under different
-  // names in mkdocs.yml but share the same Starlight target — installing
-  // either triggers the same plugin install + integration emission.
-  ['git-authors', 'contributor-list'] as const,
-  ['git-committers', 'contributor-list'] as const,
 ]);
 
 export function detectFeaturesFromPlugins(

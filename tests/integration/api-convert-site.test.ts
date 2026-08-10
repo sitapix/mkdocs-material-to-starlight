@@ -530,9 +530,45 @@ describe('interface/api/convertSiteFromDisk', () => {
     expect(result.ok).toBe(true);
     const notes = readFileSync(join(outputDir, 'MIGRATION_NOTES.md'), 'utf8');
     expect(notes).toContain('plugin-gen-files-no-equivalent');
-    expect(notes).toContain('plugin-print-site-no-equivalent');
+    expect(notes).toContain('plugin-print-site-pdf-recommended');
+    expect(notes).toContain('starlight-to-pdf');
     expect(notes).toContain('plugin-monorepo-no-equivalent');
     expect(notes).toContain('plugin-multirepo-no-equivalent');
+  });
+
+  it('translates draft_docs patterns to draft frontmatter and auto-drafts config', async () => {
+    mkdirSync(join(projectDir, 'docs', 'drafts'), { recursive: true });
+    writeFileSync(join(projectDir, 'docs', 'index.md'), '# Home\n');
+    writeFileSync(join(projectDir, 'docs', 'drafts', 'preview.md'), '# Preview\n');
+    writeFileSync(
+      join(projectDir, 'mkdocs.yml'),
+      [
+        'site_name: Draft Demo',
+        'docs_dir: docs',
+        'draft_docs: |',
+        '  drafts/',
+        'nav:',
+        '  - Home: index.md',
+        '  - Preview: drafts/preview.md',
+        '',
+      ].join('\n'),
+    );
+
+    const result = await convertSiteFromDisk({ projectDir, outputDir });
+    expect(result.ok).toBe(true);
+    const draft = readFileSync(
+      join(outputDir, 'src', 'content', 'docs', 'drafts', 'preview.md'),
+      'utf8',
+    );
+    const astroConfig = readFileSync(join(outputDir, 'astro.config.mjs'), 'utf8');
+    const pkg = JSON.parse(readFileSync(join(outputDir, 'package.json'), 'utf8'));
+    const notes = readFileSync(join(outputDir, 'MIGRATION_NOTES.md'), 'utf8');
+
+    expect(draft).toContain('draft: true');
+    expect(astroConfig).toContain("import starlightAutoDrafts from 'starlight-auto-drafts';");
+    expect(astroConfig).toContain('starlightAutoDrafts()');
+    expect(pkg.dependencies).toHaveProperty('starlight-auto-drafts', '^0.3.0');
+    expect(notes).toContain('draft-docs-applied');
   });
 
   it('scaffolds an RSS endpoint when the rss plugin is enabled', async () => {

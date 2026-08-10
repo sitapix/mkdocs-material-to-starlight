@@ -14,7 +14,7 @@
  * Imperative shell — js-yaml is the only direct dependency for this port.
  */
 
-import { DEFAULT_SCHEMA, load, Type, YAMLException } from 'js-yaml';
+import { defineScalarTag, defineSequenceTag, load, YAML11_SCHEMA, YAMLException } from 'js-yaml';
 import type { YamlDecodeError, YamlDecoder } from '../../domain/ports/yaml-decoder.js';
 import { err, ok, type Result } from '../../domain/result.js';
 
@@ -22,64 +22,64 @@ const PYTHON_NAME_PREFIX = 'tag:yaml.org,2002:python/name:';
 const PYTHON_OBJECT_PREFIX = 'tag:yaml.org,2002:python/object';
 const ENV_TAG = '!ENV';
 
-const envScalarType = new Type(ENV_TAG, {
-  kind: 'scalar',
-  resolve: () => true,
+const envScalarTag = defineScalarTag(ENV_TAG, {
   // `!ENV VAR_NAME` — preserve the var name as an opaque string. Conversion
   // never reads the runtime env, so a static placeholder is the safest
   // approximation.
-  construct: (data) => (typeof data === 'string' ? data : ''),
+  resolve: (source) => source,
 });
 
-const envSequenceType = new Type(ENV_TAG, {
-  kind: 'sequence',
-  resolve: () => true,
+const envSequenceTag = defineSequenceTag<unknown[], unknown>(ENV_TAG, {
   // `!ENV [VAR1, ..., default]` — mkdocs's env-var plugin returns `default`
   // when none of the vars are set. At conversion time we always pick the
   // default (last element); it is the right static value to reason about.
-  construct: (data) => {
-    if (!Array.isArray(data) || data.length === 0) {
+  create: () => [],
+  addItem: (items, item) => {
+    items.push(item);
+  },
+  finalize: (items) => {
+    if (items.length === 0) {
       return null;
     }
-    return data[data.length - 1];
+    return items[items.length - 1];
   },
+  identify: () => false,
+  represent: () => [],
 });
 
-const pythonNameType = new Type(PYTHON_NAME_PREFIX, {
-  kind: 'scalar',
-  multi: true,
-  resolve: () => true,
-  construct: (_data, type) =>
-    typeof type === 'string' ? type.slice(PYTHON_NAME_PREFIX.length) : '',
+const pythonNameTag = defineScalarTag(PYTHON_NAME_PREFIX, {
+  matchByTagPrefix: true,
+  resolve: (_source, _isExplicit, tagName) => tagName.slice(PYTHON_NAME_PREFIX.length),
 });
 
-const pythonObjectType = new Type(PYTHON_OBJECT_PREFIX, {
-  kind: 'scalar',
-  multi: true,
-  resolve: () => true,
-  construct: (_data, type) =>
-    typeof type === 'string' ? type.slice(PYTHON_OBJECT_PREFIX.length) : '',
+const pythonObjectTag = defineScalarTag(PYTHON_OBJECT_PREFIX, {
+  matchByTagPrefix: true,
+  resolve: (_source, _isExplicit, tagName) => tagName.slice(PYTHON_OBJECT_PREFIX.length),
 });
 
-const pythonObjectSequenceType = new Type(PYTHON_OBJECT_PREFIX, {
-  kind: 'sequence',
-  multi: true,
-  resolve: () => true,
-  construct: (_data, type) =>
-    typeof type === 'string' ? type.slice(PYTHON_OBJECT_PREFIX.length) : '',
+const pythonObjectSequenceTag = defineSequenceTag<string, string>(PYTHON_OBJECT_PREFIX, {
+  matchByTagPrefix: true,
+  create: (tagName) => tagName.slice(PYTHON_OBJECT_PREFIX.length),
+  addItem: () => {},
+  identify: () => false,
 });
 
-const PYTHON_TOLERANT_SCHEMA = DEFAULT_SCHEMA.extend([
-  pythonNameType,
-  pythonObjectType,
-  pythonObjectSequenceType,
-  envScalarType,
-  envSequenceType,
+const PYTHON_TOLERANT_SCHEMA = YAML11_SCHEMA.withTags([
+  pythonNameTag,
+  pythonObjectTag,
+  pythonObjectSequenceTag,
+  envScalarTag,
+  envSequenceTag,
 ]);
 
 export function createJsYamlDecoder(): YamlDecoder {
   return {
     decode(source: string): Result<unknown, YamlDecodeError> {
+      // js-yaml 5 rejects an empty stream instead of returning undefined.
+      // Preserve the port's established empty-document contract.
+      if (source.trim().length === 0) {
+        return ok(null);
+      }
       try {
         const value = load(source, { schema: PYTHON_TOLERANT_SCHEMA });
         return ok(value === undefined ? null : value);

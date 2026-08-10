@@ -37,19 +37,8 @@ describe('detectFeaturesFromPlugins', () => {
     expect(detectFeaturesFromPlugins(plugins('mike')).has('versions')).toBe(true);
   });
 
-  it('maps git-authors to the contributor-list feature', () => {
-    expect(detectFeaturesFromPlugins(plugins('git-authors')).has('contributor-list')).toBe(true);
-  });
-
-  it('maps git-committers to the contributor-list feature', () => {
-    expect(detectFeaturesFromPlugins(plugins('git-committers')).has('contributor-list')).toBe(true);
-  });
-
-  it('git-authors and git-committers share the same target — both produce a single contributor-list feature', () => {
-    const features = detectFeaturesFromPlugins(plugins('git-authors', 'git-committers'));
-    expect(features.has('contributor-list')).toBe(true);
-    // Set semantics: only one membership for the shared target.
-    expect(features.size).toBe(1);
+  it('does not install a deprecated contributor plugin for git author extensions', () => {
+    expect(detectFeaturesFromPlugins(plugins('git-authors', 'git-committers'))).toEqual(new Set());
   });
 
   it('detects multiple recognized plugins in one pass', () => {

@@ -14,6 +14,7 @@
 
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
+import packageJson from '../../../package.json' with { type: 'json' };
 import {
   getTranslationDepth,
   type MappingRow,
@@ -54,7 +55,7 @@ export interface CliOverrides {
   readonly imageDiffer?: ImageDiffer;
 }
 
-const VERSION = '0.1.0';
+const VERSION = packageJson.version;
 
 const HELP_TEXT = `mkdocs-material-to-starlight — convert a MkDocs Material site to Astro Starlight
 

@@ -262,11 +262,11 @@ const REGISTRY_ENTRIES: ReadonlyArray<DiagnosticEntry> = [
     fix: 'Run the gen-files Python script ahead of conversion to produce real .md files in `docs_dir`, OR rewrite the script as an Astro content loader (`docsLoader` returns a `Loader` you can extend) and emit synthetic entries from there.',
   },
   {
-    id: 'plugin-print-site-no-equivalent',
-    severity: 'warning',
+    id: 'plugin-print-site-pdf-recommended',
+    severity: 'info',
     description:
-      'mkdocs.yml lists `mkdocs-print-site-plugin` (single concatenated print page); Starlight has no equivalent.',
-    fix: 'Recreate via a custom Astro endpoint at `src/pages/print.astro` that imports every page through `getCollection("docs")` and renders them in sequence, paired with a print stylesheet.',
+      "mkdocs.yml lists `mkdocs-print-site-plugin`; starlight-to-pdf can preserve the printable artifact, but not the plugin's combined HTML route.",
+    fix: 'For PDF output, install `starlight-to-pdf` as a dev dependency and run it after `astro build` in CI. For a single concatenated HTML page, create `src/pages/print.astro`, load every page with `getCollection("docs")`, render them in sequence, and add a print stylesheet.',
   },
   {
     id: 'plugin-monorepo-no-equivalent',
@@ -570,9 +570,23 @@ const REGISTRY_ENTRIES: ReadonlyArray<DiagnosticEntry> = [
     id: 'plugin-i18n-needs-rename',
     severity: 'info',
     description:
-      'mkdocs.yml lists the `i18n` plugin (mkdocs-static-i18n); per-locale files have been renamed automatically.',
-    fix: 'Add a `locales: { … }` block to `astro.config.mjs` to register each locale with Starlight (the converter renames source files but does not write the locale config). See https://starlight.astro.build/guides/i18n/ for the `locales` config schema and translation patterns.',
+      'mkdocs.yml lists the `i18n` plugin (mkdocs-static-i18n); per-locale files and Starlight locale configuration were translated automatically.',
+    fix: 'No runtime action required. Optionally install the `starlight-i18n` Visual Studio Code extension to find missing or outdated translations and edit source/translated pages side by side.',
     relatedFeatureId: 'plugin-i18n-rename',
+  },
+  {
+    id: 'draft-docs-applied',
+    severity: 'info',
+    description:
+      'A MkDocs `draft_docs` pattern matched this source file; the converter emitted Starlight `draft: true` frontmatter and enabled starlight-auto-drafts.',
+    fix: 'No action required. Draft pages remain visible during local development and are removed from production content and explicit sidebar navigation.',
+  },
+  {
+    id: 'extension-superfences-live-code-recommended',
+    severity: 'info',
+    description:
+      'A pymdownx.superfences custom renderer appears to produce an interactive code example that cannot execute in Astro.',
+    fix: 'Install `astro-live-code`, register `liveCode()` as an Astro integration, and rewrite the custom fence as a renderable language fence with trailing `live` metadata, such as ```jsx live.',
   },
   {
     id: 'theme-fonts-applied',
@@ -954,7 +968,7 @@ const REGISTRY_ENTRIES: ReadonlyArray<DiagnosticEntry> = [
     severity: 'info',
     description:
       '`mkdocs-git-authors-plugin` or `mkdocs-git-committers-2` was configured. Both add per-page contributor metadata derived from `git log`. Starlight has no first-class per-page author/contributor block.',
-    fix: 'For project-wide contributor display, install the `starlight-contributor-list` community plugin (a single footer block of all repo contributors). For true per-page authors, write a small Astro component that runs `git log --format=%an --follow <file>` at build time and renders the result in the page footer via a component override. The converter does not auto-install either path because both require project-specific styling decisions.',
+    fix: 'Do not install the deprecated `starlight-contributor-list` package. For true per-page authors, write a local Astro component that runs `git log --format=%an --follow <file>` at build time and renders the result in the page footer via a Starlight component override. The converter does not auto-install this path because it requires project-specific repository and styling decisions.',
   },
   {
     id: 'plugin-mkdocs-bibtex-no-equivalent',

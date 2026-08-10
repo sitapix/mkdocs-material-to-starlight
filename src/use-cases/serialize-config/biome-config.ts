@@ -21,7 +21,7 @@
  * 100-char print width.
  */
 
-const BIOME_SCHEMA_URL = 'https://biomejs.dev/schemas/2.3.0/schema.json';
+const BIOME_SCHEMA_URL = 'https://biomejs.dev/schemas/2.5.7/schema.json';
 
 export function serializeBiomeConfig(): string {
   const config = {

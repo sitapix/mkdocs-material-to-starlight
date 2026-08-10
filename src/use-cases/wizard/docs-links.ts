@@ -51,8 +51,8 @@ export const PLUGIN_DOCS: Readonly<Record<string, string>> = {
   'render-swagger': 'https://starlight-openapi.vercel.app/',
   'pdf-export': 'https://github.com/Fryuni/starlight-to-pdf',
   'with-pdf': 'https://github.com/Fryuni/starlight-to-pdf',
-  'git-authors': 'https://github.com/HiDeoo/starlight-contributor-list',
-  'git-committers': 'https://github.com/HiDeoo/starlight-contributor-list',
+  'git-authors': 'https://starlight.astro.build/guides/overriding-components/',
+  'git-committers': 'https://starlight.astro.build/guides/overriding-components/',
 
   // No direct equivalent — link to upstream so the user knows what to
   // recreate.

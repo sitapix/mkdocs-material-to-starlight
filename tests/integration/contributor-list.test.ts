@@ -30,91 +30,47 @@ function readGenerated(file: string): string {
   return readFileSync(join(out, file), 'utf8');
 }
 
-describe('starlight-contributor-list integration — git-authors / git-committers', () => {
-  it('git-authors triggers the dependency in package.json', async () => {
-    writeMkdocs('  - git-authors');
+describe('git contributor plugin migration guidance', () => {
+  it.each(['git-authors', 'git-committers'])(
+    'does not install the deprecated contributor package for %s',
+    async (plugin) => {
+      writeMkdocs(`  - ${plugin}`);
 
-    const result = await convertSiteFromDisk({ projectDir: project, outputDir: out });
-    expect(result.ok).toBe(true);
+      const result = await convertSiteFromDisk({ projectDir: project, outputDir: out });
+      expect(result.ok).toBe(true);
 
-    const pkg = JSON.parse(readGenerated('package.json'));
-    expect(pkg.dependencies).toHaveProperty('starlight-contributor-list');
-  });
+      const pkg = JSON.parse(readGenerated('package.json'));
+      expect(pkg.dependencies).not.toHaveProperty('starlight-contributor-list');
+      const cfg = readGenerated('astro.config.mjs');
+      expect(cfg).not.toContain('starlight-contributor-list');
+      expect(cfg).not.toContain('starlightContributorList');
+    },
+  );
 
-  it('pins starlight-contributor-list to ^0.3.2 (0.4.0 peers on astro@^5, conflicting with our astro@^7)', async () => {
-    writeMkdocs('  - git-authors');
-
-    const result = await convertSiteFromDisk({ projectDir: project, outputDir: out });
-    expect(result.ok).toBe(true);
-
-    const pkg = JSON.parse(readGenerated('package.json'));
-    expect(pkg.dependencies['starlight-contributor-list']).toBe('^0.3.2');
-  });
-
-  it('git-committers triggers the dependency in package.json', async () => {
-    writeMkdocs('  - git-committers');
-
-    const result = await convertSiteFromDisk({ projectDir: project, outputDir: out });
-    expect(result.ok).toBe(true);
-
-    const pkg = JSON.parse(readGenerated('package.json'));
-    expect(pkg.dependencies).toHaveProperty('starlight-contributor-list');
-  });
-
-  it('emits the integration import + invocation in astro.config.mjs', async () => {
-    writeMkdocs('  - git-authors');
-
-    const result = await convertSiteFromDisk({ projectDir: project, outputDir: out });
-    expect(result.ok).toBe(true);
-
-    const cfg = readGenerated('astro.config.mjs');
-    expect(cfg).toContain("import starlightContributorList from 'starlight-contributor-list';");
-    expect(cfg).toContain('starlightContributorList({ list: [] })');
-    // Placeholder TODO must precede the call so users see it during review.
-    expect(cfg).toMatch(/TODO[^\n]*contributors[\s\S]*starlightContributorList/);
-  });
-
-  it('git-authors AND git-committers together register only ONE starlight-contributor-list dep', async () => {
-    writeMkdocs('  - git-authors\n  - git-committers');
-
-    const result = await convertSiteFromDisk({ projectDir: project, outputDir: out });
-    expect(result.ok).toBe(true);
-
-    const pkg = JSON.parse(readGenerated('package.json'));
-    const matches = Object.keys(pkg.dependencies).filter((k) => k === 'starlight-contributor-list');
-    expect(matches).toHaveLength(1);
-
-    // And the integration block appears exactly once.
-    const cfg = readGenerated('astro.config.mjs');
-    const occurrences = cfg.match(/starlightContributorList\(/g) ?? [];
-    expect(occurrences).toHaveLength(1);
-  });
-
-  it('emits the auto-wired diagnostic message in migration notes', async () => {
+  it('emits actionable manual migration guidance instead of an empty placeholder', async () => {
     writeMkdocs('  - git-authors');
 
     const result = await convertSiteFromDisk({ projectDir: project, outputDir: out });
     expect(result.ok).toBe(true);
     if (!result.ok) return;
 
-    // Plugin-level diagnostics surface in MIGRATION_NOTES.md, not the
-    // per-file diagnostics array.
     expect(result.value.migrationNotesSource).toContain('plugin-git-authors-mapped');
-    expect(result.value.migrationNotesSource).toContain('auto-wired');
-    expect(result.value.migrationNotesSource).toContain('starlight-contributor-list');
+    expect(result.value.migrationNotesSource).toContain('No package was installed');
+    expect(result.value.migrationNotesSource).toContain('deprecated');
+    expect(result.value.migrationNotesSource).toContain('component override');
+    expect(result.value.migrationNotesSource).not.toContain('auto-wired');
   });
 
-  it('a project WITHOUT git-authors/committers does not pull in the dep', async () => {
-    writeMkdocs('  - search');
+  it('reports both source plugins without adding a generated dependency', async () => {
+    writeMkdocs('  - git-authors\n  - git-committers');
 
     const result = await convertSiteFromDisk({ projectDir: project, outputDir: out });
     expect(result.ok).toBe(true);
-
+    if (!result.ok) return;
     const pkg = JSON.parse(readGenerated('package.json'));
     expect(pkg.dependencies).not.toHaveProperty('starlight-contributor-list');
-
-    const cfg = readGenerated('astro.config.mjs');
-    expect(cfg).not.toContain('starlight-contributor-list');
-    expect(cfg).not.toContain('starlightContributorList');
+    const notes = result.value.migrationNotesSource;
+    expect(notes).toContain('mkdocs-git-authors-plugin');
+    expect(notes).toContain('mkdocs-git-committers-2');
   });
 });

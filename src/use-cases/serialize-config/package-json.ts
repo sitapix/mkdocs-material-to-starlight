@@ -36,6 +36,7 @@ export function serializePackageJson(input: PackageJsonInput): string {
     type: 'module',
     version: '0.0.1',
     private: true,
+    engines: { node: CORE_VERSIONS.node },
   };
   if (input.siteDescription !== null) {
     pkg.description = input.siteDescription;

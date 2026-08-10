@@ -96,7 +96,7 @@ export interface ConvertFileInput {
   readonly tabsLinked?: boolean;
   /**
    * When true (site-level pre-scan found admonition types Starlight's four
-   * asides cannot express, so starlight-markdown-blocks is installed),
+   * asides cannot express, so a local remark plugin is generated),
    * those types keep their names verbatim (`:::abstract`) instead of being
    * squashed to note/tip/danger with icon hints.
    */

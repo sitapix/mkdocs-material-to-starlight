@@ -64,11 +64,12 @@ describe('diagnosePlugins', () => {
     expect(out[0]?.ruleId).toBe('plugin-jupyter-no-equivalent');
   });
 
-  it('emits an info diagnostic for the i18n plugin (rename done; locales config still manual)', () => {
+  it('confirms the i18n migration and recommends the optional editor extension', () => {
     const out = diagnosePlugins(plugins('i18n'));
     expect(out[0]?.ruleId).toBe('plugin-i18n-needs-rename');
     expect(out[0]?.severity).toBe('info');
     expect(out[0]?.message).toContain('locales');
+    expect(out[0]?.message).toContain('starlight-i18n');
   });
 
   it('handles multiple plugins in one pass, preserving order', () => {
@@ -118,6 +119,54 @@ describe('diagnosePlugins', () => {
   it('emits the same diagnostic for the mkdocs-with-pdf plugin variant', () => {
     const out = diagnosePlugins(plugins('with-pdf'));
     expect(out[0]?.ruleId).toBe('plugin-pdf-export-mapped');
+  });
+
+  it('recommends starlight-to-pdf for print-site while preserving the HTML caveat', () => {
+    const out = diagnosePlugins(plugins('print-site'));
+    expect(out[0]?.ruleId).toBe('plugin-print-site-pdf-recommended');
+    expect(out[0]?.severity).toBe('info');
+    expect(out[0]?.message).toContain('starlight-to-pdf');
+    expect(out[0]?.message).toContain('print.astro');
+  });
+
+  it('recommends astro-live-code for interactive custom superfences', () => {
+    const out = diagnosePlugins(
+      [],
+      [
+        {
+          name: 'pymdownx.superfences',
+          options: {
+            custom_fences: [
+              { name: 'jsx-playground', format: 'docs.render_playground' },
+              { name: 'mermaid', format: 'pymdownx.superfences.fence_code_format' },
+            ],
+          },
+        },
+      ],
+    );
+    const live = out.find(
+      (diagnostic) => diagnostic.ruleId === 'extension-superfences-live-code-recommended',
+    );
+    expect(live?.message).toContain('jsx-playground');
+    expect(live?.message).toContain('astro-live-code');
+    expect(live?.message).not.toContain('`mermaid`');
+  });
+
+  it('does not recommend astro-live-code for diagram-only custom fences', () => {
+    const out = diagnosePlugins(
+      [],
+      [
+        {
+          name: 'pymdownx.superfences',
+          options: {
+            custom_fences: [{ name: 'mermaid', format: 'pymdownx.superfences.fence_code_format' }],
+          },
+        },
+      ],
+    );
+    expect(
+      out.some((diagnostic) => diagnostic.ruleId === 'extension-superfences-live-code-recommended'),
+    ).toBe(false);
   });
 
   describe('PyMdown extension diagnostics (Tier 3)', () => {

@@ -276,7 +276,7 @@ describe('serializeAstroConfig', () => {
     expect(out).not.toContain('starlightGiscus');
   });
 
-  it('emits custom block definitions for the markdown-blocks feature', () => {
+  it('wires the local Astro 7-native remark plugin for custom Material admonitions', () => {
     const out = serializeAstroConfig({
       siteName: 'X',
       siteDescription: null,
@@ -285,11 +285,12 @@ describe('serializeAstroConfig', () => {
       detectedFeatures: ['markdown-blocks'],
     });
     expect(out).toContain(
-      `import starlightMarkdownBlocks, { Aside } from 'starlight-markdown-blocks';`,
+      `import remarkMaterialAdmonitions from './src/plugins/material-admonitions.mjs';`,
     );
-    for (const type of ['abstract', 'info', 'question', 'success', 'failure', 'bug', 'example']) {
-      expect(out).toContain(`${type}: Aside({`);
-    }
+    expect(out).toContain(`import { unified } from '@astrojs/markdown-remark';`);
+    expect(out).toContain('processor: unified({');
+    expect(out).toContain('remarkPlugins: [remarkMaterialAdmonitions]');
+    expect(out).not.toContain('starlight-markdown-blocks');
   });
 
   it('splits site into origin + base and installs starlight-base-path for subpath site URLs', () => {
@@ -318,6 +319,21 @@ describe('serializeAstroConfig', () => {
     });
     expect(out).toContain(`import d2 from 'astro-d2';`);
     expect(out).toContain('d2(),');
+  });
+
+  it('imports and wires starlight-auto-drafts after sidebar-topics', () => {
+    const out = serializeAstroConfig({
+      siteName: 'X',
+      siteDescription: null,
+      siteUrl: null,
+      sidebar: [{ kind: 'group', label: 'Guide', items: [{ kind: 'slug', slug: 'guide' }] }],
+      detectedFeatures: ['sidebar-topics', 'auto-drafts'],
+    });
+    expect(out).toContain(`import starlightAutoDrafts from 'starlight-auto-drafts';`);
+    expect(out).toContain('starlightAutoDrafts(),');
+    expect(out.indexOf('starlightSidebarTopics(')).toBeLessThan(
+      out.indexOf('starlightAutoDrafts()'),
+    );
   });
 
   it('imports remark-math and rehype-katex when math feature is detected', () => {
@@ -450,6 +466,7 @@ describe('serializeAstroConfig', () => {
     // starlight-kbd 0.4.0+ requires a `types` array; the converter emits a
     // single default type the user can extend.
     expect(out).toContain('starlightKbd({');
+    expect(out).toContain('globalPicker: false');
     expect(out).toContain('types:');
     expect(out).toContain("id: 'default'");
   });
@@ -540,21 +557,7 @@ describe('serializeAstroConfig', () => {
     expect(out).toContain('lastUpdated: true');
   });
 
-  it('emits the contributor-list import + integration with placeholder list when feature is detected', () => {
-    const out = serializeAstroConfig({
-      siteName: 'X',
-      siteDescription: null,
-      siteUrl: null,
-      sidebar: [],
-      detectedFeatures: ['contributor-list'],
-    });
-    expect(out).toContain("import starlightContributorList from 'starlight-contributor-list';");
-    expect(out).toContain('starlightContributorList({ list: [] })');
-    // TODO comment must precede the call so users see it in the diff.
-    expect(out).toMatch(/TODO[^\n]*contributors[\s\S]*starlightContributorList/);
-  });
-
-  it('does NOT emit the contributor-list integration when the feature is absent', () => {
+  it('does not emit the deprecated contributor-list integration', () => {
     const out = serializeAstroConfig({
       siteName: 'X',
       siteDescription: null,
