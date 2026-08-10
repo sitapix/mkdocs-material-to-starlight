@@ -23,6 +23,7 @@
 
 import pc from 'picocolors';
 import type { Severity } from '../../domain/diagnostics/diagnostic.js';
+import type { PackageManager } from '../../domain/wizard/answers.js';
 import { sanitizeForSingleLine } from '../../infrastructure/terminal/sanitize-terminal-output.js';
 import type { TaggedDiagnostic } from '../../use-cases/convert-site/convert.js';
 
@@ -42,6 +43,8 @@ export interface FormatReportOptions {
    * actions. Errors and warnings ignore this flag and always render rows.
    */
   readonly verbose?: boolean;
+  /** Package manager selected by the wizard or --package-manager. */
+  readonly packageManager?: PackageManager;
 }
 
 export function formatReport(
@@ -52,7 +55,7 @@ export function formatReport(
   const verbose = options.verbose === true;
   const where = resolveOutputDir(outputDir);
   const notesPath = where === '<output-dir>' ? 'MIGRATION_NOTES.md' : `${where}/MIGRATION_NOTES.md`;
-  const nextLine = `Next: ${pc.cyan(`cd ${where} && npm install && npm run dev`)}`;
+  const nextLine = `Next: ${pc.cyan(formatNextCommand(where, options.packageManager ?? 'npm'))}`;
 
   if (diagnostics.length === 0) {
     return (
@@ -113,6 +116,10 @@ export function formatReport(
     lines.push(nextLine);
   }
   return `${lines.join('\n')}\n`;
+}
+
+function formatNextCommand(where: string, packageManager: PackageManager): string {
+  return `cd ${where} && ${packageManager} install && ${packageManager} run dev`;
 }
 
 function resolveOutputDir(outputDir: string | undefined): string {

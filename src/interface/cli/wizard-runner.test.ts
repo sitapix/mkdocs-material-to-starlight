@@ -72,11 +72,12 @@ describe('runWizardFlow', () => {
 
   it('completes a fresh wizard run, persists flags, and prints the report', async () => {
     const projectDir = await project();
+    await writeFile(join(projectDir, 'yarn.lock'), '', 'utf8');
     const outputDir = join(projectDir, 'generated');
     const prompter = createFakePrompter({
       confirm: [true, true],
       text: [outputDir],
-      select: ['npm', 'c'],
+      select: ['yarn', 'c'],
     });
     usePrompter(prompter);
     const stdout = vi.fn();
@@ -93,7 +94,12 @@ describe('runWizardFlow', () => {
       expect(result.exitCode).toBe(0);
       expect(result.command.outputDir).toBe(outputDir);
       expect(result.equivalentFlags).toContain('--check');
+      expect(result.equivalentFlags).toContain('--package-manager=yarn');
     }
+    expect(
+      prompter.calls.find((call) => call.kind === 'select' && call.message === 'Package manager')
+        ?.initialValue,
+    ).toBe('yarn');
     expect(stdout).toHaveBeenCalledWith('clean report');
     expect(prompter.spinners.at(-1)).toMatchObject({ stoppedWith: 'Converted' });
   });

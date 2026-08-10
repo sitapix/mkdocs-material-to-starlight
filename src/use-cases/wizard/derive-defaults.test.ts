@@ -49,6 +49,16 @@ describe('deriveDefaults', () => {
     expect(d.configFormat).toBe('mjs');
     expect(d.packageName).toBeNull();
   });
+
+  it('prefers the repository package manager over the launcher', () => {
+    const d = deriveDefaults(baseConfig, {
+      userAgent: 'pnpm/10.0.0 npm/? node/v22.0.0 darwin arm64',
+      env: {},
+      repositoryPackageManager: 'yarn',
+    });
+
+    expect(d.packageManager).toBe('yarn');
+  });
 });
 
 describe('deriveOutputDirName', () => {

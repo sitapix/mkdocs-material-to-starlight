@@ -96,6 +96,23 @@ describe('runCli', () => {
     expect(existsSync(join(outputDir, 'MIGRATION_NOTES.md'))).toBe(true);
   });
 
+  it('uses --package-manager in the next-step command', async () => {
+    const code = await runCli([projectDir, outputDir, '--package-manager=pnpm'], makeIo());
+
+    expect(code).toBe(0);
+    expect(stdout.join('\n')).toContain(`cd ${outputDir} && pnpm install && pnpm run dev`);
+    expect(stdout.join('\n')).not.toContain('&& npm install');
+  });
+
+  it('uses the repository package manager when no flag is supplied', async () => {
+    writeFileSync(join(projectDir, 'yarn.lock'), '');
+
+    const code = await runCli([projectDir, outputDir], makeIo());
+
+    expect(code).toBe(0);
+    expect(stdout.join('\n')).toContain(`cd ${outputDir} && yarn install && yarn run dev`);
+  });
+
   it('exits 1 when conversion fails (missing mkdocs.yml)', async () => {
     rmSync(join(projectDir, 'mkdocs.yml'));
     const code = await runCli([projectDir, outputDir], makeIo());

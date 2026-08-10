@@ -321,6 +321,17 @@ describe('formatReport', () => {
     expect(out).not.toContain('localhost:4321');
   });
 
+  it.each(['npm', 'pnpm', 'yarn', 'bun'] as const)(
+    'uses the selected %s package manager in the next-step command',
+    (packageManager) => {
+      const out = formatReport([], '/converted/site', { packageManager });
+
+      expect(out).toContain(
+        `cd /converted/site && ${packageManager} install && ${packageManager} run dev`,
+      );
+    },
+  );
+
   it('omits the next-step command when there are errors (build would fail)', () => {
     const out = formatReport(
       [

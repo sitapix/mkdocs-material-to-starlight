@@ -17,11 +17,12 @@ import type { DefaultAnswers, PackageManager } from '../../domain/wizard/answers
 export interface DeriveDefaultsContext {
   readonly userAgent: string | undefined;
   readonly env: Readonly<Record<string, string | undefined>>;
+  readonly repositoryPackageManager?: PackageManager | null;
 }
 
 export function deriveDefaults(_config: MkdocsConfig, ctx: DeriveDefaultsContext): DefaultAnswers {
   return {
-    packageManager: guessPackageManager(ctx.userAgent),
+    packageManager: ctx.repositoryPackageManager ?? guessPackageManager(ctx.userAgent),
     check: true,
     tabs: 'mdx',
     sidebarTopics: true,

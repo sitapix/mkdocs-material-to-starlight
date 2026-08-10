@@ -25,9 +25,11 @@ import type { BrowserAutomator } from '../../domain/ports/browser-automator.js';
 import type { ImageDiffer } from '../../domain/ports/image-differ.js';
 import type { ProcessRunner } from '../../domain/ports/process-runner.js';
 import type { DiffPair } from '../../domain/visual-diff/page-diff.js';
+import type { PackageManager } from '../../domain/wizard/answers.js';
 import { createPlaywrightAutomator } from '../../infrastructure/browser/playwright-automator.js';
 import { resolveInteractivity } from '../../infrastructure/env/tty-detection.js';
 import { atomicWriteText } from '../../infrastructure/fs/atomic-write.js';
+import { detectRepositoryPackageManager } from '../../infrastructure/fs/detect-package-manager.js';
 import { createNodeConfigDiscoverer } from '../../infrastructure/fs/node-config-discoverer.js';
 import { createNodeFileSystem } from '../../infrastructure/fs/node-file-system.js';
 import { createPixelmatchDiffer } from '../../infrastructure/image/pixelmatch-differ.js';
@@ -302,6 +304,7 @@ interface ConvertCommand {
   readonly checkTimeoutMs: number | null;
   readonly force: boolean;
   readonly verbose: boolean;
+  readonly packageManager: PackageManager | null;
   // wizard surface — Commit A (easy parametrizations)
   readonly linksValidator: boolean | null;
   readonly tabs: 'mdx' | 'html' | null;
@@ -409,10 +412,15 @@ async function runConvertCompute(
   // astro check — means the generated project will not build. A clean exit 0
   // here would silently ship broken output to consumers.
   const exitCode = allDiagnostics.some((d) => d.diagnostic.severity === 'error') ? 1 : 0;
+  const packageManager =
+    command.packageManager ?? (await detectRepositoryPackageManager(command.projectDir)) ?? 'npm';
   return {
     kind: 'ok',
     exitCode,
-    report: formatReport(allDiagnostics, command.outputDir, { verbose: command.verbose }),
+    report: formatReport(allDiagnostics, command.outputDir, {
+      verbose: command.verbose,
+      packageManager,
+    }),
   };
 }
 

@@ -20,9 +20,9 @@ import type { WizardAnswers } from '../../domain/wizard/answers.js';
 // `parseArgs` returns when --check is absent. With this alignment, a wizard
 // answer of `check: true` emits --check, and parseArgs([...flags]).check === true.
 //
-// derive-defaults COMPUTES `packageManager` from `npm_config_user_agent`; we
-// need a hardcoded 'npm' baseline so wizard answers like `pnpm` reliably emit
-// `--package-manager=pnpm` regardless of who's invoking the binary.
+// derive-defaults COMPUTES `packageManager` from the enclosing repository or
+// `npm_config_user_agent`; we need a hardcoded 'npm' baseline so non-npm
+// answers reliably emit `--package-manager=<name>`.
 const DEFAULTS: Omit<WizardAnswers, 'projectDir' | 'outputDir'> = {
   packageManager: 'npm',
   check: false,

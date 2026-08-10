@@ -12,6 +12,7 @@ import { getTranslationDepth } from '../../domain/conversion-mapping/table.js';
 import type { ConversionPlan } from '../../domain/wizard/plan.js';
 import type { Prompter, SpinnerHandle } from '../../domain/wizard/ports/prompter.js';
 import { resolveInteractivity } from '../../infrastructure/env/tty-detection.js';
+import { detectRepositoryPackageManager } from '../../infrastructure/fs/detect-package-manager.js';
 import { createNodeDirInspector } from '../../infrastructure/fs/dir-inspector.js';
 import { createNodeDirectoryReader } from '../../infrastructure/fs/node-directory-reader.js';
 import { createNodeWizardPrefsStore } from '../../infrastructure/fs/wizard-prefs-store.js';
@@ -213,9 +214,11 @@ export async function runWizardFlow(
     detectedLocales: [],
     snippetCandidateDirs: extractSnippetBasePaths(configValue),
   };
+  const repositoryPackageManager = await detectRepositoryPackageManager(projectDir);
   const defaults = deriveDefaults(configValue, {
     userAgent: env.npm_config_user_agent,
     env,
+    repositoryPackageManager,
   });
 
   // Surface what we detected before asking anything else, so users see why
