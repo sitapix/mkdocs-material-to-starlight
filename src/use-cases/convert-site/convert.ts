@@ -335,9 +335,8 @@ export async function convertSite(
       diagnostics.push({ sourcePath, diagnostic });
     }
     if (headingBadgeDiagnostics.length > 0) {
-      // At least one ATX heading carried an attr_list class. Auto-install
-      // `starlight-heading-badges` so the class is preserved as a Badge
-      // next to the heading text — recreating Material's idiom.
+      // Record the optional plugin feature for migration guidance. The output
+      // policy filters it unless a caller explicitly enables the dependency.
       featureUnion.add('heading-badges');
     }
     // Whole-source scanners — each owns its internal loop (per-line +
@@ -471,28 +470,19 @@ export async function convertSite(
       }
     }
 
-    // Detect package-manager tab groups (npm/yarn/pnpm/bun) and promote them
-    // to <PackageManagers pkg="..."> MDX components. This must run after all
-    // text-level transformations (snippets, include-markdown, auto-append) but
-    // before convertFile so the PM component is visible to MDX detection.
-    // We pre-run normalizeContentTabs here so the PM normalizer sees the
-    // directive form; convertFile's own normalize() will re-run content-tabs
-    // idempotently.
+    // Detect package-manager tab groups for migration guidance. Keep the
+    // source as native Starlight tabs unless the user explicitly chooses the
+    // third-party component outside this automatic conversion path.
     const pmSource = normalizeContentTabs(source);
-    const pmResult = normalizePackageManagerTabs(pmSource, sourcePath);
+    const pmResult = normalizePackageManagerTabs(pmSource, sourcePath, { promote: false });
     for (const diagnostic of pmResult.diagnostics) {
       diagnostics.push({ sourcePath, diagnostic });
     }
-    if (pmResult.promoted) {
-      featureUnion.add('package-managers');
-      source = pmResult.text;
-    }
 
     // MkDocs `draft_docs` marks files by gitignore-style path patterns;
-    // Starlight marks them with frontmatter. Bridge the two representations
-    // before conversion, then install starlight-auto-drafts so explicit
-    // sidebar links are filtered from production while drafts remain visible
-    // during local development.
+    // Starlight marks them with frontmatter. Bridge the two representations;
+    // the migration report recommends starlight-auto-drafts, but package
+    // installation remains an explicit user decision.
     if (isDraftDoc(diskPath)) {
       source = markFrontmatterDraft(source);
       featureUnion.add('auto-drafts');
@@ -504,7 +494,7 @@ export async function convertSite(
           source: 'convert-site/draft-docs',
           message:
             `MkDocs draft_docs matched \`${diskPath}\`; emitted \`draft: true\` frontmatter ` +
-            'and enabled starlight-auto-drafts so the page stays available in development but is removed from production navigation.',
+            'and recorded starlight-auto-drafts as an optional migration recommendation.',
         }),
       });
     }

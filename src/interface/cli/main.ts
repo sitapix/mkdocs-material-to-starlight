@@ -99,7 +99,8 @@ Wizard decisions (Tier 1 — also surfaced as flags):
   --locale <code>          Locale to carry over (repeatable)
 
 Advanced (Tier 2):
-  --no-links-validator           Skip starlight-links-validator
+  --links-validator              Install and run starlight-links-validator
+  --no-links-validator           Do not install starlight-links-validator
   --expressive-code-theme <name> Override Shiki theme pair
   --cards <mdx|html|skip>        Card / grid output format
   --mdx-mode <auto|always|never> .mdx promotion strategy

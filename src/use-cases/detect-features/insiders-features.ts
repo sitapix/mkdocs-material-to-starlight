@@ -67,7 +67,7 @@ const INSIDERS_THEME_FEATURES: ReadonlyMap<string, string> = new Map([
   ],
   [
     'announce.dismiss',
-    'Material Insiders feature — dismissible announcement banner. Starlight equivalent: `starlight-announcement` (auto-installed by the converter when this flag is detected) provides dismissible banners with optional scheduling.',
+    'Material Insiders feature — dismissible announcement banner. Optional Starlight equivalent: `starlight-announcement`, which provides dismissible banners with scheduling.',
   ],
   [
     'content.tooltips',
@@ -83,7 +83,7 @@ const INSIDERS_THEME_FEATURES: ReadonlyMap<string, string> = new Map([
   ],
   [
     'content.action.view',
-    'Material Insiders feature — "View source" page action. Starlight equivalent: `starlight-page-actions` (auto-installed by the converter when this flag is detected) provides page-action buttons.',
+    'Material Insiders feature — "View source" page action. Optional Starlight equivalent: `starlight-page-actions`, which provides page-action buttons and must be installed explicitly.',
   ],
 ]);
 

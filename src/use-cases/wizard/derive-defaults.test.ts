@@ -20,12 +20,12 @@ const baseConfig: MkdocsConfig = {
 };
 
 describe('deriveDefaults', () => {
-  it("produces all defaults equal to today's converter behavior (no overrides)", () => {
+  it('keeps optional third-party integrations disabled by default', () => {
     const d = deriveDefaults(baseConfig, { userAgent: undefined, env: {} });
     expect(d.packageManager).toBe('npm');
     expect(d.check).toBe(true);
     expect(d.tabs).toBe('mdx');
-    expect(d.sidebarTopics).toBe(true);
+    expect(d.sidebarTopics).toBe(false);
     expect(d.rss).toBe(true);
     expect(d.mikeVersions).toEqual([]);
     expect(d.palette).toBe('translate');
@@ -34,7 +34,7 @@ describe('deriveDefaults', () => {
     expect(d.snippetBasePaths).toEqual([]);
     expect(d.snippetMaxDepth).toBe(8);
     expect(d.snippetDedentSubsections).toBe(false);
-    expect(d.linksValidator).toBe(true);
+    expect(d.linksValidator).toBe(false);
     expect(d.expressiveCodeTheme).toBeNull();
     expect(d.cards).toBe('html');
     expect(d.mdxMode).toBe('auto');

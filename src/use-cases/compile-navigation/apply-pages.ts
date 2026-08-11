@@ -9,10 +9,9 @@
  *   - `nav:` reorders items; `...` is the rest placeholder for unlisted
  *     entries; `{ Title: file.md }` renames the visible label.
  *
- * Recurses so nested groups get their own directory's overrides. The
- * directory key comes from the first slug entry inside the group (a group
- * whose first slug is `api/auth` belongs to `api`). Groups holding only
- * nested groups or external links pass through.
+ * Recurses so nested groups get their own directory's overrides. Synthesized
+ * groups carry their exact source directory; older/authored groups fall back
+ * to inference from their first slug entry.
  */
 
 import type {
@@ -41,7 +40,7 @@ function applyToEntry(entry: SidebarEntry, pages: AwesomePagesMap): SidebarEntry
   if (entry.kind !== 'group') {
     return entry;
   }
-  const directory = inferGroupDirectory(entry);
+  const directory = resolveGroupDirectory(entry);
   const config = directory === null ? undefined : pages.get(directory);
   if (config?.hide === true) {
     return null;
@@ -61,12 +60,13 @@ function buildGroup(
 ): GroupEntry {
   const label =
     config?.title !== undefined && config.title !== null ? config.title : original.label;
+  const directory = original.directory === undefined ? {} : { directory: original.directory };
   const result: GroupEntry =
     config?.collapse === true
-      ? { kind: 'group', label, items, collapsed: true }
+      ? { kind: 'group', label, items, collapsed: true, ...directory }
       : original.collapsed === undefined
-        ? { kind: 'group', label, items }
-        : { kind: 'group', label, items, collapsed: original.collapsed };
+        ? { kind: 'group', label, items, ...directory }
+        : { kind: 'group', label, items, collapsed: original.collapsed, ...directory };
   return result;
 }
 
@@ -143,7 +143,7 @@ function findMatchingItem(
     } else if (item.kind === 'group') {
       // Subgroup: nav references a directory name. Match against the last
       // segment of any inferred directory key.
-      const groupDir = inferGroupDirectory(item);
+      const groupDir = resolveGroupDirectory(item);
       if (groupDir !== null) {
         const lastSegment = groupDir.split('/').pop() ?? groupDir;
         if (lastSegment === target) return item;
@@ -158,6 +158,10 @@ function findMatchingItem(
 
 function renameSlug(entry: SlugEntry, label: string): SlugEntry {
   return { kind: 'slug', slug: entry.slug, label };
+}
+
+function resolveGroupDirectory(group: GroupEntry): string | null {
+  return group.directory ?? inferGroupDirectory(group);
 }
 
 function inferGroupDirectory(group: GroupEntry): string | null {

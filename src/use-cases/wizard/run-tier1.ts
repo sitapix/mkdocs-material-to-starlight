@@ -117,10 +117,10 @@ async function askSidebarTopics(
 ): Promise<Result<boolean, WizardCancelled>> {
   step(prompter, 'navigation.tabs (top-level grouping)', 'sidebar-topics');
   const v = await prompter.confirm({
-    message: 'Split sidebar by top-level group?',
+    message: 'Install optional starlight-sidebar-topics?',
     initialValue: defaults.sidebarTopics,
-    active: 'Yes (installs starlight-sidebar-topics)',
-    inactive: 'No (single sidebar)',
+    active: 'Yes (split by top-level group)',
+    inactive: 'No (standard Starlight sidebar)',
   });
   return v === null ? err(WIZARD_CANCELLED) : ok(v);
 }

@@ -482,24 +482,18 @@ describe('serializeAstroConfig', () => {
     expect(out).toContain("id: 'default'");
   });
 
-  it('imports and wires starlight-llms-txt when site URL is declared', () => {
-    // starlight-llms-txt requires `site:` in astro.config.mjs (it builds
-    // absolute URLs into the emitted llms.txt index). Wire it only when
-    // `siteUrl` is non-null — otherwise the plugin throws on `astro dev`.
+  it('does not add starlight-llms-txt when a site URL is declared', () => {
     const out = serializeAstroConfig({
       siteName: 'X',
       siteDescription: null,
       siteUrl: 'https://example.com',
       sidebar: [],
     });
-    expect(out).toContain(`import starlightLlmsTxt from 'starlight-llms-txt';`);
-    expect(out).toContain('starlightLlmsTxt()');
+    expect(out).not.toContain('starlight-llms-txt');
+    expect(out).not.toContain('starlightLlmsTxt');
   });
 
-  it('skips starlight-llms-txt when site URL is null (mkdocs.yml had no site_url)', () => {
-    // Real-world case: GMS² and other Material sites omit `site_url`.
-    // Without `site:` in astro.config.mjs, starlight-llms-txt throws at
-    // dev/build time. Skip the plugin in that case so the build is clean.
+  it('does not add starlight-llms-txt when site URL is absent', () => {
     const out = serializeAstroConfig({
       siteName: 'X',
       siteDescription: null,

@@ -578,8 +578,15 @@ const REGISTRY_ENTRIES: ReadonlyArray<DiagnosticEntry> = [
     id: 'draft-docs-applied',
     severity: 'info',
     description:
-      'A MkDocs `draft_docs` pattern matched this source file; the converter emitted Starlight `draft: true` frontmatter and enabled starlight-auto-drafts.',
-    fix: 'No action required. Draft pages remain visible during local development and are removed from production content and explicit sidebar navigation.',
+      'A MkDocs `draft_docs` pattern matched this source file; the converter emitted Starlight `draft: true` frontmatter.',
+    fix: 'Review Starlight draft behavior. If explicit sidebar links must be removed in production, install and configure `starlight-auto-drafts` manually.',
+  },
+  {
+    id: 'base-path-plugin-not-installed',
+    severity: 'warning',
+    description:
+      'The source site URL includes a deployment subpath. Astro `base` was preserved, but no third-party content-link rewriting plugin was installed.',
+    fix: 'Review root-relative links in converted content. Rewrite them for the deployment base or explicitly install and configure a maintained base-path helper.',
   },
   {
     id: 'extension-superfences-live-code-recommended',
@@ -624,7 +631,7 @@ const REGISTRY_ENTRIES: ReadonlyArray<DiagnosticEntry> = [
     id: 'theme-feature-unsupported',
     severity: 'warning',
     description:
-      'A `theme.features` entry has no first-class Starlight equivalent and was dropped (e.g., toc.integrate, navigation.prune, header.autohide, search.share, navigation.top, navigation.expand). Note: `announce.dismiss` and `content.action.view` ARE covered now via `starlight-announcement` and `starlight-page-actions` respectively (auto-installed when detected).',
+      'A `theme.features` entry has no first-class Starlight equivalent and was dropped. The migration note identifies any optional community plugin that can approximate it; third-party plugins are never installed automatically.',
     fix: 'Migration anchors per feature: (a) `navigation.instant.*` (XHR navigation, prefetch, progress) → Astro\'s `<ClientRouter />` from `astro:transitions` provides view-transition-style nav with prefetch hints. (b) `navigation.tracking` (URL anchor sync on scroll) → custom client script in `Head.astro` listening to `IntersectionObserver`. (c) `navigation.prune` (HTML reduction) → no equivalent; ignore. (d) `toc.integrate` / `toc.follow` → override `TableOfContents.astro` and merge into `Sidebar.astro`. (e) `header.autohide` → override `Header.astro` with a scroll-listener that toggles a `--sl-nav-translate` CSS var. (f) `search.share` → override `Search.astro` to add a "copy link to query" button. The full overrides reference is at https://starlight.astro.build/reference/overrides/.',
     relatedFeatureId: 'theme-features',
   },
@@ -657,7 +664,7 @@ const REGISTRY_ENTRIES: ReadonlyArray<DiagnosticEntry> = [
     severity: 'warning',
     description:
       '`extra.analytics.feedback` (the Material "Was this page helpful?" widget) was dropped — Starlight has no built-in equivalent.',
-    fix: 'Migration anchors: (1) **FeelBack** — the recommended community widget listed at https://starlight.astro.build/resources/plugins/ (search "FeelBack"). Install via `<script src="https://cdn.feelback.dev/...">` injected into Starlight `head[]`. (2) Custom Footer override — add a small Astro component that calls `gtag(\'event\', \'feedback\', { rating: ... })` to forward the rating to GA4. (3) Reuse `starlight-page-actions` (already auto-installed when `content.action.view` is enabled) and add a custom action that opens an issue/PR for the page.',
+    fix: 'Choose a feedback implementation explicitly: FeelBack, a local Footer override that records a GA4 event, or a manually installed page-actions plugin configured with a feedback link.',
     relatedFeatureId: 'extra-analytics',
   },
   {
@@ -809,6 +816,14 @@ const REGISTRY_ENTRIES: ReadonlyArray<DiagnosticEntry> = [
     relatedFeatureId: 'package-managers-tabs',
   },
   {
+    id: 'package-managers-tabs-recommended',
+    severity: 'info',
+    description:
+      'Package-manager commands were kept as native Starlight tabs without installing a community component.',
+    fix: 'No action required. Install `starlight-package-managers` explicitly only if its compact selector is preferred.',
+    relatedFeatureId: 'package-managers-tabs',
+  },
+  {
     id: 'plugin-swagger-ui-mapped',
     severity: 'info',
     description:
@@ -821,7 +836,7 @@ const REGISTRY_ENTRIES: ReadonlyArray<DiagnosticEntry> = [
     severity: 'info',
     description:
       "mkdocs.yml lists Material's `social` plugin (per-page Open Graph card PNGs). No `starlight-*` plugin exists for this; the canonical Starlight pattern uses `astro-og-canvas`. Distinct from Starlight's `social: []` config (header social-media icon links).",
-    fix: 'The converter has installed `astro-og-canvas` and emitted a stub endpoint at `src/pages/og/[...slug].png.ts`. Run `npm install`, then customize the card layout (logo, fonts, colors, padding) — see https://github.com/delucis/astro-og-canvas#options. Optionally inject `<meta property="og:image">` per-page via Starlight\'s `head[]` config.',
+    fix: "If generated cards are required, install `astro-og-canvas` explicitly, add an endpoint such as `src/pages/og/[...slug].png.ts`, and configure each page's `og:image` metadata.",
     relatedFeatureId: 'plugin-social',
   },
   {
@@ -876,22 +891,22 @@ const REGISTRY_ENTRIES: ReadonlyArray<DiagnosticEntry> = [
     id: 'extension-arithmatex-detected',
     severity: 'warning',
     description:
-      '`pymdownx.arithmatex` was configured. The converter passes `$inline$` and `$$block$$` math through to remark-math, but Astro needs a rehype renderer to actually display the formulas.',
+      '`pymdownx.arithmatex` was configured. The converter preserves `$inline$` and `$$block$$` source, but does not install a math renderer.',
     fix: 'Install `rehype-katex` (preferred for static rendering) or `rehype-mathjax` plus `@astrojs/markdown-remark`, then wire them through the unified processor in `astro.config.mjs` (Astro 7 defaults to Sätteri, which ignores remark/rehype plugins): `markdown: { processor: unified({ remarkPlugins: [remarkMath], rehypePlugins: [rehypeKatex] }) }` with `import { unified } from "@astrojs/markdown-remark"`. Also add `import "katex/dist/katex.min.css"` to your global CSS. Full setup: https://docs.astro.build/en/guides/markdown-content/#markdown-plugins and https://github.com/remarkjs/remark-math.',
   },
   {
     id: 'latex-delimiter-unsupported',
     severity: 'warning',
     description:
-      "Source uses Material's alternate LaTeX delimiters `\\(...\\)` (inline) or `\\[...\\]` (block), which Material recommends as a MathJax-friendly alternative to `$`/`$$`. remark-math (the math pipeline auto-wired into emitted Starlight projects) does not recognize backslash-paren delimiters by default, so they will pass through verbatim and render as literal backslashes.",
+      "Source uses Material's alternate LaTeX delimiters `\\(...\\)` (inline) or `\\[...\\]` (block). If you explicitly add remark-math, these delimiters still require normalization to `$`/`$$` or additional configuration.",
     fix: 'Easiest path: rewrite to dollar delimiters in source. `\\(x\\)` becomes `$x$`; `\\[y\\]` becomes `$$y$$`. Alternative: configure a custom remark plugin in `astro.config.mjs` that recognizes backslash delimiters (e.g., a Pandoc-flavored math plugin), or write a small regex-based remark plugin to translate the delimiters before remark-math runs. See https://github.com/remarkjs/remark-math/tree/main/packages/remark-math for the package README and API reference.',
   },
   {
     id: 'math-runtime-script-superseded',
     severity: 'info',
     description:
-      'An `extra_javascript` entry references a MathJax or KaTeX runtime configuration script. Material loads these at runtime to render math in the browser, but Astro renders math at build time via remark-math + rehype-katex (auto-wired when `pymdownx.arithmatex` is detected), making the runtime script redundant and potentially conflicting with the rehype output.',
-    fix: "Remove the script entry from your Astro config's `head[]` after confirming math still renders. The original script file is still copied through to `public/` for inspection but is no longer referenced.",
+      'An `extra_javascript` entry references MathJax or KaTeX runtime configuration. Math rendering is not installed automatically; choose either that runtime or an explicitly configured remark-math and rehype-katex build pipeline.',
+    fix: 'Choose one path: keep and verify the runtime script, or explicitly configure build-time math rendering and then remove the redundant script.',
   },
   {
     id: 'extension-progressbar-no-equivalent',
@@ -1044,7 +1059,7 @@ const REGISTRY_ENTRIES: ReadonlyArray<DiagnosticEntry> = [
     id: 'frontmatter-social-cards',
     severity: 'info',
     description:
-      "Page frontmatter `social:` block (`cards`, `cards_layout`, `cards_layout_options`) was detected — Material's per-page social-card override. The converter auto-wires `astro-og-canvas` for OG image generation, but per-page customisation works differently in Astro.",
+      'Page frontmatter `social:` block (`cards`, `cards_layout`, `cards_layout_options`) was detected. Astro social-card generation requires an explicitly selected integration and manual per-page configuration.',
     fix: 'Edit the generator endpoint at `src/pages/og/[...slug].png.ts` and branch on the page slug or frontmatter for per-page layouts. To skip OG generation for a specific page, return a 404 from that endpoint when frontmatter sets `social.cards: false`. Hand-port any `cards_layout_options` (background_color, font_family) into the og-canvas configuration.',
   },
   {
@@ -1166,7 +1181,7 @@ const REGISTRY_ENTRIES: ReadonlyArray<DiagnosticEntry> = [
     severity: 'info',
     description:
       'A GitHub-style alert blockquote (`> [!NOTE]`, `> [!TIP]`, `> [!IMPORTANT]`, `> [!WARNING]`, `> [!CAUTION]`) was detected in the source. Material does not natively render this syntax; Starlight does not either, but the `starlight-github-alerts` plugin transforms it into Starlight asides at build time.',
-    fix: 'No action required if you accept the auto-installed `starlight-github-alerts` plugin (added to `package.json` whenever any source file contains alerts). Alternative: convert each alert manually to a Starlight `:::note` / `:::tip` / `:::caution` / `:::danger` aside directive.',
+    fix: 'Install `starlight-github-alerts` explicitly, or convert each alert to a Starlight `:::note` / `:::tip` / `:::caution` / `:::danger` aside directive.',
   },
   {
     id: 'nav-multi-topic-detected',
@@ -1239,7 +1254,7 @@ const REGISTRY_ENTRIES: ReadonlyArray<DiagnosticEntry> = [
     id: 'pymdownx-quotes-callouts-routed',
     severity: 'info',
     description:
-      '`mkdocs.yml` enables `pymdownx.quotes` with the `callouts: true` option. The callout syntax (`> [!note]`, `> [!tip] Title`) is identical to GitHub-flavored alerts — already handled by `scan-github-alerts` and the `starlight-github-alerts` plugin (auto-installed when alert syntax is detected).',
+      '`mkdocs.yml` enables `pymdownx.quotes` with `callouts: true`. The syntax matches GitHub alerts; install `starlight-github-alerts` explicitly or convert the blocks to Starlight asides.',
     fix: 'No action required — `starlight-github-alerts` renders the callouts as Starlight asides at build time. The lowercase form (`> [!note]`) is supported alongside the GitHub uppercase form (`> [!NOTE]`).',
     relatedFeatureId: 'quotes-callouts',
   },
@@ -1255,7 +1270,7 @@ const REGISTRY_ENTRIES: ReadonlyArray<DiagnosticEntry> = [
     id: 'extension-quotes-callouts-routed',
     severity: 'info',
     description:
-      '`pymdownx.quotes` extension was detected. If `callouts: true` is configured, the callout syntax routes through `scan-github-alerts` and `starlight-github-alerts` (auto-installed when alert markers are present).',
+      '`pymdownx.quotes` was detected. If `callouts: true` is configured, install an alert renderer explicitly or convert the callouts to Starlight asides.',
     fix: 'No action required.',
     relatedFeatureId: 'quotes-callouts',
   },

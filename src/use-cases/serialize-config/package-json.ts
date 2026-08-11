@@ -20,6 +20,8 @@ export interface PackageJsonInput {
   readonly siteName: string;
   readonly siteDescription: string | null;
   readonly detectedFeatures?: ReadonlyArray<DetectedFeature>;
+  /** Explicit opt-in for the community link-validator plugin. */
+  readonly enableLinksValidator?: boolean;
   /** Extra npm package names (and optional version specs) to include as deps.
    *  Used today for Fontsource packages derived from `theme.font`; when no
    *  version is provided, `latest` is pinned. */
@@ -60,9 +62,10 @@ export function serializePackageJson(input: PackageJsonInput): string {
   const dependencies: Record<string, string> = {
     astro: CORE_VERSIONS.astro,
     '@astrojs/starlight': CORE_VERSIONS.starlight,
-    'starlight-links-validator': CORE_VERSIONS.starlightLinksValidator,
-    'starlight-llms-txt': CORE_VERSIONS.starlightLlmsTxt,
   };
+  if (input.enableLinksValidator === true) {
+    dependencies['starlight-links-validator'] = CORE_VERSIONS.starlightLinksValidator;
+  }
   for (const feature of input.detectedFeatures ?? []) {
     for (const [pkgName, version] of FEATURE_DEPENDENCIES[feature]) {
       dependencies[pkgName] = version;

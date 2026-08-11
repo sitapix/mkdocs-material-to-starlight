@@ -37,7 +37,7 @@ const githubAlertScanner: LineScanner = {
       severity: 'info',
       ruleId: 'github-alert-detected',
       source: 'normalize/scan-github-alerts',
-      message: `GitHub-style alert blockquote \`[!${type}]\` detected. Install \`starlight-github-alerts\` (added to package.json automatically) for native rendering, or convert manually to a Starlight aside (\`:::${aside}\`).`,
+      message: `GitHub-style alert blockquote \`[!${type}]\` detected. Install \`starlight-github-alerts\` explicitly for native rendering, or convert it to a Starlight aside (\`:::${aside}\`).`,
       place: { line: lineNumber, column: 1 },
     });
   },

@@ -32,8 +32,8 @@ type Risk = 'low' | 'medium' | 'high';
  *                    loss; user can opt into manual remediation.
  *   `passthrough`  — no emit needed; CommonMark / Astro / Starlight defaults
  *                    already handle it.
- *   `recommend-dep` — auto-installs a Starlight community plugin or Astro
- *                    integration; UX is equivalent post-install.
+ *   `recommend-dep` — records an optional Starlight community plugin or Astro
+ *                     integration for explicit installation by the user.
  *   `manual`       — flagged via diagnostic only; user must hand-port.
  */
 export type TranslationDepth = 'full' | 'lossy-named' | 'passthrough' | 'recommend-dep' | 'manual';
@@ -338,7 +338,7 @@ const TABLE: ReadonlyArray<MappingRow> = [
     materialInput: 'mkdocs.yml plugins: [glightbox] (image lightbox plugin)',
     requiredExtensions: [],
     requiredPlugins: ['glightbox'],
-    starlightOutput: 'starlight-image-zoom Starlight plugin auto-wired in astro.config.mjs',
+    starlightOutput: 'diagnostic recommending the optional starlight-image-zoom plugin',
     fileExt: 'md',
     conversionType: 'recommended-dep',
     risk: 'low',
@@ -349,8 +349,8 @@ const TABLE: ReadonlyArray<MappingRow> = [
     requiredExtensions: [],
     requiredPlugins: ['mike'],
     starlightOutput:
-      'starlight-versions Starlight plugin auto-wired (versions list left as a stub)',
-    summary: 'Adds starlight-versions with the versions list left as a stub.',
+      'diagnostic recommending the optional starlight-versions plugin; version slugs require manual configuration',
+    summary: 'Recommends starlight-versions; version slugs require manual configuration.',
     fileExt: 'md',
     conversionType: 'recommended-dep',
     risk: 'medium',
@@ -461,7 +461,7 @@ const TABLE: ReadonlyArray<MappingRow> = [
     materialInput: 'Material `blog` plugin in mkdocs.yml',
     requiredExtensions: [],
     requiredPlugins: ['blog'],
-    starlightOutput: 'starlight-blog community plugin added to package.json + astro.config.mjs',
+    starlightOutput: 'diagnostic recommending the optional starlight-blog community plugin',
     fileExt: 'md',
     conversionType: 'recommended-dep',
     risk: 'medium',
@@ -471,7 +471,7 @@ const TABLE: ReadonlyArray<MappingRow> = [
     materialInput: 'Material `tags` plugin in mkdocs.yml',
     requiredExtensions: [],
     requiredPlugins: ['tags'],
-    starlightOutput: 'starlight-tags community plugin added to package.json + astro.config.mjs',
+    starlightOutput: 'diagnostic recommending the optional starlight-tags community plugin',
     fileExt: 'md',
     conversionType: 'recommended-dep',
     risk: 'medium',
@@ -616,7 +616,7 @@ const TABLE: ReadonlyArray<MappingRow> = [
       'mkdocs.yml `theme.features` list — navigation.tabs, navigation.sections, navigation.expand, navigation.path, navigation.indexes, navigation.tracking, navigation.instant, navigation.prune, navigation.top, toc.integrate, toc.follow, header.autohide, content.tabs.link, content.code.copy, content.action.edit, content.action.view, search.suggest, search.highlight, search.share, announce.dismiss',
     requiredExtensions: [],
     starlightOutput:
-      'per-feature mapping: navigation.indexes → starlight `pagefind` + group index pages (no-op, on by default); navigation.instant → no-op (Astro view transitions handle this via `<ClientRouter />`); content.action.edit → starlight `editLink: { baseUrl }`; content.action.view → `starlight-page-actions` (auto-installed); announce.dismiss → `starlight-announcement` (auto-installed); navigation.tabs → top-level sidebar groups (Starlight default); toc.integrate, toc.follow, header.autohide, navigation.prune → diagnostic-only (no Starlight equivalent); search.* → replaced by Pagefind defaults',
+      'per-feature mapping: navigation.indexes → starlight `pagefind` + group index pages; navigation.instant → Astro view-transition recommendation; content.action.edit → starlight `editLink`; content.action.view and announce.dismiss → optional plugin recommendations; navigation.tabs → standard top-level sidebar groups unless topics is explicitly enabled; unsupported flags remain diagnostic-only',
     summary:
       'Maps each feature flag to its Starlight equivalent; toc.integrate, toc.follow, header.autohide, navigation.prune drop with a diagnostic.',
     fileExt: 'md',
@@ -656,7 +656,7 @@ const TABLE: ReadonlyArray<MappingRow> = [
     requiredExtensions: [],
     requiredPlugins: ['social'],
     starlightOutput:
-      'no automatic conversion — recommended dep `astro-og-canvas` (or `@astrojs/og`) added to package.json with a stub `src/pages/og/[...slug].png.ts` endpoint; per-card layout, fonts, and color overrides are not auto-mapped from the Material `social.cards_layout_options` block',
+      'no automatic conversion — recommends an explicitly installed social-card integration such as `astro-og-canvas`; per-card layout, fonts, and colors require manual mapping',
     fileExt: 'md',
     conversionType: 'recommended-dep',
     risk: 'high',
@@ -667,7 +667,7 @@ const TABLE: ReadonlyArray<MappingRow> = [
       'mkdocs.yml header surface — `extra.announce` (or overrides/main.html announcement bar), `repo_url` + `repo_name` + `edit_uri`, `theme.features: [announce.dismiss, header.autohide]`',
     requiredExtensions: [],
     starlightOutput:
-      'announcement → starlight `banner: { content }`; repo_url/repo_name → `social: [{ icon: "github" | "gitlab" | "bitbucket", label, href }]`; edit_uri → `editLink: { baseUrl }`; announce.dismiss → `starlight-announcement` (auto-installed); header.autohide has no Starlight equivalent (diagnostic)',
+      'announcement → starlight `banner: { content }`; repo_url/repo_name → `social` entry; edit_uri → `editLink`; announce.dismiss → optional plugin recommendation; header.autohide remains diagnostic-only',
     summary:
       'announcement → banner; repo_url → social entry; edit_uri → editLink; header.autohide has no equivalent.',
     fileExt: 'md',
@@ -760,7 +760,7 @@ const TABLE: ReadonlyArray<MappingRow> = [
     requiredExtensions: [],
     requiredPlugins: ['swagger-ui-tag'],
     starlightOutput:
-      '`starlight-openapi` Starlight plugin auto-wired in astro.config.mjs; each `<swagger-ui>` tag must be manually replaced with the appropriate Starlight Openapi route or component',
+      'diagnostic recommending `starlight-openapi`; install explicitly and replace each `<swagger-ui>` tag manually',
     summary:
       'Adds starlight-openapi; each <swagger-ui> tag must be replaced with the matching Starlight Openapi route or component.',
     fileExt: 'md',
@@ -860,7 +860,7 @@ const TABLE: ReadonlyArray<MappingRow> = [
       '`pymdownx.quotes` with `callouts: true` — `> [!note]`, `> [!tip] Title`, `> [!danger]-` (collapsible) syntax',
     requiredExtensions: ['pymdownx.quotes'],
     starlightOutput:
-      'routed through `scan-github-alerts` (case-insensitive); `starlight-github-alerts` plugin auto-installed and renders the callouts as Starlight asides at build time',
+      'routed through `scan-github-alerts` (case-insensitive), which recommends explicit installation of `starlight-github-alerts` or conversion to native Starlight asides',
     fileExt: 'md',
     conversionType: 'recommended-dep',
     risk: 'low',
@@ -1043,7 +1043,7 @@ const TABLE: ReadonlyArray<MappingRow> = [
       'ATX heading with attr_list class flagged as a badge marker (e.g., `## Title { .badge }`, `### Beta { .new }`) — detected by `scan-heading-badges`',
     requiredExtensions: ['attr_list'],
     starlightOutput:
-      "`starlight-heading-badges` community plugin auto-wired in astro.config.mjs; the heading's `{ .class }` is preserved as a badge marker the plugin renders into a `<Badge>` next to the heading text",
+      '`attr_list` class is stripped with a diagnostic recommending explicit `starlight-heading-badges` installation and a manual `<Badge>` replacement',
     fileExt: 'md',
     conversionType: 'recommended-dep',
     risk: 'low',

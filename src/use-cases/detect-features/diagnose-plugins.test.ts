@@ -174,17 +174,12 @@ describe('diagnosePlugins', () => {
       return names.map((name) => ({ name }));
     }
 
-    it('emits an info confirming math is auto-wired (severity downgraded — no manual action)', () => {
-      // Previously the converter only flagged arithmatex and asked the user
-      // to install + wire rehype-katex themselves. The pipeline now auto-
-      // detects `$$...$$` content, adds remark-math + rehype-katex + katex
-      // to package.json, registers `katex/dist/katex.min.css` in customCss,
-      // and wires the plugins into astro.config. So this is informational.
+    it('warns that math rendering requires an explicit integration', () => {
       const out = diagnosePlugins([], exts('pymdownx.arithmatex'));
       expect(out).toHaveLength(1);
       expect(out[0]?.ruleId).toBe('extension-arithmatex-detected');
-      expect(out[0]?.severity).toBe('info');
-      expect(out[0]?.message).toMatch(/auto-?wired|automatically/i);
+      expect(out[0]?.severity).toBe('warning');
+      expect(out[0]?.message).toMatch(/no third-party renderer is installed automatically/i);
     });
 
     it('emits an info for pymdownx.progressbar (transform now promotes to <progress>)', () => {

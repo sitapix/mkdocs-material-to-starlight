@@ -17,6 +17,7 @@
  */
 
 import { join } from 'node:path';
+import { createDiagnostic } from '../../domain/diagnostics/diagnostic.js';
 import { err, ok, type Result } from '../../domain/result.js';
 import type { PackageManager } from '../../domain/wizard/answers.js';
 import { atomicCopyFile, atomicWriteText } from '../../infrastructure/fs/atomic-write.js';
@@ -39,15 +40,17 @@ import { assembleConfigOutputs } from '../../use-cases/serialize-config/assemble
 import { serializeBiomeConfig } from '../../use-cases/serialize-config/biome-config.js';
 import { buildOutputSources } from '../../use-cases/serialize-config/build-output-sources.js';
 import { serializeContentConfig } from '../../use-cases/serialize-config/content-config.js';
+import { applyThirdPartyPluginPolicy } from '../../use-cases/serialize-config/plugin-policy.js';
 import { serializePnpmWorkspace } from '../../use-cases/serialize-config/pnpm-workspace.js';
 import { serializeSidebar } from '../../use-cases/serialize-config/sidebar.js';
 import { computeUnclaimedSlugs } from '../../use-cases/serialize-config/topics-exclude.js';
+import type { DetectedFeature } from '../../use-cases/serialize-config/versions.js';
 
 export interface ConvertSiteFromDiskInput {
   readonly projectDir: string;
   readonly outputDir: string;
   readonly snippetBasePaths?: ReadonlyArray<string>;
-  /** When false, omits starlight-links-validator from generated config. Defaults to true. */
+  /** When true, explicitly install and configure starlight-links-validator. */
   readonly linksValidator?: boolean;
   /** Override for tab output mode. Defaults to `'mdx'` — emit Starlight
    *  `<Tabs>+<TabItem>` JSX (file promoted to `.mdx`); `syncKey` is added
@@ -107,8 +110,8 @@ export interface ConvertSiteFromDiskInput {
   readonly locales?: ReadonlyArray<string>;
   /** Rule IDs to suppress in the diagnostic stream. Deferred. */
   readonly suppressRules?: ReadonlyArray<string>;
-  /** When false, opt out of the starlight-sidebar-topics auto-install for
-   *  Material `navigation.tabs` and keep the flat sidebar. */
+  /** When true, explicitly install starlight-sidebar-topics for Material
+   *  `navigation.tabs`. Community plugins are otherwise recommendation-only. */
   readonly sidebarTopics?: boolean;
   /**
    * Optional injected output validator (test seam). When omitted, the API
@@ -250,9 +253,8 @@ export async function convertSiteFromDisk(
   const featuresFromThemeFlags = detectFeaturesFromThemeFeatures(themeFeatures);
 
   // Material comments live in a Giscus <script> inside the theme override
-  // partial (`<custom_dir>/partials/comments.html`). starlight-giscus needs
-  // all four data attributes; when they parse, auto-install — otherwise the
-  // existing `comment-system` diagnostic keeps recommending the manual port.
+  // partial (`<custom_dir>/partials/comments.html`). Parse the settings for
+  // migration guidance, but do not install the community plugin implicitly.
   const customDir = config.value.theme?.options?.custom_dir;
   let giscusConfig: GiscusConfig | null = null;
   if (typeof customDir === 'string' && customDir.length > 0) {
@@ -268,7 +270,7 @@ export async function convertSiteFromDisk(
   // absolute link 404s on subpath deploys (GitHub Pages project sites).
   const basePath = deriveBasePath(config.value.siteUrl);
 
-  const allFeatures = [
+  const detectedFeatures = [
     ...new Set([
       ...siteResult.value.detectedFeatures,
       ...featuresFromPlugins,
@@ -276,14 +278,16 @@ export async function convertSiteFromDisk(
       ...(giscusConfig !== null ? (['giscus'] as const) : []),
       ...(basePath !== null ? (['base-path'] as const) : []),
     ]),
-  ]
-    // `navigation.tabs` → starlight-sidebar-topics is on by default;
-    // `--no-sidebar-topics` keeps the flat sidebar instead.
-    .filter(
-      (f) =>
-        f !== 'sidebar-topics' || (input.sidebarTopics !== false && sidebarWithPages.length > 0),
-    )
-    .sort();
+  ].sort();
+
+  // Detection informs the migration report; it does not grant permission to
+  // install packages maintained outside Astro/Starlight. Community plugins
+  // only cross this boundary after an affirmative converter option.
+  const explicitlyEnabledPlugins = new Set<DetectedFeature>();
+  if (input.sidebarTopics === true && sidebarWithPages.length > 0) {
+    explicitlyEnabledPlugins.add('sidebar-topics');
+  }
+  const enabledFeatures = applyThirdPartyPluginPolicy(detectedFeatures, explicitlyEnabledPlugins);
 
   // Extract per-plugin option dicts so the astro-config + og-endpoint
   // serializers can translate the load-bearing knobs (blog_dir,
@@ -315,6 +319,19 @@ export async function convertSiteFromDisk(
       ...siteResult.value.diagnostics,
       ...sidebarBuilt.value.sectionIndexDiagnostics,
       ...sidebarBuilt.value.literateNavDiagnostics,
+      ...(basePath === null
+        ? []
+        : [
+            {
+              sourcePath: 'mkdocs.yml',
+              diagnostic: createDiagnostic({
+                severity: 'warning',
+                ruleId: 'base-path-plugin-not-installed',
+                source: 'interface/api/convert-site',
+                message: `site_url uses the subpath \`${basePath}\`. Astro \`base\` was emitted, but the community \`starlight-base-path\` plugin was not installed. Review root-relative content links or install a base-path helper explicitly.`,
+              }),
+            },
+          ]),
     ],
     deferredInput: input,
   });
@@ -352,10 +369,12 @@ export async function convertSiteFromDisk(
       siteUrl: config.value.siteUrl,
       useDirectoryUrls: config.value.useDirectoryUrls,
       sidebar: sidebarWithPages,
-      detectedFeatures: allFeatures,
-      ...(giscusConfig !== null ? { giscus: giscusConfig } : {}),
+      detectedFeatures: enabledFeatures,
+      ...(enabledFeatures.includes('giscus') && giscusConfig !== null
+        ? { giscus: giscusConfig }
+        : {}),
       ...(basePath !== null ? { basePath } : {}),
-      ...(allFeatures.includes('sidebar-topics')
+      ...(enabledFeatures.includes('sidebar-topics')
         ? {
             topicExcludeSlugs: computeUnclaimedSlugs(
               sidebarWithPages,
@@ -399,7 +418,7 @@ export async function convertSiteFromDisk(
     palette,
     paletteStrategy: input.palette,
     themeFonts,
-    detectedFeatures: allFeatures,
+    detectedFeatures: enabledFeatures,
     socialCardsLayoutOptions,
     rssOption: input.rss,
     siteDiagnostics: siteResult.value.diagnostics,
@@ -418,7 +437,7 @@ export async function convertSiteFromDisk(
     configFormat: input.configFormat ?? 'mjs',
     extendedFrontmatterFields,
     preserveSlugs,
-    includeBlogSchema: allFeatures.includes('blog'),
+    includeBlogSchema: detectedFeatures.includes('blog'),
     ...(input.packageManager === undefined ? {} : { packageManager: input.packageManager }),
   });
   if (!writeResult.ok) {

@@ -213,23 +213,23 @@ describe('serializePackageJson', () => {
     expect(JSON.parse(out).dependencies).not.toHaveProperty('starlight-md-txt');
   });
 
-  it('always includes starlight-llms-txt as a default dependency (AI-assistant accessibility)', () => {
-    // Tier-3 closure: starlight-llms-txt generates llms.txt / llms-full.txt
-    // automatically from Starlight content. It needs no per-site configuration
-    // and improves AI-assistant accessibility for every Starlight site, so the
-    // converter installs it by default.
+  it('does not add optional community plugins by default', () => {
     const outNoFeatures = serializePackageJson({
       siteName: 'X',
       siteDescription: null,
     });
-    expect(JSON.parse(outNoFeatures).dependencies).toHaveProperty('starlight-llms-txt');
+    const dependencies = JSON.parse(outNoFeatures).dependencies;
+    expect(dependencies).not.toHaveProperty('starlight-llms-txt');
+    expect(dependencies).not.toHaveProperty('starlight-links-validator');
+  });
 
-    const outWithFeatures = serializePackageJson({
-      siteName: 'Y',
+  it('adds starlight-links-validator only after explicit opt-in', () => {
+    const out = serializePackageJson({
+      siteName: 'X',
       siteDescription: null,
-      detectedFeatures: ['math', 'versions'],
+      enableLinksValidator: true,
     });
-    expect(JSON.parse(outWithFeatures).dependencies).toHaveProperty('starlight-llms-txt');
+    expect(JSON.parse(out).dependencies).toHaveProperty('starlight-links-validator', '^0.25.2');
   });
 
   it('does not add starlight-changelogs when versions is not detected', () => {

@@ -76,7 +76,7 @@ const LONGTAIL: ReadonlyMap<string, string> = new Map([
   ],
   [
     'announce.dismiss',
-    '`starlight-announcement` covers this — dismissible announcement banners with optional scheduling. Auto-installed; configure title/message in `astro.config.mjs`.',
+    '`starlight-announcement` covers this with dismissible announcement banners and scheduling. Install and configure it explicitly if needed.',
   ],
   [
     'content.action.edit',
@@ -84,7 +84,7 @@ const LONGTAIL: ReadonlyMap<string, string> = new Map([
   ],
   [
     'content.action.view',
-    '`starlight-page-actions` covers this — adds a "View source" page-action button. Auto-installed; configure the source link in `astro.config.mjs`.',
+    '`starlight-page-actions` covers this, but also enables additional actions by default. Install and configure it explicitly if needed.',
   ],
   [
     'content.tooltips',

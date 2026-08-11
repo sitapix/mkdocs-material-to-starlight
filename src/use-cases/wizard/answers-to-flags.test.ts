@@ -9,7 +9,7 @@ const baseline: WizardAnswers = {
   packageManager: 'npm',
   check: false,
   tabs: 'mdx',
-  sidebarTopics: true,
+  sidebarTopics: false,
   rss: true,
   mikeVersions: [],
   palette: 'translate',
@@ -18,7 +18,7 @@ const baseline: WizardAnswers = {
   snippetBasePaths: [],
   snippetMaxDepth: 8,
   snippetDedentSubsections: false,
-  linksValidator: true,
+  linksValidator: false,
   expressiveCodeTheme: null,
   cards: 'html',
   mdxMode: 'auto',
@@ -51,10 +51,8 @@ describe('answersToFlags', () => {
     expect(answersToFlags({ ...baseline, tabs: 'html' })).toContain('--tabs=html');
   });
 
-  it('emits --no-links-validator when disabled', () => {
-    expect(answersToFlags({ ...baseline, linksValidator: false })).toContain(
-      '--no-links-validator',
-    );
+  it('emits --links-validator only when enabled', () => {
+    expect(answersToFlags({ ...baseline, linksValidator: true })).toContain('--links-validator');
   });
 
   it('repeats --snippet-base-path for each entry', () => {
@@ -149,17 +147,17 @@ describe('answersToFlags ↔ parseArgs round-trip', () => {
     if (parsed.kind === 'convert') expect(parsed.check).toBe(true);
   });
 
-  it('round-trips sidebarTopics: false', () => {
-    const a = answersFor({ sidebarTopics: false });
+  it('round-trips sidebarTopics: true', () => {
+    const a = answersFor({ sidebarTopics: true });
     const flags = answersToFlags(a);
-    expect(flags).toContain('--no-sidebar-topics');
+    expect(flags).toContain('--sidebar-topics');
     const parsed = parseArgs([...flags]);
     expect(parsed.kind).toBe('convert');
-    if (parsed.kind === 'convert') expect(parsed.sidebarTopics).toBe(false);
+    if (parsed.kind === 'convert') expect(parsed.sidebarTopics).toBe(true);
   });
 
-  it('round-trips sidebarTopics: true (default; flag omitted)', () => {
-    const a = answersFor({ sidebarTopics: true });
+  it('keeps sidebarTopics disabled when the default flag is omitted', () => {
+    const a = answersFor({ sidebarTopics: false });
     const flags = answersToFlags(a);
     expect(flags).not.toContain('--no-sidebar-topics');
     expect(flags).not.toContain('--sidebar-topics');
@@ -174,7 +172,7 @@ describe('answersToFlags ↔ parseArgs round-trip', () => {
       tabs: 'html',
       rss: false,
       packageManager: 'pnpm',
-      linksValidator: false,
+      linksValidator: true,
       configFormat: 'ts',
       packageName: 'my-pkg',
       mikeVersions: ['v1', 'v2'],
@@ -186,7 +184,7 @@ describe('answersToFlags ↔ parseArgs round-trip', () => {
       expect(parsed.tabs).toBe('html');
       expect(parsed.rss).toBe(false);
       expect(parsed.packageManager).toBe('pnpm');
-      expect(parsed.linksValidator).toBe(false);
+      expect(parsed.linksValidator).toBe(true);
       expect(parsed.configFormat).toBe('ts');
       expect(parsed.packageName).toBe('my-pkg');
       expect(parsed.mikeVersions).toEqual(['v1', 'v2']);

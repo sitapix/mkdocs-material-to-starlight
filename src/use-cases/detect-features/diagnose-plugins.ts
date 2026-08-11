@@ -44,7 +44,7 @@ const PLUGIN_DIAGNOSTICS: ReadonlyMap<string, PluginDiagnosticSpec> = new Map([
       ruleId: 'plugin-social-mapped',
       severity: 'info',
       message:
-        "Material `social` plugin (per-page OG card PNGs) detected — auto-wired to `astro-og-canvas`. The converter installs the package and emits a stub endpoint at `src/pages/og/[...slug].png.ts` that you must customize (logo, fonts, colors). Note: distinct from Starlight's `social: []` config (header social-media icon links), which is wired separately from `extra.social[]` in mkdocs.yml.",
+        "Material `social` plugin (per-page OG card PNGs) detected. For equivalent output, explicitly install `astro-og-canvas` and add an image endpoint such as `src/pages/og/[...slug].png.ts`. This is distinct from Starlight's `social: []` header links, which are mapped separately from `extra.social[]`.",
     },
   ],
   [
@@ -325,9 +325,9 @@ const PLUGIN_DIAGNOSTICS: ReadonlyMap<string, PluginDiagnosticSpec> = new Map([
     'pymdownx.arithmatex',
     {
       ruleId: 'extension-arithmatex-detected',
-      severity: 'info',
+      severity: 'warning',
       message:
-        '`pymdownx.arithmatex` (math rendering) detected. The converter has automatically: (1) added `remark-math`, `rehype-katex`, `katex`, and `@astrojs/markdown-remark` to `package.json`; (2) wired both plugins into `astro.config.mjs` via `markdown.processor: unified({...})` (required on Astro 7, whose default Sätteri processor ignores remark/rehype plugins); and (3) registered `katex/dist/katex.min.css` in Starlight `customCss`. Run `npm install` and formulas will render — no further configuration needed. To swap KaTeX for MathJax, replace `rehype-katex` with `rehype-mathjax` in both files and remove the `katex.min.css` line.',
+        '`pymdownx.arithmatex` math was detected. The source delimiters are preserved, but no third-party renderer is installed automatically. Explicitly configure remark-math with rehype-katex or rehype-mathjax, including the renderer stylesheet when required.',
     },
   ],
   [
@@ -408,7 +408,7 @@ const PLUGIN_DIAGNOSTICS: ReadonlyMap<string, PluginDiagnosticSpec> = new Map([
       ruleId: 'extension-quotes-callouts-routed',
       severity: 'info',
       message:
-        '`pymdownx.quotes` detected. If `callouts: true` is set, the syntax (`> [!note]`, `> [!tip] Title`, `> [!warning]-` for collapsed) is identical to GitHub-flavored alerts and routes through `scan-github-alerts` automatically. The `starlight-github-alerts` plugin is auto-installed when alert markers are present.',
+        '`pymdownx.quotes` detected. If `callouts: true` is set, the syntax (`> [!note]`, `> [!tip] Title`, `> [!warning]-` for collapsed) is identical to GitHub-flavored alerts. Install `starlight-github-alerts` explicitly or convert the blocks to Starlight asides.',
     },
   ],
   [
@@ -581,12 +581,9 @@ export function diagnosePlugins(
     );
   }
 
-  // Per-plugin custom-config detection. The auto-wired plugin substitutions
-  // (blog → starlight-blog, glightbox → starlight-image-zoom, etc.) cover the
-  // happy path with default options. When the user has customized the
-  // upstream plugin, surface a single diagnostic listing the bespoke option
-  // keys so they know which settings need hand-porting to the Starlight
-  // plugin's own (different) configuration shape.
+  // Per-plugin custom-config detection. Surface bespoke upstream options so
+  // users can evaluate them when explicitly configuring an optional
+  // Starlight replacement.
   const blog = plugins.find((p) => p.name === 'blog');
   if (blog !== undefined) {
     const customKeys = Object.keys(blog.options).filter((k) => !DEFAULT_BLOG_KEYS.has(k));

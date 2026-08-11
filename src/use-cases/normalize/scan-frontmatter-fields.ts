@@ -95,7 +95,7 @@ export function scanFrontmatterFields(source: string): ReadonlyArray<Diagnostic>
         ruleId: 'frontmatter-social-cards',
         source: 'normalize/scan-frontmatter-fields',
         message:
-          "Frontmatter `social:` block (`cards`, `cards_layout`, `cards_layout_options`) detected — Material's per-page social-card override. The converter auto-wires `astro-og-canvas` for OG image generation, but per-page customisation works differently: edit the generator endpoint at `src/pages/og/[...slug].png.ts` and branch on the page slug or frontmatter, or skip OG generation per page by returning a 404 from that endpoint when frontmatter says so. The `cards_layout_options` (background_color, font_family, etc.) must be hand-ported into the og-canvas configuration.",
+          "Frontmatter `social:` block (`cards`, `cards_layout`, `cards_layout_options`) detected — Material's per-page social-card override. No third-party generator is installed automatically. If social cards are required, select an Astro integration, add an image endpoint, and hand-port the layout options.",
       }),
     );
   }

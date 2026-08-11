@@ -79,6 +79,58 @@ describe('applyPagesOverrides', () => {
     ]);
   });
 
+  it('does not leak a parent .pages title into synthesized child groups with index pages', () => {
+    const sidebar: ReadonlyArray<SidebarEntry> = [
+      {
+        kind: 'group',
+        label: 'Runtime Catalog',
+        directory: 'runtime-catalog',
+        items: [
+          { kind: 'slug', slug: 'runtime-catalog' },
+          {
+            kind: 'group',
+            label: 'Interpreters',
+            directory: 'runtime-catalog/interpreters',
+            items: [
+              { kind: 'slug', slug: 'runtime-catalog/interpreters' },
+              { kind: 'slug', slug: 'runtime-catalog/interpreters/configuration' },
+            ],
+          },
+          {
+            kind: 'group',
+            label: 'Compilers',
+            directory: 'runtime-catalog/compilers',
+            items: [{ kind: 'slug', slug: 'runtime-catalog/compilers' }],
+          },
+        ],
+      },
+    ];
+    const map = new Map([
+      ['runtime-catalog', pages({ title: 'Language Runtime Catalog' })],
+      ['runtime-catalog/interpreters', pages({ title: 'Interpreter Reference' })],
+    ]);
+
+    const result = applyPagesOverrides(sidebar, map);
+
+    expect(result).toMatchObject([
+      {
+        label: 'Language Runtime Catalog',
+        directory: 'runtime-catalog',
+        items: [
+          { kind: 'slug', slug: 'runtime-catalog' },
+          {
+            label: 'Interpreter Reference',
+            directory: 'runtime-catalog/interpreters',
+          },
+          {
+            label: 'Compilers',
+            directory: 'runtime-catalog/compilers',
+          },
+        ],
+      },
+    ]);
+  });
+
   it('applies collapsed: true when .pages has collapse: true', () => {
     const sidebar: ReadonlyArray<SidebarEntry> = [
       {

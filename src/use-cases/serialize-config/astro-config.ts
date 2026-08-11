@@ -134,32 +134,16 @@ export function serializeAstroConfig(input: AstroConfigInput): string {
   const hasMarkdownBlocks = features.has('markdown-blocks');
   const hasD2 = features.has('d2');
   const hasAutoDrafts = features.has('auto-drafts');
-  const hasBasePath = features.has('base-path') && input.basePath !== undefined;
-
-  // `starlight-llms-txt` requires `site:` in astro.config.mjs (it builds
-  // absolute URLs into the emitted llms.txt index). When the source
-  // mkdocs.yml has no `site_url`, we have nothing to feed it — installing
-  // the plugin in that case is a hard failure at `astro dev` / `astro build`
-  // time. Gate the import + invocation on `siteUrl` so projects without a
-  // declared site URL still convert and build cleanly.
-  //
-  // Real-world (governance/src/mkdocs.yml): `site_url` was set to a Python
-  // YAML tag that decodes to a marker string like `/apply:os.getenv`. That
-  // is truthy but is NOT a parseable URL. We skip emitting `site:` in that
-  // case (see the `site:` block below), and llms-txt depends on a real
-  // `site:` field — so the same validity check gates the plugin.
-  const enableLlmsTxt = input.siteUrl !== null && isValidAbsoluteUrl(input.siteUrl);
+  // Astro's official `base` config remains safe to emit automatically. The
+  // community starlight-base-path helper is separately gated by the feature
+  // policy, so absolute content links may still need manual review.
+  const hasBasePath = input.basePath !== undefined;
+  const hasBasePathPlugin = features.has('base-path') && hasBasePath;
 
   const imports: string[] = [
     `import { defineConfig } from 'astro/config';`,
     `import starlight from '@astrojs/starlight';`,
   ];
-  if (enableLlmsTxt) {
-    // Default-on AI-assistant accessibility plugin — emits llms.txt routes
-    // from Starlight content. Gap-analysis (2026-05-03) bundles this for
-    // every emitted Starlight project that has a declared site URL.
-    imports.push(`import starlightLlmsTxt from 'starlight-llms-txt';`);
-  }
   if (hasSidebarTopics) {
     imports.push(`import starlightSidebarTopics from 'starlight-sidebar-topics';`);
   }
@@ -172,7 +156,7 @@ export function serializeAstroConfig(input: AstroConfigInput): string {
   if (hasMarkdownBlocks) {
     imports.push(`import remarkMaterialAdmonitions from './src/plugins/material-admonitions.mjs';`);
   }
-  if (hasBasePath) {
+  if (hasBasePathPlugin) {
     // Named export — the package has no default (unlike its siblings).
     imports.push(`import { starlightBasePath } from 'starlight-base-path';`);
   }
@@ -388,133 +372,150 @@ export function serializeAstroConfig(input: AstroConfigInput): string {
     lines.push('      },');
   }
   const enableLinksValidator = input.enableLinksValidator === true;
-  lines.push('      plugins: [');
-  if (hasSidebarTopics) {
-    // Material `navigation.tabs`: top-level nav sections become topics,
-    // each with its own sidebar. The plugin OWNS sidebar generation, so
-    // the `sidebar:` key is omitted above when this is active.
-    //
-    // `exclude` lists pages that legitimately belong to NO topic — the
-    // plugin hard-errors on any unmatched page otherwise. The scaffolded
-    // 404 is always topic-less; blog routes (posts plus starlight-blog's
-    // generated authors/tags/archive pages) carry starlight-blog's own
-    // sidebar instead of a topic.
-    // '/' is always excluded: topic membership works through slug items,
-    // and the root page's slug ('') cannot be referenced in a sidebar —
-    // so the root can never be claimed by a topic and would hard-error.
-    const excludeGlobs = ['/', '/404'];
+  const hasStarlightPlugins =
+    hasSidebarTopics ||
+    hasAutoDrafts ||
+    hasBasePathPlugin ||
+    hasScrollToTop ||
+    hasGiscus ||
+    hasImageZoom ||
+    hasVersions ||
+    hasBlog ||
+    hasTags ||
+    hasKbd ||
+    hasGithubAlerts ||
+    hasAnnouncement ||
+    hasPageActions ||
+    hasHeadingBadges ||
+    enableLinksValidator;
+  if (hasStarlightPlugins) {
+    lines.push('      plugins: [');
+    if (hasSidebarTopics) {
+      // Material `navigation.tabs`: top-level nav sections become topics,
+      // each with its own sidebar. The plugin OWNS sidebar generation, so
+      // the `sidebar:` key is omitted above when this is active.
+      //
+      // `exclude` lists pages that legitimately belong to NO topic — the
+      // plugin hard-errors on any unmatched page otherwise. The scaffolded
+      // 404 is always topic-less; blog routes (posts plus starlight-blog's
+      // generated authors/tags/archive pages) carry starlight-blog's own
+      // sidebar instead of a topic.
+      // '/' is always excluded: topic membership works through slug items,
+      // and the root page's slug ('') cannot be referenced in a sidebar —
+      // so the root can never be claimed by a topic and would hard-error.
+      const excludeGlobs = ['/', '/404'];
+      if (hasBlog) {
+        const blogDir =
+          typeof input.blogOptions?.blog_dir === 'string' ? input.blogOptions.blog_dir : 'blog';
+        excludeGlobs.push(`/${blogDir}/**`);
+      }
+      if (hasTags) {
+        // starlight-tags owns its generated index and per-tag routes. They are
+        // not content slugs and cannot be claimed by a sidebar topic.
+        excludeGlobs.push('/tags', '/tags/**');
+      }
+      // Converted pages absent from the nav (MkDocs converts every file,
+      // listed or not) — computed exactly by the caller from the slug map.
+      for (const slug of input.topicExcludeSlugs ?? []) {
+        excludeGlobs.push(`/${slug}`);
+      }
+      lines.push(`        ${indentTopics(serializeSidebarTopics(input.sidebar, excludeGlobs))},`);
+    }
+    if (hasAutoDrafts) {
+      // Keep this after sidebar-topics: auto-drafts must see the final sidebar
+      // configuration in order to remove links to draft pages in production.
+      lines.push('        starlightAutoDrafts(),');
+    }
+    if (hasBasePathPlugin) {
+      // Reads `base` from the Astro config above and prefixes content links.
+      lines.push('        starlightBasePath(),');
+    }
+    if (hasScrollToTop) {
+      lines.push('        starlightScrollToTop(),');
+    }
+    if (hasGiscus && input.giscus !== undefined) {
+      const g = input.giscus;
+      lines.push(
+        `        starlightGiscus({ repo: ${quote(g.repo)}, repoId: ${quote(g.repoId)}, category: ${quote(g.category)}, categoryId: ${quote(g.categoryId)} }),`,
+      );
+    }
+    if (hasImageZoom) {
+      lines.push('        imageZoom(),');
+    }
+    if (hasVersions) {
+      const versionSlugs = input.mikeVersions;
+      if (versionSlugs === undefined) {
+        // No concrete versions known: mkdocs.yml only declared
+        // `extra.version.provider: mike` (mike reads versions from git tags
+        // at build time, which the converter cannot reproduce). Emit a
+        // guidance comment so the site still builds — an active
+        // `starlightVersions({ versions: [{ slug: '2.0' }] })` placeholder
+        // breaks `astro:config:setup` because the slug has no matching
+        // docs/<version>/ tree. Re-run with `--mike-versions <slug>`
+        // (repeatable) to enable the plugin.
+        lines.push(
+          "        // TODO: starlightVersions({ versions: [{ slug: '1.0' }] }) — fill in real version slugs and uncomment.",
+        );
+      } else if (versionSlugs.length === 0) {
+        lines.push('        starlightVersions({ versions: [] }),');
+      } else {
+        const vList = versionSlugs.map((s) => `{ slug: ${quote(s)} }`).join(', ');
+        lines.push(`        starlightVersions({ versions: [${vList}] }),`);
+      }
+    }
     if (hasBlog) {
-      const blogDir =
-        typeof input.blogOptions?.blog_dir === 'string' ? input.blogOptions.blog_dir : 'blog';
-      excludeGlobs.push(`/${blogDir}/**`);
+      const blogArg =
+        input.blogOptions !== undefined ? translateBlogOptions(input.blogOptions) : '';
+      lines.push(`        starlightBlog(${blogArg}),`);
     }
     if (hasTags) {
-      // starlight-tags owns its generated index and per-tag routes. They are
-      // not content slugs and cannot be claimed by a sidebar topic.
-      excludeGlobs.push('/tags', '/tags/**');
+      const tagsArg =
+        input.tagsOptions !== undefined ? translateTagsOptions(input.tagsOptions) : '';
+      lines.push(`        starlightTags(${tagsArg}),`);
     }
-    // Converted pages absent from the nav (MkDocs converts every file,
-    // listed or not) — computed exactly by the caller from the slug map.
-    for (const slug of input.topicExcludeSlugs ?? []) {
-      excludeGlobs.push(`/${slug}`);
-    }
-    lines.push(`        ${indentTopics(serializeSidebarTopics(input.sidebar, excludeGlobs))},`);
-  }
-  if (hasAutoDrafts) {
-    // Keep this after sidebar-topics: auto-drafts must see the final sidebar
-    // configuration in order to remove links to draft pages in production.
-    lines.push('        starlightAutoDrafts(),');
-  }
-  if (enableLlmsTxt) {
-    lines.push('        starlightLlmsTxt(),');
-  }
-  if (hasBasePath) {
-    // Reads `base` from the Astro config above and prefixes content links.
-    lines.push('        starlightBasePath(),');
-  }
-  if (hasScrollToTop) {
-    lines.push('        starlightScrollToTop(),');
-  }
-  if (hasGiscus && input.giscus !== undefined) {
-    const g = input.giscus;
-    lines.push(
-      `        starlightGiscus({ repo: ${quote(g.repo)}, repoId: ${quote(g.repoId)}, category: ${quote(g.category)}, categoryId: ${quote(g.categoryId)} }),`,
-    );
-  }
-  if (hasImageZoom) {
-    lines.push('        imageZoom(),');
-  }
-  if (hasVersions) {
-    const versionSlugs = input.mikeVersions;
-    if (versionSlugs === undefined) {
-      // No concrete versions known: mkdocs.yml only declared
-      // `extra.version.provider: mike` (mike reads versions from git tags
-      // at build time, which the converter cannot reproduce). Emit a
-      // guidance comment so the site still builds — an active
-      // `starlightVersions({ versions: [{ slug: '2.0' }] })` placeholder
-      // breaks `astro:config:setup` because the slug has no matching
-      // docs/<version>/ tree. Re-run with `--mike-versions <slug>`
-      // (repeatable) to enable the plugin.
+    if (hasKbd) {
+      // starlight-kbd 0.4.0+ requires a `types` array with exactly one
+      // entry flagged `default: true`. Material's `pymdownx.keys` doesn't
+      // carry layout metadata, so emit a single default type the user can
+      // extend. Disable the global picker: the converter may already emit a
+      // ThemeSelect override for Material's palette toggle, and starlight-kbd
+      // otherwise attempts to own the same component and warns on every build.
       lines.push(
-        "        // TODO: starlightVersions({ versions: [{ slug: '1.0' }] }) — fill in real version slugs and uncomment.",
+        "        starlightKbd({ globalPicker: false, types: [{ id: 'default', label: 'Keyboard', default: true }] }),",
       );
-    } else if (versionSlugs.length === 0) {
-      lines.push('        starlightVersions({ versions: [] }),');
-    } else {
-      const vList = versionSlugs.map((s) => `{ slug: ${quote(s)} }`).join(', ');
-      lines.push(`        starlightVersions({ versions: [${vList}] }),`);
     }
+    if (hasGithubAlerts) {
+      lines.push('        starlightGithubAlerts(),');
+    }
+    if (hasAnnouncement) {
+      // Plugin requires user to fill in announcement text/schedule; converter
+      // emits a placeholder so users know exactly what to fill in.
+      lines.push(
+        "        starlightAnnouncement({ title: 'Announcement', message: 'Configure starlight-announcement options here.' }),",
+      );
+    }
+    if (hasPageActions) {
+      lines.push('        starlightPageActions(),');
+    }
+    if (hasHeadingBadges) {
+      lines.push('        starlightHeadingBadges(),');
+    }
+    if (enableLinksValidator) {
+      // Migrated MkDocs sites routinely link to pages that the original build
+      // generated dynamically (`mkdocs-click` produces a CLI reference,
+      // `mkdocstrings` produces autodoc pages) and to non-content paths
+      // (`/LICENSE`, `/CHANGELOG`, `/CONTRIBUTING`, etc.) that point at
+      // GitLab/GitHub web surfaces or static files. The plugin's defaults
+      // reject all of these at `astro build`. Soften the policy and exclude
+      // common non-content paths so the build completes; the converter's own
+      // `broken-link` diagnostic catches genuine cross-content link issues
+      // during conversion (surfaced in MIGRATION_NOTES.md).
+      lines.push(
+        "        starlightLinksValidator({ errorOnRelativeLinks: false, errorOnInvalidHashes: false, errorOnLocalLinks: false, exclude: ['/LICENSE', '/LICENSE.md', '/LICENSE.txt', '/CHANGELOG', '/CHANGELOG.md', '/CONTRIBUTING', '/CONTRIBUTING.md', '/CODE_OF_CONDUCT', '/CODE_OF_CONDUCT.md', '/SECURITY', '/SECURITY.md', '/COPYING', '/COPYING.md'] }),",
+      );
+    }
+    lines.push('      ],');
   }
-  if (hasBlog) {
-    const blogArg = input.blogOptions !== undefined ? translateBlogOptions(input.blogOptions) : '';
-    lines.push(`        starlightBlog(${blogArg}),`);
-  }
-  if (hasTags) {
-    const tagsArg = input.tagsOptions !== undefined ? translateTagsOptions(input.tagsOptions) : '';
-    lines.push(`        starlightTags(${tagsArg}),`);
-  }
-  if (hasKbd) {
-    // starlight-kbd 0.4.0+ requires a `types` array with exactly one
-    // entry flagged `default: true`. Material's `pymdownx.keys` doesn't
-    // carry layout metadata, so emit a single default type the user can
-    // extend. Disable the global picker: the converter may already emit a
-    // ThemeSelect override for Material's palette toggle, and starlight-kbd
-    // otherwise attempts to own the same component and warns on every build.
-    lines.push(
-      "        starlightKbd({ globalPicker: false, types: [{ id: 'default', label: 'Keyboard', default: true }] }),",
-    );
-  }
-  if (hasGithubAlerts) {
-    lines.push('        starlightGithubAlerts(),');
-  }
-  if (hasAnnouncement) {
-    // Plugin requires user to fill in announcement text/schedule; converter
-    // emits a placeholder so users know exactly what to fill in.
-    lines.push(
-      "        starlightAnnouncement({ title: 'Announcement', message: 'Configure starlight-announcement options here.' }),",
-    );
-  }
-  if (hasPageActions) {
-    lines.push('        starlightPageActions(),');
-  }
-  if (hasHeadingBadges) {
-    lines.push('        starlightHeadingBadges(),');
-  }
-  if (enableLinksValidator) {
-    // Migrated MkDocs sites routinely link to pages that the original build
-    // generated dynamically (`mkdocs-click` produces a CLI reference,
-    // `mkdocstrings` produces autodoc pages) and to non-content paths
-    // (`/LICENSE`, `/CHANGELOG`, `/CONTRIBUTING`, etc.) that point at
-    // GitLab/GitHub web surfaces or static files. The plugin's defaults
-    // reject all of these at `astro build`. Soften the policy and exclude
-    // common non-content paths so the build completes; the converter's own
-    // `broken-link` diagnostic catches genuine cross-content link issues
-    // during conversion (surfaced in MIGRATION_NOTES.md).
-    lines.push(
-      "        starlightLinksValidator({ errorOnRelativeLinks: false, errorOnInvalidHashes: false, errorOnLocalLinks: false, exclude: ['/LICENSE', '/LICENSE.md', '/LICENSE.txt', '/CHANGELOG', '/CHANGELOG.md', '/CONTRIBUTING', '/CONTRIBUTING.md', '/CODE_OF_CONDUCT', '/CODE_OF_CONDUCT.md', '/SECURITY', '/SECURITY.md', '/COPYING', '/COPYING.md'] }),",
-    );
-  }
-  lines.push('      ],');
   lines.push('    }),');
   if (hasMermaid) {
     lines.push('    mermaid(),');

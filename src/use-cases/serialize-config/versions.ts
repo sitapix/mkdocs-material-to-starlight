@@ -109,21 +109,9 @@ export const CORE_VERSIONS = {
   // projects; a Fontsource major with changed CSS paths would break the
   // emitted `customCss` imports on fresh installs.
   fontsource: '^5.3.0',
-  // Default-on link-validation plugin, run on every build.
+  // Optional link-validation plugin, installed only after an explicit opt-in.
   // (0.25.2 peers `@astrojs/starlight >=0.41.0`, `astro >=7.0.2`.)
   starlightLinksValidator: '^0.25.2',
-  // Default-on AI-assistant accessibility — generates llms.txt /
-  // llms-full.txt / llms-small.txt automatically from Starlight content
-  // with no per-site config needed. (0.11.0 peers `astro ^7.0.0`; the
-  // previous 0.10.0 peered `astro ^6.0.0`, which ERESOLVEs against the
-  // Astro 7 core — this bump is required, not cosmetic.)
-  starlightLlmsTxt: '^0.11.0',
-  // NOT bundled: `starlight-md-txt` (raw Markdown at `.md.txt` URLs) was
-  // evaluated 2026-07-23 as a default-on llms-txt companion and rejected —
-  // 0.1.0 re-renders page content through an MDX-flavored pipeline that
-  // crashes on HTML comments ("Unexpected character `!` before name"),
-  // and every Material blog post carries `<!-- more -->` as its excerpt
-  // marker. Re-evaluate when a release parses plain Markdown.
 } as const;
 
 /**
@@ -237,9 +225,8 @@ export const FEATURE_DEPENDENCIES: Readonly<
   // starlight-scroll-to-top. Zero-config.
   'scroll-to-top': [['starlight-scroll-to-top', '^1.0.1']],
   // Material comments via a Giscus script in `overrides/partials/
-  // comments.html` → starlight-giscus. Only auto-installed when the
-  // partial exists AND its data-repo/data-repo-id/data-category/
-  // data-category-id attributes parse — the plugin hard-requires all four.
+  // comments.html` → starlight-giscus. Available only after explicit opt-in;
+  // the plugin hard-requires all four parsed repository/category fields.
   // (1.1.0 peers `@astrojs/starlight >=0.41.0`.)
   giscus: [['starlight-giscus', '^1.1.0']],
   // Material admonition types beyond Starlight's four asides are handled by

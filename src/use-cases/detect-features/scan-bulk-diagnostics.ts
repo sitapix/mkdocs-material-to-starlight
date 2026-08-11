@@ -30,7 +30,7 @@ const NO_SELECT_FENCE_RE = /^```[^`\n]*?\{[^}\n]*?\.no-select[^}\n]*?\}/m;
 
 /** Matches Material's alternate LaTeX delimiters `\(...\)` and `\[...\]`,
  *  which Material recommends as a MathJax-friendly alternative to `$`/`$$`.
- *  remark-math (Starlight's math pipeline) does NOT recognize these by
+ *  remark-math, when explicitly installed, does NOT recognize these by
  *  default. The negative lookbehind avoids false-positives on a literal
  *  backslash-escaped `\\(` or `\\[`. */
 const BACKSLASH_PAREN_RE = /(?<!\\)\\\(/;
@@ -122,7 +122,7 @@ export function scanCodeBlockOptOuts(
  * Scan source files for Material's alternate LaTeX delimiters `\(...\)`
  * (inline) and `\[...\]` (block). Material's docs recommend these as a
  * MathJax-friendly alternative to `$`/`$$`, but remark-math (the math
- * pipeline auto-wired into emitted Starlight projects) does not recognize
+ * pipeline, when explicitly installed) does not recognize
  * them by default.
  *
  * One diagnostic per file even if the file uses both forms — the message
@@ -145,7 +145,7 @@ export function scanLatexDelimiters(
         severity: 'warning',
         ruleId: 'latex-delimiter-unsupported',
         source: 'detect-features/scan-bulk-diagnostics',
-        message: `LaTeX delimiter (${markers}) found in "${sourcePath}". remark-math (the Starlight-default math pipeline) only recognizes $...$ and $$...$$. The marker will pass through verbatim and render as a literal backslash. Either rewrite to dollar delimiters in source, or configure a custom remark plugin in astro.config.mjs to recognize backslash delimiters (e.g., a Pandoc-flavored math plugin).`,
+        message: `LaTeX delimiter (${markers}) found in "${sourcePath}". If remark-math is explicitly installed, it only recognizes $...$ and $$...$$ by default. Rewrite to dollar delimiters or configure a processor that recognizes backslash delimiters.`,
       }),
     });
   }
@@ -177,7 +177,7 @@ export function scanMathScripts(
         severity: 'info',
         ruleId: 'math-runtime-script-superseded',
         source: 'detect-features/scan-bulk-diagnostics',
-        message: `extra_javascript entry "${path}" looks like a ${which} runtime configuration. Astro renders math at build time via remark-math + rehype-katex (auto-wired when pymdownx.arithmatex is detected), so this script is now redundant and may conflict with the rehype output. Remove the entry from astro.config.mjs head[] after confirming math still renders.`,
+        message: `extra_javascript entry "${path}" looks like a ${which} runtime configuration. Math rendering is not installed automatically. Keep this runtime, or explicitly configure remark-math + rehype-katex and then remove the script after verifying output.`,
       }),
     });
   }

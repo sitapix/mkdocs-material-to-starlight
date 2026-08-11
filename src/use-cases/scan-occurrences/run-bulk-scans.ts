@@ -105,7 +105,7 @@ export async function runBulkScans(
   for (const d of scanCodeBlockOptOuts(sourceEntries)) out.push(d);
 
   // Scan for Material's alternate LaTeX delimiters `\(...\)` / `\[...\]`.
-  // remark-math (the auto-wired math pipeline) only recognizes $/$$, so
+  // remark-math, if the user explicitly installs it, only recognizes $/$$, so
   // these would silently render as literal backslashes.
   for (const d of scanLatexDelimiters(sourceEntries)) out.push(d);
 

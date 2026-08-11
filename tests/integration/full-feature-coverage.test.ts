@@ -109,33 +109,24 @@ describe('full feature coverage end-to-end', () => {
     expect(indexOut).toContain('```mermaid');
     expect(indexOut).toContain('graph LR');
 
-    // Recommended-dep loop fired for source-driven features
+    // Third-party renderers are recommendation-only.
     const packageJson = JSON.parse(readFileSync(join(outputDir, 'package.json'), 'utf8'));
-    expect(packageJson.dependencies).toHaveProperty('remark-math');
-    expect(packageJson.dependencies).toHaveProperty('rehype-katex');
-    expect(packageJson.dependencies).toHaveProperty('astro-mermaid');
+    expect(packageJson.dependencies).not.toHaveProperty('remark-math');
+    expect(packageJson.dependencies).not.toHaveProperty('rehype-katex');
+    expect(packageJson.dependencies).not.toHaveProperty('astro-mermaid');
+    expect(packageJson.dependencies).not.toHaveProperty('starlight-image-zoom');
+    expect(packageJson.dependencies).not.toHaveProperty('starlight-versions');
+    expect(packageJson.dependencies).not.toHaveProperty('starlight-auto-drafts');
 
-    // Recommended-dep loop fired for plugin-driven features
-    expect(packageJson.dependencies).toHaveProperty('starlight-image-zoom');
-    expect(packageJson.dependencies).toHaveProperty('starlight-versions');
-    expect(packageJson.dependencies).toHaveProperty('starlight-auto-drafts');
-
-    // astro.config.mjs imports and wires every detected plugin
     const astroConfig = readFileSync(join(outputDir, 'astro.config.mjs'), 'utf8');
-    expect(astroConfig).toContain(`import remarkMath from 'remark-math';`);
-    expect(astroConfig).toContain(`import rehypeKatex from 'rehype-katex';`);
-    expect(astroConfig).toContain(`import mermaid from 'astro-mermaid';`);
-    expect(astroConfig).toContain(`import imageZoom from 'starlight-image-zoom';`);
-    expect(astroConfig).toContain(`import starlightVersions from 'starlight-versions';`);
-    expect(astroConfig).toContain(`import starlightAutoDrafts from 'starlight-auto-drafts';`);
-    expect(astroConfig).toContain('mermaid()');
-    expect(astroConfig).toContain('imageZoom()');
-    expect(astroConfig).toContain('remarkMath');
-    expect(astroConfig).toContain('rehypeKatex');
-    expect(astroConfig).toContain('starlightVersions(');
-    expect(astroConfig).toContain('starlightAutoDrafts()');
+    expect(astroConfig).not.toContain('remark-math');
+    expect(astroConfig).not.toContain('rehype-katex');
+    expect(astroConfig).not.toContain('astro-mermaid');
+    expect(astroConfig).not.toContain('starlight-image-zoom');
+    expect(astroConfig).not.toContain('starlight-versions');
+    expect(astroConfig).not.toContain('starlight-auto-drafts');
 
-    // MkDocs 1.6 draft_docs → Starlight draft frontmatter + auto-drafts.
+    // MkDocs 1.6 draft_docs still maps to Starlight draft frontmatter.
     const draftOut = readFileSync(
       join(outputDir, 'src', 'content', 'docs', 'drafts', 'preview.md'),
       'utf8',

@@ -30,6 +30,12 @@ export interface GroupEntry {
   readonly label: string;
   readonly items: ReadonlyArray<SidebarEntry>;
   readonly collapsed?: boolean;
+  /**
+   * Internal identity for groups synthesized from the docs directory tree.
+   * Used to apply the matching `.pages` file without guessing from a child
+   * slug. The sidebar serializer intentionally does not emit this field.
+   */
+  readonly directory?: string;
 }
 
 export interface AutoEntry {

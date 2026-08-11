@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { convertSiteFromDisk } from '../../src/interface/api/convert-site.js';
 
-describe('PackageManagers tab promotion (integration)', () => {
+describe('package-manager tabs (integration)', () => {
   let projectDir: string;
   let outputDir: string;
 
@@ -56,38 +56,32 @@ describe('PackageManagers tab promotion (integration)', () => {
     rmSync(outputDir, { recursive: true, force: true });
   });
 
-  it('promotes npm/yarn/pnpm/bun tab group to <PackageManagers> MDX component', async () => {
+  it('keeps npm/yarn/pnpm/bun commands as native Starlight tabs', async () => {
     const result = await convertSiteFromDisk({ projectDir, outputDir, force: true });
     expect(result.ok).toBe(true);
     if (!result.ok) return;
 
-    // Output file should be .mdx (promoted due to MDX component usage).
+    // Native Starlight tabs still require MDX, but no community import.
     const outPath = join(outputDir, 'src', 'content', 'docs', 'install.mdx');
     const content = readFileSync(outPath, 'utf8');
 
     // 1. The file is .mdx.
     expect(content).toBeTruthy();
 
-    // 2. Contains the PackageManagers import.
-    expect(content).toContain("import { PackageManagers } from 'starlight-package-managers'");
+    expect(content).not.toContain('starlight-package-managers');
+    expect(content).toContain('<Tabs');
+    expect(content).toContain('<TabItem label="npm">');
+    expect(content).toContain('npm install my-cool-lib');
 
-    // 3. Contains the component with the extracted pkg name.
-    expect(content).toContain('<PackageManagers pkg="my-cool-lib"');
-
-    // 4. Does NOT contain plain <Tabs> or <TabItem> for these tabs.
-    expect(content).not.toContain('<Tabs');
-    expect(content).not.toContain('<TabItem');
-
-    // 5. A package-managers-tabs-promoted diagnostic was emitted.
     const pmDiag = result.value.diagnostics.find(
-      (d) => d.diagnostic.ruleId === 'package-managers-tabs-promoted',
+      (d) => d.diagnostic.ruleId === 'package-managers-tabs-recommended',
     );
     expect(pmDiag).toBeTruthy();
     expect(pmDiag?.diagnostic.severity).toBe('info');
     expect(pmDiag?.sourcePath).toBe('install.md');
   });
 
-  it('includes starlight-package-managers in the generated package.json', async () => {
+  it('does not install starlight-package-managers', async () => {
     const result = await convertSiteFromDisk({ projectDir, outputDir, force: true });
     expect(result.ok).toBe(true);
     if (!result.ok) return;
@@ -95,6 +89,6 @@ describe('PackageManagers tab promotion (integration)', () => {
     const pkg = JSON.parse(readFileSync(join(outputDir, 'package.json'), 'utf8')) as {
       dependencies: Record<string, string>;
     };
-    expect(pkg.dependencies['starlight-package-managers']).toBeTruthy();
+    expect(pkg.dependencies['starlight-package-managers']).toBeUndefined();
   });
 });

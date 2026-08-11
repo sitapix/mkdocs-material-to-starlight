@@ -177,6 +177,7 @@ export function assembleConfigOutputs(
     siteName: input.siteName,
     siteDescription: input.siteDescription,
     detectedFeatures: input.detectedFeatures,
+    enableLinksValidator: input.enableLinksValidator,
     extraDependencies: fontDependencies,
     ...(input.packageName !== undefined ? { packageName: input.packageName } : {}),
   });

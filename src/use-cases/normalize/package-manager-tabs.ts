@@ -29,6 +29,11 @@ export interface NormalizePackageManagerTabsResult {
   readonly promoted: boolean;
 }
 
+export interface NormalizePackageManagerTabsOptions {
+  /** Emit the third-party component. Defaults to true for explicit callers. */
+  readonly promote?: boolean;
+}
+
 const SOURCE = 'normalize/package-manager-tabs';
 
 /**
@@ -47,6 +52,7 @@ const SOURCE = 'normalize/package-manager-tabs';
 export function normalizePackageManagerTabs(
   source: string,
   sourcePath: string,
+  options: NormalizePackageManagerTabsOptions = {},
 ): NormalizePackageManagerTabsResult {
   const diagnostics: Diagnostic[] = [];
   let promoted = false;
@@ -68,7 +74,12 @@ export function normalizePackageManagerTabs(
         continue;
       }
 
-      const pmResult = tryPromotePackageManagerBlock(block.tabs, sourcePath, diagnostics);
+      const pmResult = tryPromotePackageManagerBlock(
+        block.tabs,
+        sourcePath,
+        diagnostics,
+        options.promote !== false,
+      );
       if (pmResult !== null) {
         output.push(...pmResult);
         promoted = true;
@@ -176,6 +187,7 @@ function tryPromotePackageManagerBlock(
   tabs: ReadonlyArray<TabEntry>,
   sourcePath: string,
   diagnostics: Diagnostic[],
+  promote: boolean,
 ): ReadonlyArray<string> | null {
   if (tabs.length < 2) return null;
 
@@ -197,6 +209,18 @@ function tryPromotePackageManagerBlock(
         ruleId: 'package-managers-tabs-fallback',
         source: SOURCE,
         message: `Package-manager tab group detected in "${sourcePath}" but the package name could not be extracted from the install command. Falling back to plain <Tabs>. Manually replace with <PackageManagers pkg="your-package"> from starlight-package-managers.`,
+      }),
+    );
+    return null;
+  }
+
+  if (!promote) {
+    diagnostics.push(
+      createDiagnostic({
+        severity: 'info',
+        ruleId: 'package-managers-tabs-recommended',
+        source: SOURCE,
+        message: `Package-manager tabs detected in "${sourcePath}". Kept as native Starlight tabs; install starlight-package-managers explicitly if its compact selector is preferred.`,
       }),
     );
     return null;

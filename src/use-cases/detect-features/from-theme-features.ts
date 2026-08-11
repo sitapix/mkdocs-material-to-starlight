@@ -4,8 +4,9 @@
  *
  * Some Material `theme.features` entries have first-class Starlight community
  * plugins as equivalents (the original 2026-05-03 audit missed several of
- * these). This detector returns the corresponding `DetectedFeature` values so
- * the package.json + astro.config scaffolders auto-install and wire them.
+ * these). This detector returns the corresponding `DetectedFeature` values for
+ * migration guidance. Community plugins are not installed unless explicitly
+ * enabled by the caller.
  *
  *   announce.dismiss     → starlight-announcement (dismissible banners)
  *   content.action.view  → starlight-page-actions (View source button)

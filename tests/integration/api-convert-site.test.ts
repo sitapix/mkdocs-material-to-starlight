@@ -78,8 +78,16 @@ describe('interface/api/convertSiteFromDisk', () => {
     expect(result.value.sidebarSource).toContain(`label: 'API'`);
   });
 
-  it('synthesizes capitalized sidebar topics when navigation.tabs has no nav', async () => {
+  it('synthesizes a capitalized flat sidebar without auto-installing topics', async () => {
     mkdirSync(join(projectDir, 'docs', 'runtime-systems', 'nodejs'), { recursive: true });
+    writeFileSync(
+      join(projectDir, 'docs', 'runtime-systems', '.pages'),
+      'title: Execution Environments\n',
+    );
+    writeFileSync(
+      join(projectDir, 'docs', 'runtime-systems', 'nodejs', 'index.md'),
+      '---\ntitle: Node.js Overview\n---\n',
+    );
     writeFileSync(
       join(projectDir, 'docs', 'runtime-systems', 'nodejs', 'event-loop.md'),
       '---\ntitle: Event Loop\n---\n',
@@ -102,10 +110,24 @@ describe('interface/api/convertSiteFromDisk', () => {
     if (!result.ok) return;
 
     const astroConfig = readFileSync(join(outputDir, 'astro.config.mjs'), 'utf8');
-    expect(astroConfig).toContain('starlightSidebarTopics');
+    expect(astroConfig).not.toContain('starlightSidebarTopics');
+    expect(astroConfig).not.toContain('starlight-sidebar-topics');
     expect(astroConfig).not.toContain('sidebar: []');
-    expect(astroConfig).toContain("label: 'Runtime Systems'");
+    expect(astroConfig).toContain("label: 'Execution Environments'");
     expect(astroConfig).toContain("label: 'Node.js'");
+    expect(astroConfig.match(/label: 'Execution Environments'/g)).toHaveLength(1);
+
+    const optedInOutput = join(outputDir, 'with-topics');
+    const optedIn = await convertSiteFromDisk({
+      projectDir,
+      outputDir: optedInOutput,
+      sidebarTopics: true,
+    });
+    expect(optedIn.ok).toBe(true);
+    const optedInConfig = readFileSync(join(optedInOutput, 'astro.config.mjs'), 'utf8');
+    expect(optedInConfig).toContain('starlightSidebarTopics');
+    const optedInPackage = JSON.parse(readFileSync(join(optedInOutput, 'package.json'), 'utf8'));
+    expect(optedInPackage.dependencies).toHaveProperty('starlight-sidebar-topics', '^0.8.0');
   });
 
   it('emits a narrow pnpm build policy when pnpm is selected', async () => {
@@ -581,7 +603,7 @@ describe('interface/api/convertSiteFromDisk', () => {
     expect(notes).toContain('plugin-multirepo-no-equivalent');
   });
 
-  it('translates draft_docs patterns to draft frontmatter and auto-drafts config', async () => {
+  it('translates draft_docs frontmatter without auto-installing auto-drafts', async () => {
     mkdirSync(join(projectDir, 'docs', 'drafts'), { recursive: true });
     writeFileSync(join(projectDir, 'docs', 'index.md'), '# Home\n');
     writeFileSync(join(projectDir, 'docs', 'drafts', 'preview.md'), '# Preview\n');
@@ -610,9 +632,8 @@ describe('interface/api/convertSiteFromDisk', () => {
     const notes = readFileSync(join(outputDir, 'MIGRATION_NOTES.md'), 'utf8');
 
     expect(draft).toContain('draft: true');
-    expect(astroConfig).toContain("import starlightAutoDrafts from 'starlight-auto-drafts';");
-    expect(astroConfig).toContain('starlightAutoDrafts()');
-    expect(pkg.dependencies).toHaveProperty('starlight-auto-drafts', '^0.3.0');
+    expect(astroConfig).not.toContain('starlight-auto-drafts');
+    expect(pkg.dependencies).not.toHaveProperty('starlight-auto-drafts');
     expect(notes).toContain('draft-docs-applied');
   });
 
@@ -647,7 +668,33 @@ describe('interface/api/convertSiteFromDisk', () => {
     expect(pkg.dependencies['@astrojs/rss']).toBeDefined();
   });
 
-  it('scaffolds an OG-card endpoint and installs astro-og-canvas when the social plugin is enabled', async () => {
+  it('preserves Astro base config without auto-installing a base-path plugin', async () => {
+    writeFileSync(
+      join(projectDir, 'mkdocs.yml'),
+      [
+        'site_name: Subpath Docs',
+        'site_url: https://docs.example.com/toolkit/',
+        'docs_dir: docs',
+        'nav:',
+        '  - Home: index.md',
+        '',
+      ].join('\n'),
+    );
+
+    const result = await convertSiteFromDisk({ projectDir, outputDir });
+    expect(result.ok).toBe(true);
+    const config = readFileSync(join(outputDir, 'astro.config.mjs'), 'utf8');
+    const pkg = JSON.parse(readFileSync(join(outputDir, 'package.json'), 'utf8'));
+    const notes = readFileSync(join(outputDir, 'MIGRATION_NOTES.md'), 'utf8');
+
+    expect(config).toContain("site: 'https://docs.example.com'");
+    expect(config).toContain("base: '/toolkit'");
+    expect(config).not.toContain('starlight-base-path');
+    expect(pkg.dependencies).not.toHaveProperty('starlight-base-path');
+    expect(notes).toContain('base-path-plugin-not-installed');
+  });
+
+  it('recommends OG-card migration without installing astro-og-canvas', async () => {
     writeFileSync(join(projectDir, 'docs', 'index.md'), '# Home\n');
     writeFileSync(
       join(projectDir, 'mkdocs.yml'),
@@ -663,16 +710,12 @@ describe('interface/api/convertSiteFromDisk', () => {
     );
     const result = await convertSiteFromDisk({ projectDir, outputDir });
     expect(result.ok).toBe(true);
-    // Endpoint stub scaffolded at the canonical Astro file route.
     const ogPath = join(outputDir, 'src', 'pages', 'og', '[...slug].png.ts');
-    expect(existsSync(ogPath)).toBe(true);
-    const ogSource = readFileSync(ogPath, 'utf8');
-    expect(ogSource).toContain("import { OGImageRoute } from 'astro-og-canvas'");
-    expect(ogSource).toContain("await getCollection('docs')");
-    expect(ogSource).toContain("'My Docs'");
-    // Dependency added.
+    expect(existsSync(ogPath)).toBe(false);
     const pkg = JSON.parse(readFileSync(join(outputDir, 'package.json'), 'utf8'));
-    expect(pkg.dependencies['astro-og-canvas']).toBeDefined();
+    expect(pkg.dependencies['astro-og-canvas']).toBeUndefined();
+    const notes = readFileSync(join(outputDir, 'MIGRATION_NOTES.md'), 'utf8');
+    expect(notes).toContain('plugin-social-mapped');
   });
 
   it('does not scaffold an OG-card endpoint when the social plugin is absent', async () => {
@@ -1168,6 +1211,8 @@ describe('interface/api/convertSiteFromDisk', () => {
     expect(result.ok).toBe(true);
     const cfg = readFileSync(join(outputDir, 'astro.config.mjs'), 'utf8');
     expect(cfg).not.toContain('starlight-links-validator');
+    const pkg = JSON.parse(readFileSync(join(outputDir, 'package.json'), 'utf8'));
+    expect(pkg.dependencies).not.toHaveProperty('starlight-links-validator');
   });
 
   it('registers starlight-links-validator with safe excludes when opted in', async () => {
@@ -1179,7 +1224,9 @@ describe('interface/api/convertSiteFromDisk', () => {
     });
     expect(result.ok).toBe(true);
     const cfg = readFileSync(join(outputDir, 'astro.config.mjs'), 'utf8');
+    const pkg = JSON.parse(readFileSync(join(outputDir, 'package.json'), 'utf8'));
     expect(cfg).toContain('starlightLinksValidator({');
+    expect(pkg.dependencies).toHaveProperty('starlight-links-validator', '^0.25.2');
     // Safe excludes for common non-content paths so the build does not
     // fail on `[License](/LICENSE)`-style links to repository-root files.
     expect(cfg).toContain("'/LICENSE'");

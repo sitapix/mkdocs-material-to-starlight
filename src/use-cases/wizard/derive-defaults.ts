@@ -5,9 +5,8 @@
  * `process.env.npm_config_user_agent` explicitly so this function is trivially
  * testable.
  *
- * The defaults intentionally reproduce the converter's *current* behavior
- * (links validator on, palette translate, tabs MDX-when-detected, etc.) so
- * `--yes` on a fresh install equals "what we shipped before this wizard."
+ * Defaults favor built-in Astro/Starlight behavior. Community integrations
+ * stay off until the user explicitly enables one in the TUI or with a flag.
  */
 
 import { join } from 'node:path';
@@ -25,7 +24,7 @@ export function deriveDefaults(_config: MkdocsConfig, ctx: DeriveDefaultsContext
     packageManager: ctx.repositoryPackageManager ?? guessPackageManager(ctx.userAgent),
     check: true,
     tabs: 'mdx',
-    sidebarTopics: true,
+    sidebarTopics: false,
     rss: true,
     mikeVersions: [],
     palette: 'translate',
@@ -34,7 +33,7 @@ export function deriveDefaults(_config: MkdocsConfig, ctx: DeriveDefaultsContext
     snippetBasePaths: [],
     snippetMaxDepth: 8,
     snippetDedentSubsections: false,
-    linksValidator: true,
+    linksValidator: false,
     expressiveCodeTheme: null,
     cards: 'html',
     mdxMode: 'auto',

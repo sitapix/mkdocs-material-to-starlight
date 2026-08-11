@@ -24,10 +24,10 @@ export async function runTier2(
   );
 
   const linksValidator = await prompter.confirm({
-    message: 'Run starlight-links-validator on every build?',
+    message: 'Install optional starlight-links-validator?',
     initialValue: defaults.linksValidator,
-    active: 'Yes (catches broken links; slower)',
-    inactive: 'No (faster builds)',
+    active: 'Yes (check links on every build; slower)',
+    inactive: 'No (standard Starlight build)',
   });
   if (linksValidator === null) return err(WIZARD_CANCELLED);
 

@@ -53,6 +53,7 @@ describe('serializeSidebar', () => {
       {
         kind: 'group',
         label: 'Guide',
+        directory: 'guide',
         items: [{ kind: 'slug', slug: 'guide/intro' }],
       },
     ];
@@ -60,6 +61,7 @@ describe('serializeSidebar', () => {
     expect(out).toContain(`label: 'Guide'`);
     expect(out).toContain(`items: [`);
     expect(out).toContain(`'guide/intro'`);
+    expect(out).not.toContain(`directory: 'guide'`);
   });
 
   it('serializes an autogenerate group with directory using the iterable-items shape', () => {

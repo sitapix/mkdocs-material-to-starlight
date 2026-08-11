@@ -17,7 +17,7 @@ The converter reads `mkdocs.yml` and writes a buildable Starlight project with c
 npx mkdocs-material-to-starlight
 ```
 
-The wizard reads `mkdocs.yml`, asks about site-specific choices, and writes to `./starlight-out`. Requires Node 20.19+.
+The wizard reads `mkdocs.yml`, asks about site-specific choices, and writes to `./starlight-out`. Requires Node 22.12+.
 
 ```bash
 cd ./starlight-out
@@ -27,6 +27,8 @@ npm run dev
 
 > Preview the plan without writing files:
 > `npx mkdocs-material-to-starlight ./my-mkdocs --explain`
+
+Generated projects use Astro and Starlight without silently installing community plugins. The TUI offers `starlight-sidebar-topics` when it detects navigation tabs and `starlight-links-validator` under advanced options; both default to No. Other integrations, including whole-page Copy Markdown, are recommendation-only in `MIGRATION_NOTES.md`. CLI users can opt in with `--sidebar-topics` or `--links-validator`.
 
 ---
 
@@ -49,8 +51,8 @@ npm run dev
 | `++ctrl+alt+del++` keyboard keys | `<kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>Del</kbd>` |
 | `[link](api/auth.md)` internal refs | Rewritten to Starlight slugs (`[link](/api/auth)`) |
 | Footnotes (`[^1]`) | GFM footnotes via remark-gfm |
-| Math (`$inline$`, `$$block$$`) | remark-math plus rehype-katex (deps included) |
-| ` ```mermaid ` blocks | astro-mermaid (dep included) |
+| Math (`$inline$`, `$$block$$`) | Preserved; migration notes recommend an optional math pipeline |
+| ` ```mermaid ` blocks | Preserved; migration notes recommend an optional Mermaid integration |
 | MagicLink autolinks (`@user`, `#123`) | Markdown links pointing at GitHub from `repo_url` |
 | Definition lists, abbreviations, buttons, CriticMarkup, code annotations | Normalized to standard Markdown or styled HTML |
 
@@ -64,11 +66,11 @@ npm run dev
 | `nav:` tree | `sidebar` config in `astro.config.mjs` |
 | No `nav:` tree | Complete sidebar synthesized from the docs directory tree, with software-aware group casing |
 | `site_name`, `site_description`, `site_url` | `title`, `description` on the integration; `site` on Astro config |
-| `site_url` with a subpath (GitHub Pages project sites) | Astro `base:` plus `starlight-base-path` so content links resolve on subpath deploys |
-| `theme.features: navigation.tabs` | `starlight-sidebar-topics`; top-level nav sections become topics with per-topic sidebars (`--no-sidebar-topics` opts out) |
-| `theme.features: navigation.top` | `starlight-scroll-to-top` |
-| `theme.features: announce.dismiss` / `content.action.view` | `starlight-announcement` / `starlight-page-actions` |
-| `draft_docs` | Matching files receive `draft: true`; `starlight-auto-drafts` keeps them in dev and removes production sidebar links |
+| `site_url` with a subpath (GitHub Pages project sites) | Astro `base:`; migration notes flag content links needing review |
+| `theme.features: navigation.tabs` | Standard grouped sidebar; `--sidebar-topics` explicitly opts into the community plugin |
+| `theme.features: navigation.top` | Migration note recommending the optional scroll-to-top plugin |
+| `theme.features: announce.dismiss` / `content.action.view` | Migration notes recommending optional plugins |
+| `draft_docs` | Matching files receive `draft: true`; production filtering remains an explicit plugin choice |
 | Missing frontmatter `title` | Synthesized from first H1 or a software-aware humanized filename (Starlight requires it) |
 | Missing 404 page | Minimal styled `404.md` scaffolded (skipped when the source converts its own) |
 
@@ -85,14 +87,14 @@ npm run dev
 | `mkdocs-literate-nav` | `SUMMARY.md` parsed and used as the nav source |
 | `mkdocs-include-markdown-plugin` | `{% include %}` resolved inline before conversion |
 | `mkdocs-rss-plugin` | `@astrojs/rss` dep plus `src/pages/rss.xml.ts` scaffold |
-| `mkdocs-glightbox` | `starlight-image-zoom` dep |
-| `mike` (versioned docs) | `starlight-versions` dep |
+| `mkdocs-glightbox` | Recommends optional `starlight-image-zoom` |
+| `mike` (versioned docs) | Recommends optional `starlight-versions` |
 | `mkdocs-git-revision-date-localized` | Built-in `lastUpdated: true` |
-| `blog`, `tags` (Material) | `starlight-blog`, `starlight-tags` deps |
-| `social` (Material, per-page OG cards) | `astro-og-canvas` dep plus a `src/pages/og/[...slug].png.ts` endpoint |
-| `mkdocs-d2-plugin` | `astro-d2` dep (the `d2` CLI must be on PATH at build time) |
-| Giscus comments (`overrides/partials/comments.html`) | `starlight-giscus` with the repo/category IDs parsed from the partial; unparseable configs stay a diagnostic |
-| `mkdocs-swagger-ui-tag` | `starlight-openapi` dep |
+| `blog`, `tags` (Material) | Recommends optional `starlight-blog` and `starlight-tags` |
+| `social` (Material, per-page OG cards) | Recommends an explicitly selected OG-image integration |
+| `mkdocs-d2-plugin` | Recommends an optional D2 integration |
+| Giscus comments (`overrides/partials/comments.html`) | Records parsed repo/category IDs and recommends explicit integration |
+| `mkdocs-swagger-ui-tag` | Recommends optional `starlight-openapi` |
 | `mkdocs-macros-plugin` (Jinja2) | Diagnostic at each occurrence with a file and line locator |
 | `mkdocs-puml` / `plantuml-markdown` | Diagnostic: `astro-plantuml` still peers astro@^5 and won't resolve against the Astro 7 stack |
 | Interactive `pymdownx.superfences.custom_fences` | Diagnostic recommending `astro-live-code` and a renderable language fence with the `live` metadata flag |

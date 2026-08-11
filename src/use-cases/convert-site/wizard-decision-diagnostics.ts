@@ -124,7 +124,7 @@ export function buildDeferredWizardDiagnostics(
   }
   if (input.sidebarTopics === false) {
     add(
-      `Configured: sidebarTopics: false requested. The starlight-sidebar-topics auto-install path is not implemented in this build; sidebar remains flat. (Tracked for v2.)`,
+      'Configured: sidebarTopics: false requested. The generated site keeps the standard flat Starlight sidebar and does not install the community topics plugin.',
     );
   }
   return out;

@@ -215,9 +215,7 @@ describe('runWizard — additional Tier 1 prompts', () => {
     });
     expect(result.ok).toBe(true);
     if (result.ok) expect(result.value.sidebarTopics).toBe(true);
-    expect(prompter.calls.some((c) => c.message.toLowerCase().includes('split sidebar'))).toBe(
-      true,
-    );
+    expect(prompter.calls.some((c) => c.message.includes('starlight-sidebar-topics'))).toBe(true);
   });
 
   it('asks rss confirmation when rss plugin is present', async () => {
